@@ -8,14 +8,14 @@ Northstar Workspace is the fictional company used in all seeds, documents, dashb
 
 Northstar Workspace sells collaborative workflow software to mid-market and enterprise customers in Europe and North America.
 
-| Attribute          | Contract                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| Revenue model      | B2B SaaS subscriptions, billed monthly or annually                                    |
-| Currency           | EUR is the reporting currency; source currencies are out of scope for the first slice |
-| Plans              | Starter, Growth, Enterprise                                                           |
-| Customer lifecycle | Prospect → customer → active / cancelled                                              |
-| Reporting calendar | Gregorian calendar; reporting month ends at 23:59:59 UTC on its last day              |
-| Analysis horizon   | Synthetic data starts in January 2025; evaluations state an explicit period           |
+| Attribute          | Contract                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| Revenue model      | B2B SaaS subscriptions, billed monthly or annually                                        |
+| Currency           | EUR is the reporting currency; source currencies are out of scope for the initial release |
+| Plans              | Starter, Growth, Enterprise                                                               |
+| Customer lifecycle | Prospect → customer → active / cancelled                                                  |
+| Reporting calendar | Gregorian calendar; reporting month ends at 23:59:59 UTC on its last day                  |
+| Analysis horizon   | Synthetic data starts in January 2025; evaluations state an explicit period               |
 
 ## Customer segmentation
 
@@ -32,7 +32,7 @@ Northstar Workspace sells collaborative workflow software to mid-market and ente
 
 ## Source domains
 
-| Domain    | System of record        | Core entities                        | First-slice role                |
+| Domain    | System of record        | Core entities                        | Initial capability role         |
 | --------- | ----------------------- | ------------------------------------ | ------------------------------- |
 | Billing   | billing platform        | subscriptions, invoices, payments    | Recurring-revenue facts         |
 | CRM       | sales platform          | accounts, opportunities, owners      | Pipeline and loss context       |
@@ -67,7 +67,7 @@ The first capabilities should answer these questions from evidence, not a fabric
 4. What support, CRM, or incident evidence is relevant to those customers or dates?
 5. Is the company on track against a stated MRR target?
 
-## Non-goals for the semantic-foundation slice
+## Non-goals for the semantic foundation
 
 - Real customer data, credentials, or external integrations.
 - Multi-currency accounting and revenue-recognition schedules.

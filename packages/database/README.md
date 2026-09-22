@@ -1,6 +1,6 @@
 # Database package
 
-The first analytics path is intentionally SQL-first and runs in local PostgreSQL. Docker initialization SQL lives in `infra/postgres/init` because it owns the local service lifecycle; this package will contain the typed application database client once the API slice starts.
+The initial analytics path is intentionally SQL-first and runs in local PostgreSQL. Docker initialization SQL lives in `infra/postgres/init` because it owns the local service lifecycle; this package will contain the typed application database client when the API capability begins.
 
 ## Start locally
 

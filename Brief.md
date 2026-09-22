@@ -83,19 +83,21 @@ Evidence should include source type, source identifier, query or document refere
 
 Each meaningful capability needs cases for correctness, ambiguity, safety, groundedness, permissions, and failure behavior. Track answer quality separately from latency and cost.
 
-## Delivery sequence
+## Capability roadmap
 
-Build in small vertical slices:
+Deliver each capability as a complete, merge-ready system outcome. The roadmap
+orders dependencies; it does not require teams to manually split work into
+artificial delivery slices. Prefer repeatable automation, typed boundaries, and
+evaluation over process overhead.
 
-1. Define only the metric, evidence, and safety rules needed for the first
-   executable slice.
-2. Create deterministic synthetic data and an analytics path.
-3. Implement one trusted metric end to end with tests and an evaluation.
-4. Add breakdowns, comparisons, and chart-ready results.
-5. Add company-knowledge ingestion and hybrid evidence.
-6. Add investigation planning and follow-up context.
-7. Add safe exploratory SQL, permissions, observability, and review workflows.
-8. Add the executive web experience and deployment when the core path is reliable.
+1. Establish metric, evidence, and safety contracts with deterministic
+   synthetic analytics data.
+2. Provide trusted MRR analysis, including comparisons, movements, breakdowns,
+   and chart-ready results.
+3. Provide company-knowledge retrieval and hybrid evidence.
+4. Provide investigation planning and follow-up context.
+5. Provide safe exploratory SQL, permissions, observability, and review workflows.
+6. Provide the executive web experience and deployment once the core path is reliable.
 
 ## Success criteria
 

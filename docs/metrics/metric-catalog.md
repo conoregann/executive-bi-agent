@@ -6,7 +6,7 @@
 - Calendar reporting is UTC. A `month` is the first UTC day of the reporting month.
 - A metric query always specifies a closed period, optional filters, and an explicit comparison when a change is requested.
 - Dimensions are taken from the customer record as it existed at the start of the reporting period unless the metric says otherwise.
-- All first-slice metrics are calculated from `analytics.subscription_month` or a documented derivative. Raw tables are not a public metric interface.
+- All initial-release metrics are calculated from `analytics.subscription_month` or a documented derivative. Raw tables are not a public metric interface.
 
 ## Source model contract
 
