@@ -13,13 +13,12 @@ knowledge retrieval, and evidence-backed investigations.
 - `docs/` — discovery, architecture, metric definitions, and deliverables.
 - `infra/` — infrastructure definitions when deployment needs justify them.
 
-Build in outcome-sized, end-to-end increments. Keep one branch open for the
-full capability across related changes, sessions, tests, and fixes; use regular
-reviewable commits as checkpoints. Create a new branch only for a separate
-outcome or intentionally isolated work, not for each prompt or small slice.
-Keep contracts concise and update them only when a durable boundary, metric
-definition, safety rule, or acceptance criterion changes. See
-[AGENTS.md](AGENTS.md) for the delivery standard.
+Deliver complete, end-to-end capabilities. Keep one branch open for the full
+capability across changes, sessions, tests, and fixes. Automate repeatable
+checks and integration so engineering quality is systematic rather than a
+manual coordination burden. Keep contracts concise and update them only when a
+durable boundary, metric definition, safety rule, or acceptance criterion
+changes. See [AGENTS.md](AGENTS.md) for the delivery standard.
 
 ## Local development
 
@@ -42,9 +41,10 @@ The repository uses pnpm exclusively. Do not commit `package-lock.json`.
 
 ## Development approach
 
-Use outcome-sized branches from `main` for meaningful capabilities. Keep the
-branch open until the capability is complete and ready for review or merge,
-including follow-up fixes and documentation. Implement related increments with
-focused tests and useful, independently reviewable Conventional Commits; do
-not create a new branch for every prompt, session, commit, or small slice. Use
-`feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>` branch names.
+Use capability-sized branches from `main`. Keep the branch open until the
+capability is complete and ready for review or merge, including follow-up fixes
+and documentation. Build the complete path with focused tests, evaluations,
+and automated checks; use Conventional Commits as useful review and recovery
+points. Start another branch only for independently reviewable or releasable
+work. Use `feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>`
+branch names.

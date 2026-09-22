@@ -8,11 +8,12 @@ request leaves a material architectural choice open.
 
 Deliver a secure, testable, outcome-sized body of work. Prefer direct
 implementation, simplification, and deletion over speculative layers,
-scaffolding, or prose. Keep one branch open for the full coherent outcome,
-even when that outcome takes several related increments or sessions. Use
-commits to create reviewable checkpoints; do not create a new branch merely
-because a subtask, prompt, or intermediate slice is complete. Do not add
-unrelated work, refactor broadly, or introduce dependencies without a
+scaffolding, or prose. Treat a capability as the unit of delivery: carry its
+contracts, implementation, failure handling, tests, and evaluation through to
+a merge-ready outcome. Automate routine validation and integration wherever
+practical so quality does not depend on manually coordinating artificial work
+chunks. Use commits for recovery and review, not as a delivery model. Do not
+add unrelated work, refactor broadly, or introduce dependencies without a
 concrete need.
 
 Documentation is a tool, not a gate. Update it only when a durable public
@@ -38,7 +39,7 @@ an otherwise clear implementation.
   rule changes. Add an evaluation when user-facing investigation behavior
   changes.
 - Do not introduce infrastructure, providers, vector stores, or model
-  dependencies until a completed slice requires them.
+  dependencies until a completed capability requires them.
 
 ## Layout boundaries
 
@@ -49,22 +50,20 @@ an otherwise clear implementation.
 | `data/`     | Synthetic source data and seeds only.                                         |
 | `evals/`    | Repeatable acceptance cases for user-facing or safety-critical behavior.      |
 | `docs/`     | Concise canonical contracts and decisions; no duplicate implementation notes. |
-| `infra/`    | Infrastructure only when a shipped slice needs it.                            |
+| `infra/`    | Infrastructure only when a shipped capability needs it.                       |
 
 ## Delivery loop
 
 1. Identify the requested outcome and the narrowest governing contract.
 2. Update that contract only if the requested change alters it.
-3. Implement coherent increments toward the outcome, including relevant
-   failure paths. Commit stable milestones with Conventional Commits when
-   they improve reviewability or recovery; a milestone commit does not require
-   a new branch.
+3. Complete the capability coherently, including relevant failure paths,
+   targeted tests, and required evaluations. Prefer automated checks and
+   repeatable workflows over manual coordination.
 4. Run targeted checks while iterating, then `pnpm format:check`, `pnpm check`,
    and `pnpm test` before handoff when available.
 5. Review the diff for scope, correctness, security, evidence, and stale code
    or prose that can be removed.
-6. Commit the coherent outcome, or the next stable milestone if work will
-   continue on the same branch, using a Conventional Commit. Keep the branch
+6. Commit the merge-ready outcome with a Conventional Commit. Keep the branch
    open until its outcome is complete and ready for review or merge.
 
 ## Git and handoff
@@ -73,13 +72,12 @@ an otherwise clear implementation.
   `chore/<short-name>` branches.
 - Keep the branch open until its defined outcome is complete, including
   follow-up fixes, tests, and documentation needed to make that outcome
-  shippable. Branch lifetime is determined by outcome scope, not by prompt,
-  session, commit, or small vertical slice.
+  shippable. Branch lifetime is determined by capability scope, not by prompt,
+  session, task, or commit.
 - Start a new branch only for a genuinely separate outcome, an intentionally
   isolated experiment, or work that must be reviewed or released independently.
-- A branch may span multiple sessions and several related increments. Use
-  regular commits for rollback and review; do not use branch creation as task
-  management.
+- A branch may span multiple sessions. Use regular commits for rollback and
+  review; do not use branch creation as task management.
 - Preserve unrelated working-tree changes. Never rewrite history or discard
   work without explicit approval.
 - Before handoff, run `git diff --check`, report relevant validation, and name
