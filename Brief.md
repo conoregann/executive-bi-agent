@@ -87,8 +87,9 @@ Each meaningful capability needs cases for correctness, ambiguity, safety, groun
 
 Build in small vertical slices:
 
-1. Document the domain, metric contracts, and evidence model.
-2. Create deterministic synthetic data and a PostgreSQL analytics path.
+1. Define only the metric, evidence, and safety rules needed for the first
+   executable slice.
+2. Create deterministic synthetic data and an analytics path.
 3. Implement one trusted metric end to end with tests and an evaluation.
 4. Add breakdowns, comparisons, and chart-ready results.
 5. Add company-knowledge ingestion and hybrid evidence.
@@ -100,4 +101,6 @@ Build in small vertical slices:
 
 An executive can ask a cross-functional business question and receive an answer that is faster than a manual analyst workflow, consistent with defined metrics, grounded in inspectable evidence, safe with respect to permissions and database execution, explicit about uncertainty, and useful for a decision or next investigation.
 
-Detailed contracts belong in `docs/`, and repeatable examples belong in `evals/`; this file remains a concise orientation document.
+Keep durable contracts in `docs/` and repeatable acceptance cases in `evals/`.
+Avoid duplicate or speculative documentation; this file remains a concise
+orientation document.
