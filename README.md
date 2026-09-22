@@ -54,7 +54,12 @@ The repository uses pnpm exclusively. Do not commit `package-lock.json`.
 
 ## Development approach
 
-Use small vertical slices: document the contract first, implement the narrowest useful path, add a representative evaluation, and keep each commit independently reviewable. Use `feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>` branches from `main`; use conventional commit messages.
+Build durable, outcome-sized vertical slices: identify the relevant contract,
+implement the narrowest complete path, add a representative evaluation, and
+commit coherent milestones. Keep working on the same feature branch until that
+outcome is complete; create a new branch only for an independent reviewable
+outcome. Use `feat/<short-name>`, `fix/<short-name>`, and
+`chore/<short-name>` branches from `main`, with Conventional Commit messages.
 
 All fixtures and documents in this repository are synthetic. They must never be
 represented as access to a real company system.

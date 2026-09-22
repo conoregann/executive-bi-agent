@@ -1,6 +1,9 @@
 # Project documentation
 
-Documentation is the source of truth for the system’s business language, boundaries, and testable behavior. Read contracts in this order before implementing a capability:
+Documentation is the source of truth for the system’s business language,
+boundaries, and testable behavior. Read the smallest relevant set of contracts;
+do not load or duplicate unrelated documents. For a new capability, use this
+order to find the governing contract:
 
 1. [Project brief](../Brief.md)
 2. [Company context](discovery/company-context.md)
@@ -14,3 +17,7 @@ Documentation is the source of truth for the system’s business language, bound
 Evaluation cases live in `evals/` and are acceptance criteria, not optional
 examples. The executable MRR slice is evaluated by
 [`evals/analytics/trusted-mrr-service.md`](../evals/analytics/trusted-mrr-service.md).
+
+Keep contracts concise and decision-focused: record definitions, boundaries,
+invariants, and accepted failure behavior. Put implementation details in code
+and repeatable examples in `evals/`.

@@ -5,8 +5,11 @@ This directory contains project-specific guidance for agent-assisted work. It co
 ## How to use this guidance
 
 - Apply the narrowest relevant instruction file for the task.
-- Treat `Brief.md` and `docs/` as the product and architecture source of truth.
-- Keep guidance procedural and stable. Put changing product facts in project documentation instead.
+- Read the smallest set of files needed to establish the contract and boundary.
+- Treat `Brief.md` and `docs/` as the product and architecture source of truth;
+  link to existing definitions instead of copying them.
+- Keep guidance procedural and stable. Put changing product facts in project
+  documentation instead.
 - If instructions conflict, the root `AGENTS.md` and direct user request take precedence.
 
 ## Prompt engineering rules
@@ -19,4 +22,7 @@ This directory contains project-specific guidance for agent-assisted work. It co
 
 ## Change discipline
 
-Use one focused branch and one coherent commit series per slice. Update the corresponding contract or evaluation before expanding implementation scope.
+Keep one branch for one reviewable outcome, with coherent commits as progress
+checkpoints. Start a new branch only when the outcome is independent or needs
+isolation. Update the corresponding contract or evaluation when behavior—not
+merely implementation detail—changes.
