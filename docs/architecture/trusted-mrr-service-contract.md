@@ -21,10 +21,10 @@ driver.
 
 ## Initial supported operations
 
-| Operation | Required input | Output |
-| --- | --- | --- |
-| `get_mrr` | one complete UTC month, optional allowed filters | MRR in cents and metric-query evidence |
-| `compare_mrr` | current and previous complete UTC months, same filters | both values, absolute/percent change, calculation evidence |
+| Operation          | Required input                                                        | Output                                                             |
+| ------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `get_mrr`          | one complete UTC month, optional allowed filters                      | MRR in cents and metric-query evidence                             |
+| `compare_mrr`      | current and previous complete UTC months, same filters                | both values, absolute/percent change, calculation evidence         |
 | `get_mrr_movement` | current and immediately preceding UTC month, optional allowed filters | new, expansion, contraction, churned MRR and reconciliation status |
 
 The implementation deliberately excludes arbitrary groupings, free-form SQL,
