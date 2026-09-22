@@ -9,6 +9,7 @@ const FILTER_FIELDS = [
 ] as const;
 
 type FilterField = (typeof FILTER_FIELDS)[number];
+type BreakdownDimension = FilterField;
 
 export interface SubscriptionMonthRecord {
   customerId: string;
@@ -82,12 +83,39 @@ export interface MrrMovement {
   reconciles: boolean;
 }
 
+export interface MrrBreakdownRow {
+  dimensionValue: string;
+  mrrEurCents: number;
+}
+
+export interface MrrBreakdown {
+  month: string;
+  groupBy: BreakdownDimension;
+  totalMrrEurCents: number;
+  groupedMrrEurCents: number;
+  unassignedMrrEurCents: number;
+  reconciles: boolean;
+  rows: readonly MrrBreakdownRow[];
+}
+
+export interface MrrBreakdownChart {
+  chartType: 'bar';
+  title: string;
+  xField: 'dimensionValue';
+  yField: 'mrrEurCents';
+  data: readonly MrrBreakdownRow[];
+  sourceEvidenceId: string;
+}
+
 export interface TrustedMrrServiceOptions {
   now?: () => string;
   nextEvidenceId?: (prefix: 'metric' | 'calculation') => string;
 }
 
 type ValidatedRequest = { month: string; filters: MetricFilters };
+type ValidatedBreakdownRequest = ValidatedRequest & {
+  groupBy: BreakdownDimension;
+};
 
 export class TrustedMrrService {
   private readonly now: () => string;
@@ -232,6 +260,84 @@ export class TrustedMrrService {
     };
   }
 
+  async breakdownMrr(input: unknown): Promise<MetricResult<MrrBreakdown>> {
+    const parsed = parseBreakdownRequest(input);
+    if (!parsed.ok) return invalidRequest(parsed.error);
+
+    const data = await this.loadMonth(parsed.value);
+    if (!data.ok) return data.result;
+
+    const freshness = await this.repository.freshness();
+    const breakdown = calculateBreakdown(data.rows, parsed.value);
+    const integrity: Evidence['integrity'] = breakdown.reconciles
+      ? 'valid'
+      : 'warning';
+    const evidence: Evidence = {
+      evidenceId: this.nextEvidenceId('metric'),
+      type: 'metric_query',
+      source: 'analytics.subscription_month',
+      sourceRef: `mrr:${parsed.value.month}:by:${parsed.value.groupBy}`,
+      observedAt: parsed.value.month,
+      retrievedAt: this.now(),
+      scope: {
+        month: parsed.value.month,
+        filters: parsed.value.filters,
+        groupBy: parsed.value.groupBy,
+        metric: 'mrr',
+        definitionVersion: METRIC_DEFINITION_VERSION,
+      },
+      content: { ...breakdown },
+      freshness,
+      integrity,
+    };
+    return {
+      status: 'ok',
+      value: breakdown,
+      evidence: [evidence],
+      warnings: breakdown.reconciles ? [] : ['missing_breakdown_dimension'],
+    };
+  }
+
+  async createMrrBreakdownChart(
+    input: unknown,
+  ): Promise<MetricResult<MrrBreakdownChart>> {
+    const breakdown = await this.breakdownMrr(input);
+    if (breakdown.status !== 'ok' || !breakdown.value) {
+      return {
+        status: breakdown.status,
+        evidence: breakdown.evidence,
+        warnings: breakdown.warnings,
+        error: breakdown.error,
+      };
+    }
+
+    const sourceEvidence = breakdown.evidence[0];
+    if (!sourceEvidence)
+      return invalidRequest('Breakdown evidence is unavailable.');
+    const freshness = await this.repository.freshness();
+    const chart: MrrBreakdownChart = {
+      chartType: 'bar',
+      title: `MRR by ${breakdown.value.groupBy} for ${breakdown.value.month}`,
+      xField: 'dimensionValue',
+      yField: 'mrrEurCents',
+      data: breakdown.value.rows,
+      sourceEvidenceId: sourceEvidence.evidenceId,
+    };
+    const chartEvidence = this.calculationEvidence(
+      'chart.data = mrr_breakdown.rows',
+      [sourceEvidence.evidenceId],
+      chart,
+      freshness,
+      sourceEvidence.integrity,
+    );
+    return {
+      status: 'ok',
+      value: chart,
+      evidence: [...breakdown.evidence, chartEvidence],
+      warnings: breakdown.warnings,
+    };
+  }
+
   private async loadMonth(
     request: ValidatedRequest,
   ): Promise<
@@ -319,6 +425,33 @@ function parseRequest(
   const filters = parseFilters(input.filters);
   if (!filters.ok) return filters;
   return { ok: true, value: { month: input.month, filters: filters.value } };
+}
+
+function parseBreakdownRequest(
+  input: unknown,
+):
+  | { ok: true; value: ValidatedBreakdownRequest }
+  | { ok: false; error: string } {
+  if (!isRecord(input))
+    return { ok: false, error: 'Request must be an object.' };
+  if (!hasOnlyKeys(input, ['month', 'filters', 'groupBy'])) {
+    return { ok: false, error: 'Request includes an unknown field.' };
+  }
+  const request = parseRequest({ month: input.month, filters: input.filters });
+  if (!request.ok) return request;
+  if (
+    typeof input.groupBy !== 'string' ||
+    !FILTER_FIELDS.includes(input.groupBy as FilterField)
+  ) {
+    return {
+      ok: false,
+      error: 'groupBy must be an allowed MRR dimension.',
+    };
+  }
+  return {
+    ok: true,
+    value: { ...request.value, groupBy: input.groupBy as BreakdownDimension },
+  };
 }
 
 function parseFilters(
@@ -420,6 +553,50 @@ function customerMrr(
 
 function totalMrr(rows: readonly SubscriptionMonthRecord[]): number {
   return sum(customerMrr(rows).values());
+}
+
+function calculateBreakdown(
+  rows: readonly SubscriptionMonthRecord[],
+  request: ValidatedBreakdownRequest,
+): MrrBreakdown {
+  const totals = new Map<string, number>();
+  let unassignedMrrEurCents = 0;
+  for (const row of rows) {
+    if (!row.isActiveAtMonthEnd) continue;
+    const dimensionValue = row[request.groupBy];
+    if (dimensionValue.trim() === '') {
+      unassignedMrrEurCents += row.mrrEurCents;
+      continue;
+    }
+    totals.set(
+      dimensionValue,
+      (totals.get(dimensionValue) ?? 0) + row.mrrEurCents,
+    );
+  }
+  const rowsByValue = [...totals].map(([dimensionValue, mrrEurCents]) => ({
+    dimensionValue,
+    mrrEurCents,
+  }));
+  rowsByValue.sort((left, right) => {
+    if (right.mrrEurCents !== left.mrrEurCents)
+      return right.mrrEurCents - left.mrrEurCents;
+    return left.dimensionValue < right.dimensionValue
+      ? -1
+      : left.dimensionValue > right.dimensionValue
+        ? 1
+        : 0;
+  });
+  const groupedMrrEurCents = sum(totals.values());
+  const totalMrrEurCents = totalMrr(rows);
+  return {
+    month: request.month,
+    groupBy: request.groupBy,
+    totalMrrEurCents,
+    groupedMrrEurCents,
+    unassignedMrrEurCents,
+    reconciles: totalMrrEurCents === groupedMrrEurCents,
+    rows: rowsByValue,
+  };
 }
 
 function matchesFilters(

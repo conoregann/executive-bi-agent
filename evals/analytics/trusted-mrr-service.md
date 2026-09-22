@@ -17,13 +17,17 @@ cents.
 
 ## Cases
 
-| ID        | Type        | Request or condition                                    | Expected outcome                                                                |
-| --------- | ----------- | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `mrr-001` | Correctness | Get August MRR                                          | 370,000 cents with valid metric-query evidence.                                 |
-| `mrr-002` | Correctness | Compare August to July                                  | -170,000 cents and -31.481481% with calculation evidence.                       |
-| `mrr-003` | Correctness | Get August movement                                     | 60,000 new, 20,000 expansion, 10,000 contraction, 240,000 churn; reconciled.    |
-| `mrr-004` | Semantics   | A customer cancels one subscription but retains another | Customer is not churned; aggregate customer MRR determines classification.      |
-| `mrr-005` | Validation  | `2026-08-15` requested as a month                       | Reject as `invalid_request`; never round or coerce.                             |
-| `mrr-006` | Safety      | Filter includes `region; DROP TABLE`                    | Reject as `invalid_request`; no repository call.                                |
-| `mrr-007` | Evidence    | Repository omits the comparison month                   | Return `data_unavailable`; do not substitute zero or issue comparison evidence. |
-| `mrr-008` | Evidence    | Reconciliation does not balance                         | Mark movement evidence `invalid`; caller cannot present the movement as valid.  |
+| ID        | Type        | Request or condition                                    | Expected outcome                                                                                  |
+| --------- | ----------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `mrr-001` | Correctness | Get August MRR                                          | 370,000 cents with valid metric-query evidence.                                                   |
+| `mrr-002` | Correctness | Compare August to July                                  | -170,000 cents and -31.481481% with calculation evidence.                                         |
+| `mrr-003` | Correctness | Get August movement                                     | 60,000 new, 20,000 expansion, 10,000 contraction, 240,000 churn; reconciled.                      |
+| `mrr-004` | Semantics   | A customer cancels one subscription but retains another | Customer is not churned; aggregate customer MRR determines classification.                        |
+| `mrr-005` | Validation  | `2026-08-15` requested as a month                       | Reject as `invalid_request`; never round or coerce.                                               |
+| `mrr-006` | Safety      | Filter includes `region; DROP TABLE`                    | Reject as `invalid_request`; no repository call.                                                  |
+| `mrr-007` | Evidence    | Repository omits the comparison month                   | Return `data_unavailable`; do not substitute zero or issue comparison evidence.                   |
+| `mrr-008` | Evidence    | Reconciliation does not balance                         | Mark movement evidence `invalid`; caller cannot present the movement as valid.                    |
+| `mrr-009` | Correctness | Break down August MRR by plan                           | Return ranked plan rows totaling 370,000 cents with valid metric-query evidence.                  |
+| `mrr-010` | Evidence    | A contributing customer has no requested dimension      | Return valid total, explicit unassigned MRR, warning integrity, and no full-reconciliation claim. |
+| `mrr-011` | Safety      | Request grouping by an unknown field                    | Reject as `invalid_request`; no repository call.                                                  |
+| `mrr-012` | Evidence    | Create a chart from a breakdown                         | Chart references only breakdown rows and input evidence IDs.                                      |

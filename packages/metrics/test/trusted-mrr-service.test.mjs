@@ -181,3 +181,86 @@ test('returns null and a warning for a zero comparison denominator', async () =>
   assert.deepEqual(result.warnings, ['zero_comparison_denominator']);
   assert.equal(result.evidence[2]?.integrity, 'warning');
 });
+
+test('returns a ranked, reconciled MRR breakdown for an allowed dimension', async () => {
+  const repository = fixtureRepository({
+    [AUGUST]: [
+      record('cust_enterprise', AUGUST, 120_000, { plan: 'enterprise' }),
+      record('cust_growth', AUGUST, 150_000, { plan: 'growth' }),
+      record('cust_starter', AUGUST, 100_000, { plan: 'starter' }),
+    ],
+  });
+
+  const result = await service(repository).breakdownMrr({
+    month: AUGUST,
+    groupBy: 'plan',
+  });
+
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.value, {
+    month: AUGUST,
+    groupBy: 'plan',
+    totalMrrEurCents: 370_000,
+    groupedMrrEurCents: 370_000,
+    unassignedMrrEurCents: 0,
+    reconciles: true,
+    rows: [
+      { dimensionValue: 'growth', mrrEurCents: 150_000 },
+      { dimensionValue: 'enterprise', mrrEurCents: 120_000 },
+      { dimensionValue: 'starter', mrrEurCents: 100_000 },
+    ],
+  });
+  assert.equal(result.evidence[0]?.type, 'metric_query');
+  assert.equal(result.evidence[0]?.integrity, 'valid');
+});
+
+test('marks a breakdown with an unavailable dimension as incomplete', async () => {
+  const repository = fixtureRepository({
+    [AUGUST]: [
+      record('cust_named', AUGUST, 100_000, { region: 'EMEA' }),
+      record('cust_unassigned', AUGUST, 50_000, { region: '' }),
+    ],
+  });
+
+  const result = await service(repository).breakdownMrr({
+    month: AUGUST,
+    groupBy: 'region',
+  });
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.value?.totalMrrEurCents, 150_000);
+  assert.equal(result.value?.groupedMrrEurCents, 100_000);
+  assert.equal(result.value?.unassignedMrrEurCents, 50_000);
+  assert.equal(result.value?.reconciles, false);
+  assert.deepEqual(result.warnings, ['missing_breakdown_dimension']);
+  assert.equal(result.evidence[0]?.integrity, 'warning');
+});
+
+test('rejects unsupported breakdown fields before reading a repository', async () => {
+  const repository = fixture();
+  const result = await service(repository).breakdownMrr({
+    month: AUGUST,
+    groupBy: 'customerId',
+  });
+
+  assert.equal(result.status, 'invalid_request');
+  assert.equal(repository.calls(), 0);
+});
+
+test('creates a chart specification from breakdown data and evidence only', async () => {
+  const result = await service(fixture()).createMrrBreakdownChart({
+    month: AUGUST,
+    groupBy: 'plan',
+  });
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.value?.chartType, 'bar');
+  assert.equal(result.value?.sourceEvidenceId, result.evidence[0]?.evidenceId);
+  assert.deepEqual(result.value?.data, [
+    { dimensionValue: 'enterprise', mrrEurCents: 370_000 },
+  ]);
+  assert.equal(result.evidence[1]?.type, 'calculation');
+  assert.deepEqual(result.evidence[1]?.content.inputEvidenceIds, [
+    result.evidence[0]?.evidenceId,
+  ]);
+});
