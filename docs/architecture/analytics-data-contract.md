@@ -22,9 +22,9 @@ analytics.*            metric-ready subscription and movement views
 
 The fixtures cover July and August 2026 and are designed to make the MRR movement contract testable:
 
-| Month | MRR | Expected movement versus July |
-| --- | ---: | --- |
-| July 2026 | €4,200 | Starting point |
+| Month       |    MRR | Expected movement versus July                            |
+| ----------- | -----: | -------------------------------------------------------- |
+| July 2026   | €4,200 | Starting point                                           |
 | August 2026 | €2,500 | €600 new, €200 expansion, €100 contraction, €2,400 churn |
 
 The movement reconciles in cents:
