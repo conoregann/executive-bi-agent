@@ -83,6 +83,20 @@ export interface MrrMovement {
   reconciles: boolean;
 }
 
+export interface CustomerMrrMovementRow {
+  customerId: string;
+  previousMrrEurCents: number;
+  currentMrrEurCents: number;
+  mrrChangeEurCents: number;
+  movement: 'new' | 'expansion' | 'contraction' | 'churn';
+}
+
+export interface CustomerMrrMovement {
+  currentMonth: string;
+  previousMonth: string;
+  rows: readonly CustomerMrrMovementRow[];
+}
+
 export interface MrrBreakdownRow {
   dimensionValue: string;
   mrrEurCents: number;
@@ -116,6 +130,7 @@ type ValidatedRequest = { month: string; filters: MetricFilters };
 type ValidatedBreakdownRequest = ValidatedRequest & {
   groupBy: BreakdownDimension;
 };
+type ValidatedCustomerMovementRequest = ValidatedRequest & { limit: number };
 
 export class TrustedMrrService {
   private readonly now: () => string;
@@ -258,6 +273,50 @@ export class TrustedMrrService {
       evidence: [priorEvidence, currentEvidence, reconciliation],
       warnings: movement.reconciles ? [] : ['mrr_movement_does_not_reconcile'],
     };
+  }
+
+  async getCustomerMrrMovement(
+    input: unknown,
+  ): Promise<MetricResult<CustomerMrrMovement>> {
+    const parsed = parseCustomerMovementRequest(input);
+    if (!parsed.ok) return invalidRequest(parsed.error);
+
+    const previousMonth = priorMonth(parsed.value.month);
+    const [current, previous] = await Promise.all([
+      this.loadMonth(parsed.value),
+      this.loadMonth({ month: previousMonth, filters: parsed.value.filters }),
+    ]);
+    if (!current.ok) return current.result;
+    if (!previous.ok) return previous.result;
+
+    const value: CustomerMrrMovement = {
+      currentMonth: parsed.value.month,
+      previousMonth,
+      rows: calculateCustomerMovements(previous.rows, current.rows).slice(
+        0,
+        parsed.value.limit,
+      ),
+    };
+    const freshness = await this.repository.freshness();
+    const evidence: Evidence = {
+      evidenceId: this.nextEvidenceId('metric'),
+      type: 'metric_query',
+      source: 'analytics.subscription_month',
+      sourceRef: `mrr_movement:${parsed.value.month}:customers`,
+      observedAt: parsed.value.month,
+      retrievedAt: this.now(),
+      scope: {
+        month: parsed.value.month,
+        filters: parsed.value.filters,
+        limit: parsed.value.limit,
+        metric: 'customer_mrr_movement',
+        definitionVersion: METRIC_DEFINITION_VERSION,
+      },
+      content: { ...value },
+      freshness,
+      integrity: 'valid',
+    };
+    return { status: 'ok', value, evidence: [evidence], warnings: [] };
   }
 
   async breakdownMrr(input: unknown): Promise<MetricResult<MrrBreakdown>> {
@@ -454,6 +513,39 @@ function parseBreakdownRequest(
   };
 }
 
+function parseCustomerMovementRequest(
+  input: unknown,
+):
+  | { ok: true; value: ValidatedCustomerMovementRequest }
+  | { ok: false; error: string } {
+  if (!isRecord(input))
+    return { ok: false, error: 'Request must be an object.' };
+  if (!hasOnlyKeys(input, ['month', 'filters', 'limit'])) {
+    return { ok: false, error: 'Request includes an unknown field.' };
+  }
+  const request = parseRequest({ month: input.month, filters: input.filters });
+  if (!request.ok) return request;
+  if (
+    input.limit !== undefined &&
+    (typeof input.limit !== 'number' ||
+      !Number.isInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > 100)
+  ) {
+    return {
+      ok: false,
+      error: 'limit must be an integer from 1 to 100.',
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      ...request.value,
+      limit: input.limit === undefined ? 10 : input.limit,
+    },
+  };
+}
+
 function parseFilters(
   input: unknown,
 ): { ok: true; value: MetricFilters } | { ok: false; error: string } {
@@ -534,6 +626,46 @@ function calculateMovement(
     churnedMrrEurCents,
     reconciles,
   };
+}
+
+function calculateCustomerMovements(
+  previousRows: readonly SubscriptionMonthRecord[],
+  currentRows: readonly SubscriptionMonthRecord[],
+): readonly CustomerMrrMovementRow[] {
+  const previous = customerMrr(previousRows);
+  const current = customerMrr(currentRows);
+  const customerIds = new Set([...previous.keys(), ...current.keys()]);
+  const movements: CustomerMrrMovementRow[] = [];
+  for (const customerId of customerIds) {
+    const previousMrrEurCents = previous.get(customerId) ?? 0;
+    const currentMrrEurCents = current.get(customerId) ?? 0;
+    if (previousMrrEurCents === currentMrrEurCents) continue;
+    const movement =
+      previousMrrEurCents === 0
+        ? 'new'
+        : currentMrrEurCents === 0
+          ? 'churn'
+          : currentMrrEurCents > previousMrrEurCents
+            ? 'expansion'
+            : 'contraction';
+    movements.push({
+      customerId,
+      previousMrrEurCents,
+      currentMrrEurCents,
+      mrrChangeEurCents: currentMrrEurCents - previousMrrEurCents,
+      movement,
+    });
+  }
+  return movements.sort((left, right) => {
+    if (left.mrrChangeEurCents !== right.mrrChangeEurCents) {
+      return left.mrrChangeEurCents - right.mrrChangeEurCents;
+    }
+    return left.customerId < right.customerId
+      ? -1
+      : left.customerId > right.customerId
+        ? 1
+        : 0;
+  });
 }
 
 function customerMrr(

@@ -26,6 +26,7 @@ driver.
 | `get_mrr`                    | one complete UTC month, optional allowed filters                        | MRR in cents and metric-query evidence                             |
 | `compare_mrr`                | current and previous complete UTC months, same filters                  | both values, absolute/percent change, calculation evidence         |
 | `get_mrr_movement`           | current and immediately preceding UTC month, optional allowed filters   | new, expansion, contraction, churned MRR and reconciliation status |
+| `get_customer_mrr_movement`  | current and immediately preceding UTC month, optional filters and limit | ranked changed customers and movement classification               |
 | `breakdown_mrr`              | one complete UTC month, one allowed dimension, optional allowed filters | ranked MRR rows and explicit reconciliation status                 |
 | `create_mrr_breakdown_chart` | valid `breakdown_mrr` input                                             | chart-ready bar specification referencing breakdown evidence       |
 
@@ -33,6 +34,13 @@ The implementation deliberately excludes multiple simultaneous groupings,
 free-form SQL, partial months, and comparison periods other than the immediately
 preceding month. Those additions require their own catalog and evaluation
 updates.
+
+Customer movement rows aggregate subscriptions before classification. Unchanged
+customers are omitted. Rows sort by MRR change ascending (largest loss first),
+then canonical customer ID; `limit` defaults to 10 and cannot exceed 100. A
+customer row returns prior MRR, current MRR, signed change, and exactly one of
+`new`, `expansion`, `contraction`, or `churn`. The operation carries the same
+filter scope and metric-query evidence as other MRR operations.
 
 ## Input validation
 

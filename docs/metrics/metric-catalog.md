@@ -148,6 +148,15 @@ current MRR = prior MRR + new MRR + expansion MRR - contraction MRR - churned MR
 
 If this does not reconcile, the result is invalid and must not be presented. A dimension breakdown can fail to reconcile only when the dimension is unavailable for some contributing customer; that missing segment must be explicit.
 
+## Customer MRR movement query
+
+`customer_mrr_movement` is a controlled diagnostic query over the same two
+complete months as `mrr_change`. It aggregates subscriptions by canonical
+customer before classifying a change as new, expansion, contraction, or churn.
+It returns only changed customers, ordered by signed MRR change ascending and
+bounded to 100 rows. It is evidence for ranked drivers, not a metric definition
+that can be inferred from prose.
+
 ## Metric lifecycle
 
 Only metrics in this catalog are exposed by controlled analytics tools. A new metric requires its definition, source model, owner, tests, example query, and evaluation case before release.
