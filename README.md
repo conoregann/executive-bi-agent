@@ -13,11 +13,13 @@ knowledge retrieval, and evidence-backed investigations.
 - `docs/` — discovery, architecture, metric definitions, and deliverables.
 - `infra/` — infrastructure definitions when deployment needs justify them.
 
-Build in outcome-sized, end-to-end increments. A branch may include several
-related changes that complete a meaningful business capability, with regular
-reviewable commits along the way. Keep contracts concise and update them only
-when a durable boundary, metric definition, safety rule, or acceptance
-criterion changes. See [AGENTS.md](AGENTS.md) for the delivery standard.
+Build in outcome-sized, end-to-end increments. Keep one branch open for the
+full capability across related changes, sessions, tests, and fixes; use regular
+reviewable commits as checkpoints. Create a new branch only for a separate
+outcome or intentionally isolated work, not for each prompt or small slice.
+Keep contracts concise and update them only when a durable boundary, metric
+definition, safety rule, or acceptance criterion changes. See
+[AGENTS.md](AGENTS.md) for the delivery standard.
 
 ## Local development
 
@@ -40,7 +42,9 @@ The repository uses pnpm exclusively. Do not commit `package-lock.json`.
 
 ## Development approach
 
-Use outcome-sized branches from `main` for meaningful capabilities. Implement
-related increments with focused tests and regular, independently reviewable
-Conventional Commits; do not create a new branch for every small slice. Use
+Use outcome-sized branches from `main` for meaningful capabilities. Keep the
+branch open until the capability is complete and ready for review or merge,
+including follow-up fixes and documentation. Implement related increments with
+focused tests and useful, independently reviewable Conventional Commits; do
+not create a new branch for every prompt, session, commit, or small slice. Use
 `feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>` branch names.
