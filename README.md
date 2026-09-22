@@ -13,9 +13,11 @@ knowledge retrieval, and evidence-backed investigations.
 - `docs/` — discovery, architecture, metric definitions, and deliverables.
 - `infra/` — infrastructure definitions when deployment needs justify them.
 
-Build in focused, end-to-end slices. Keep contracts concise and update them only
-when a durable boundary, metric definition, safety rule, or acceptance criterion
-changes. See [AGENTS.md](AGENTS.md) for the delivery standard.
+Build in outcome-sized, end-to-end increments. A branch may include several
+related changes that complete a meaningful business capability, with regular
+reviewable commits along the way. Keep contracts concise and update them only
+when a durable boundary, metric definition, safety rule, or acceptance
+criterion changes. See [AGENTS.md](AGENTS.md) for the delivery standard.
 
 ## Local development
 
@@ -38,7 +40,7 @@ The repository uses pnpm exclusively. Do not commit `package-lock.json`.
 
 ## Development approach
 
-Use small vertical slices: implement the narrowest useful path, test it, and
-keep each commit independently reviewable. Use `feat/<short-name>`,
-`fix/<short-name>`, and `chore/<short-name>` branches from `main` with
-conventional commit messages.
+Use outcome-sized branches from `main` for meaningful capabilities. Implement
+related increments with focused tests and regular, independently reviewable
+Conventional Commits; do not create a new branch for every small slice. Use
+`feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>` branch names.
