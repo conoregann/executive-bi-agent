@@ -1,6 +1,8 @@
 # Executive BI Agent
 
-Production-style executive business intelligence agent for a fictional B2B SaaS company. The system will combine trusted metrics, controlled analytics queries, company knowledge retrieval, and evidence-backed investigations.
+Production-style executive business intelligence agent for a fictional B2B SaaS
+company. It combines trusted metrics, controlled analytics queries, company
+knowledge retrieval, and evidence-backed investigations.
 
 ## Repository layout
 
@@ -11,7 +13,9 @@ Production-style executive business intelligence agent for a fictional B2B SaaS 
 - `docs/` — discovery, architecture, metric definitions, and deliverables.
 - `infra/` — infrastructure definitions when deployment needs justify them.
 
-The initial scaffold intentionally contains no business logic. The next step is to define the core domain and semantic metrics in Markdown before implementing the runtime.
+Build in focused, end-to-end slices. Keep contracts concise and update them only
+when a durable boundary, metric definition, safety rule, or acceptance criterion
+changes. See [AGENTS.md](AGENTS.md) for the delivery standard.
 
 ## Local development
 
@@ -19,10 +23,22 @@ Requirements: Node.js 22+ and pnpm 10+.
 
 ```bash
 pnpm install
+pnpm format:check
 pnpm check
 pnpm test
 ```
 
+To run the MRR service tests directly:
+
+```bash
+pnpm --filter @executive-bi/metrics test
+```
+
+The repository uses pnpm exclusively. Do not commit `package-lock.json`.
+
 ## Development approach
 
-Use small vertical slices: document the contract first, implement the narrowest useful path, add a representative evaluation, and keep each commit independently reviewable. Use `feat/<short-name>`, `fix/<short-name>`, and `chore/<short-name>` branches from `main`; use conventional commit messages.
+Use small vertical slices: implement the narrowest useful path, test it, and
+keep each commit independently reviewable. Use `feat/<short-name>`,
+`fix/<short-name>`, and `chore/<short-name>` branches from `main` with
+conventional commit messages.

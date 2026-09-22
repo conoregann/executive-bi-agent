@@ -1,17 +1,32 @@
 # Contributing
 
-## Branches
+## Branches and commits
 
-Create short-lived branches from `main` using `feat/<short-name>`, `fix/<short-name>`, or `chore/<short-name>`.
+- Start a branch from `main` for a distinct reviewable outcome. Keep working on
+  that branch until the outcome is complete; do not create a new branch for
+  every small vertical slice.
+- Use `feat/<short-name>`, `fix/<short-name>`, or `chore/<short-name>`.
+- Make small, coherent Conventional Commits as milestones within the branch.
+  Each commit should be understandable and safe to review, but does not need to
+  be a separately merged feature.
+- Do not rewrite history or overwrite unrelated working-tree changes.
 
-## Commits
+## Efficient contribution loop
 
-Prefer conventional commits such as `feat(metrics): define mrr contract` or `chore(repo): add workspace scaffold`. Keep commits small, focused, and runnable.
+1. Define the intended outcome and read only the relevant contract and
+   evaluation.
+2. Update a contract or evaluation when behavior or acceptance criteria change.
+3. Implement the smallest complete increment, including a representative test
+   and a meaningful failure case where applicable.
+4. Run targeted checks while iterating; run the repository checks before review.
+5. Review the final diff for scope, safety, evidence, and documentation drift.
 
-## Delivery loop
+## Validation
 
-1. Write or update the relevant Markdown contract.
-2. Implement one vertical slice.
-3. Add an evaluation or test that demonstrates the behavior.
-4. Run `pnpm check`, `pnpm test`, and `pnpm format:check`.
-5. Commit the slice and open a reviewable change.
+1. Read the narrowest relevant contract and update it only if behavior,
+   semantics, safety, or acceptance criteria change.
+2. Implement one complete vertical slice.
+3. Add the relevant test; add an evaluation for user-facing or safety-critical
+   behavior.
+4. Run `pnpm format:check`, `pnpm check`, and `pnpm test`.
+5. Remove stale code or documentation, then commit the reviewable slice.

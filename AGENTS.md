@@ -1,52 +1,75 @@
-# AGENTS.md
+# Executive BI Agent Guide
 
-## Mission
+## Operating posture
 
-Build a production-style Executive BI Agent for a fictional B2B SaaS company. The system must answer business questions with trusted metrics, controlled data access, relevant company knowledge, explicit evidence, and useful next actions.
+Think before changing code: read the affected interface, implementation, tests,
+and only the contract that governs the behavior. State an assumption when the
+request leaves a material architectural choice open.
 
-The repository is intentionally contract-first. Before adding runtime complexity, make the business language, system boundaries, and evaluation expectations inspectable in Markdown.
+Deliver the smallest secure, testable vertical slice that completes the stated
+outcome. Prefer deletion, simplification, and direct implementation over new
+layers, scaffolding, or prose. Do not refactor unrelated code, broaden scope,
+or add dependencies without a concrete need.
 
-## Repository map
+Documentation is a tool, not a gate. Update it only when a durable public
+contract, metric meaning, safety boundary, architecture decision, or acceptance
+criterion changes. Keep it short, link to the canonical source, and remove
+stale or duplicated guidance. Do not create documentation-only work to precede
+an otherwise clear implementation.
 
-- `Brief.md` — product brief and intended capability surface.
-- `docs/` — durable project contracts and decisions.
-- `apps/` — deployable applications: web, API, and worker.
-- `packages/` — shared domain capabilities and contracts.
-- `data/` — synthetic source data and seeds only.
-- `evals/` — repeatable quality cases for metrics, SQL, retrieval, and investigations.
-- `infra/` — infrastructure definitions when justified.
-- `.agents/` — scoped operating guidance for agent work.
+## Non-negotiable system rules
 
-## Operating principles
+- Metrics are centrally defined and deterministic. Never infer MRR, revenue,
+  churn, CAC, LTV, retention, or conversion from model text.
+- Treat generated SQL as hostile input: approved schemas only, read-only
+  access, validation, timeout, and row limit. Never execute a write statement.
+- Keep structured analytics and knowledge retrieval separate; connect them
+  through inspectable evidence.
+- Material claims need source, scope, freshness, and integrity. Label missing,
+  stale, conflicting, or correlational evidence plainly.
+- All fixtures and synthetic data must be labeled synthetic. Do not imply
+  access to real customer systems or data.
+- Prefer typed, bounded, deterministic tools to unrestricted model behavior.
+- Add or update a targeted test whenever behavior, an invariant, or a safety
+  rule changes. Add an evaluation when user-facing investigation behavior
+  changes.
+- Do not introduce infrastructure, providers, vector stores, or model
+  dependencies until a completed slice requires them.
 
-1. Read the relevant Markdown contract before changing code or data.
-2. Prefer a small vertical slice over scaffolding broad abstractions.
-3. Define semantic metrics centrally; never let a model invent definitions for revenue, MRR, churn, CAC, LTV, retention, or conversion.
-4. Treat generated SQL as untrusted input. Enforce read-only access, approved schemas, timeouts, row limits, and validation before execution.
-5. Separate structured analytics from company-knowledge retrieval, then join them through inspectable evidence.
-6. Every material answer should expose its source, query or document reference, freshness, and evidence strength where applicable.
-7. Synthetic data must be clearly labeled and must not imply access to real company systems.
-8. Prefer deterministic tools and schemas over free-form agent behavior.
-9. Add or update an evaluation with each meaningful capability.
-10. Do not add infrastructure, providers, vector databases, or model dependencies until a concrete slice needs them.
+## Layout boundaries
 
-## Standard work loop
+| Path        | Responsibility                                                                |
+| ----------- | ----------------------------------------------------------------------------- |
+| `apps/`     | Deployable web, API, and worker surfaces.                                     |
+| `packages/` | Shared domain capabilities and typed contracts.                               |
+| `data/`     | Synthetic source data and seeds only.                                         |
+| `evals/`    | Repeatable acceptance cases for user-facing or safety-critical behavior.      |
+| `docs/`     | Concise canonical contracts and decisions; no duplicate implementation notes. |
+| `infra/`    | Infrastructure only when a shipped slice needs it.                            |
 
-1. Update the relevant contract in `docs/` or `evals/`.
-2. Implement the narrowest end-to-end behavior.
-3. Add representative tests or evaluation cases, including failure cases.
-4. Run `pnpm format:check`, `pnpm check`, and `pnpm test` when dependencies are available.
-5. Review the diff for scope, evidence handling, permissions, and misleading claims.
-6. Commit one coherent change using Conventional Commits.
+## Delivery loop
 
-## Git conventions
+1. Identify the requested outcome and the narrowest governing contract.
+2. Update that contract only if the requested change alters it.
+3. Implement the smallest complete behavior and its relevant failure path.
+4. Run the narrowest checks first, then `pnpm format:check`, `pnpm check`, and
+   `pnpm test` when available.
+5. Review the diff for scope, correctness, security, evidence, and stale code
+   or prose that can be removed.
+6. Commit a coherent, independently reviewable change using Conventional
+   Commits.
 
-- Base work on `main`.
-- Use `feat/<short-name>`, `fix/<short-name>`, or `chore/<short-name>` branches.
-- Keep commits small and independently understandable.
-- Examples: `docs(metrics): define mrr contract`, `feat(analytics): add revenue breakdown`, `fix(sql): reject write statements`.
-- Do not rewrite history or discard unrelated work.
+## Git and handoff
+
+- Base work on `main`; use `feat/<short-name>`, `fix/<short-name>`, or
+  `chore/<short-name>` branches.
+- Preserve unrelated working-tree changes. Never rewrite history or discard
+  work without explicit approval.
+- Before handoff, run `git diff --check`, report relevant validation, and name
+  any environmental blocker.
 
 ## Definition of done
 
-A change is complete when its contract, implementation, validation, and limitations are clear; relevant checks pass or their environmental blocker is recorded; and the diff is ready for review.
+A change is done when the requested outcome works, relevant invariants and
+safety boundaries hold, focused validation passes, and the diff is minimal,
+clear, and ready to merge.
