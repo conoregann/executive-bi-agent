@@ -42,3 +42,20 @@ These cases are fixture-backed acceptance criteria for the first implementation.
 | ----------------- | ----------------------------------------------------------------------------------------------------------- |
 | Fixture condition | Customer region is missing for some MRR contributors.                                                       |
 | Required answer   | Present total MRR if valid, flag the incomplete regional breakdown, and avoid claiming it fully reconciles. |
+
+## Case: retained follow-up scope
+
+| Field             | Expected contract                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| Starting request  | An MRR-decline investigation for August 2026 with a permitted customer scope.                                 |
+| Follow-up         | “What period and customers did this investigation cover?”                                                     |
+| Required behavior | Return the stored resolved month and permitted customer IDs without running another tool or broadening scope. |
+| Prohibited answer | Infer a different period from the current date or search another customer's data.                             |
+
+## Case: unreconciled movement
+
+| Field             | Expected contract                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| Fixture condition | The MRR movement equation does not reconcile.                                                       |
+| Required behavior | End as `blocked`, retain the invalid calculation evidence, and state the reconciliation limitation. |
+| Prohibited answer | Rank customer or document context as an explanation for an invalid MRR movement result.             |
