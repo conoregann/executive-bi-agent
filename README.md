@@ -23,9 +23,18 @@ Requirements: Node.js 22+ and pnpm 10+.
 
 ```bash
 pnpm install
+pnpm format:check
 pnpm check
 pnpm test
 ```
+
+To run the MRR service tests directly:
+
+```bash
+pnpm --filter @executive-bi/metrics test
+```
+
+The repository uses pnpm exclusively. Do not commit `package-lock.json`.
 
 ## Development approach
 
