@@ -12,13 +12,13 @@ The comparison is invalid if the equation does not balance exactly in cents.
 
 ## Customer-level movement classification
 
-| Prior customer MRR | Current customer MRR | Expected classification |
-| ---: | ---: | --- |
-| 0 | 50000 | New MRR of 50000 cents |
-| 50000 | 70000 | Expansion MRR of 20000 cents |
-| 70000 | 50000 | Contraction MRR of 20000 cents |
-| 50000 | 0 | Churned MRR of 50000 cents |
-| 50000 | 50000 | No movement |
+| Prior customer MRR | Current customer MRR | Expected classification        |
+| -----------------: | -------------------: | ------------------------------ |
+|                  0 |                50000 | New MRR of 50000 cents         |
+|              50000 |                70000 | Expansion MRR of 20000 cents   |
+|              70000 |                50000 | Contraction MRR of 20000 cents |
+|              50000 |                    0 | Churned MRR of 50000 cents     |
+|              50000 |                50000 | No movement                    |
 
 ## Churn semantics
 

@@ -19,29 +19,29 @@ Only `completed` investigations may be presented as an answer. `blocked` explain
 
 Before tools run, the orchestrator persists a plan with:
 
-| Field | Requirement |
-| --- | --- |
-| `investigation_id` | Immutable identifier for the full request. |
-| `resolved_request` | The normalized executive-question contract. |
-| `claims_to_test` | Measurable questions, not predicted conclusions. |
-| `steps` | Ordered controlled tool calls and expected evidence. |
-| `stop_conditions` | Maximum steps, time, and explicit evidence sufficiency rule. |
-| `permissions` | The least-privilege scope applied to every step. |
+| Field              | Requirement                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `investigation_id` | Immutable identifier for the full request.                   |
+| `resolved_request` | The normalized executive-question contract.                  |
+| `claims_to_test`   | Measurable questions, not predicted conclusions.             |
+| `steps`            | Ordered controlled tool calls and expected evidence.         |
+| `stop_conditions`  | Maximum steps, time, and explicit evidence sufficiency rule. |
+| `permissions`      | The least-privilege scope applied to every step.             |
 
 Example claims for “Why did MRR fall in August?” are: measure the change, reconcile MRR movements, identify the largest contributing segments/customers, and retrieve dated context for those drivers. “A pricing change caused churn” is not a valid initial claim because it presupposes a conclusion.
 
 ## Approved initial tools
 
-| Tool | Purpose | Output requirement |
-| --- | --- | --- |
-| `get_metric` | Retrieve a catalog metric at a stated scope. | Metric result contract and query evidence. |
-| `compare_metric` | Compare equivalent periods or targets. | Both scopes and calculation evidence. |
-| `breakdown_metric` | Group a metric by an allowed dimension. | Reconciliation or missing-segment warning. |
-| `get_customer_mrr_movement` | Identify customer-level revenue movement. | Customer IDs, values, and period. |
-| `get_support_tickets` | Retrieve permission-scoped account support facts. | Ticket identifiers and timestamps. |
-| `get_crm_context` | Retrieve permission-scoped sales/account facts. | Record identifiers and timestamps. |
-| `search_company_knowledge` | Retrieve relevant document chunks. | Chunk evidence with metadata and scores. |
-| `create_chart_spec` | Produce a chart-ready specification from evidence. | Data references, no invented series. |
+| Tool                        | Purpose                                            | Output requirement                         |
+| --------------------------- | -------------------------------------------------- | ------------------------------------------ |
+| `get_metric`                | Retrieve a catalog metric at a stated scope.       | Metric result contract and query evidence. |
+| `compare_metric`            | Compare equivalent periods or targets.             | Both scopes and calculation evidence.      |
+| `breakdown_metric`          | Group a metric by an allowed dimension.            | Reconciliation or missing-segment warning. |
+| `get_customer_mrr_movement` | Identify customer-level revenue movement.          | Customer IDs, values, and period.          |
+| `get_support_tickets`       | Retrieve permission-scoped account support facts.  | Ticket identifiers and timestamps.         |
+| `get_crm_context`           | Retrieve permission-scoped sales/account facts.    | Record identifiers and timestamps.         |
+| `search_company_knowledge`  | Retrieve relevant document chunks.                 | Chunk evidence with metadata and scores.   |
+| `create_chart_spec`         | Produce a chart-ready specification from evidence. | Data references, no invented series.       |
 
 Tools return typed data and evidence objects. They do not return prose intended for an executive. Exploratory SQL is excluded until its separate safety contract and evaluation suite exist.
 
