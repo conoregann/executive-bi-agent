@@ -139,6 +139,67 @@ test('classifies movement after aggregating customer subscriptions', async () =>
   assert.equal(result.evidence[2]?.integrity, 'valid');
 });
 
+test('returns bounded customer MRR movements ranked by largest loss', async () => {
+  const result = await service(fixture()).getCustomerMrrMovement({
+    month: AUGUST,
+    limit: 3,
+  });
+
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.value, {
+    currentMonth: AUGUST,
+    previousMonth: JULY,
+    rows: [
+      {
+        customerId: 'cust_churn',
+        previousMrrEurCents: 240_000,
+        currentMrrEurCents: 0,
+        mrrChangeEurCents: -240_000,
+        movement: 'churn',
+      },
+      {
+        customerId: 'cust_contract',
+        previousMrrEurCents: 100_000,
+        currentMrrEurCents: 90_000,
+        mrrChangeEurCents: -10_000,
+        movement: 'contraction',
+      },
+      {
+        customerId: 'cust_expand',
+        previousMrrEurCents: 100_000,
+        currentMrrEurCents: 120_000,
+        mrrChangeEurCents: 20_000,
+        movement: 'expansion',
+      },
+    ],
+  });
+  assert.equal(
+    result.evidence[0]?.sourceRef,
+    'mrr_movement:2026-08-01:customers',
+  );
+  assert.equal(result.evidence[0]?.integrity, 'valid');
+});
+
+test('applies customer scope and rejects unbounded customer movement requests', async () => {
+  const repository = fixture();
+  const scoped = await service(repository).getCustomerMrrMovement({
+    month: AUGUST,
+    filters: { customerIds: ['cust_churn'] },
+  });
+  assert.equal(scoped.status, 'ok');
+  assert.deepEqual(
+    scoped.value?.rows.map((row) => row.customerId),
+    ['cust_churn'],
+  );
+
+  const invalid = await service(repository).getCustomerMrrMovement({
+    month: AUGUST,
+    limit: 101,
+  });
+  assert.equal(invalid.status, 'invalid_request');
+  assert.deepEqual(invalid.evidence, []);
+});
+
 test('rejects a partial month before reading a repository', async () => {
   const repository = fixture();
   const result = await service(repository).getMrr({ month: '2026-08-15' });
