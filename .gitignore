@@ -1,6 +1,7 @@
 node_modules/
 package-lock.json
 .pnpm-store/
+package-lock.json
 .turbo/
 dist/
 .next/
