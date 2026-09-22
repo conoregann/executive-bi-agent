@@ -5,7 +5,8 @@ This directory contains project-specific guidance for agent-assisted work. It co
 ## How to use this guidance
 
 - Apply the narrowest relevant instruction file for the task.
-- Treat `Brief.md` and `docs/` as the product and architecture source of truth.
+- Read the smallest relevant contract; do not load project documentation by
+  default.
 - Keep guidance procedural and stable. Put changing product facts in project documentation instead.
 - If instructions conflict, the root `AGENTS.md` and direct user request take precedence.
 
@@ -19,4 +20,6 @@ This directory contains project-specific guidance for agent-assisted work. It co
 
 ## Change discipline
 
-Use one focused branch and one coherent commit series per slice. Update the corresponding contract or evaluation before expanding implementation scope.
+Use one focused branch and one coherent commit series per slice. Update a
+contract or evaluation only when behavior, safety, semantics, or acceptance
+criteria change; avoid documentation churn.
