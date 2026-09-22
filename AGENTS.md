@@ -6,10 +6,12 @@ Think before changing code: read the affected interface, implementation, tests,
 and only the contract that governs the behavior. State an assumption when the
 request leaves a material architectural choice open.
 
-Deliver the smallest secure, testable vertical slice that completes the stated
-outcome. Prefer deletion, simplification, and direct implementation over new
-layers, scaffolding, or prose. Do not refactor unrelated code, broaden scope,
-or add dependencies without a concrete need.
+Deliver a secure, testable, outcome-sized body of work. Prefer direct
+implementation, simplification, and deletion over speculative layers,
+scaffolding, or prose. A branch may contain several related increments when
+together they complete a meaningful business capability; do not split work
+into tiny branches solely to make slices small. Do not add unrelated work,
+refactor broadly, or introduce dependencies without a concrete need.
 
 Documentation is a tool, not a gate. Update it only when a durable public
 contract, metric meaning, safety boundary, architecture decision, or acceptance
@@ -51,9 +53,10 @@ an otherwise clear implementation.
 
 1. Identify the requested outcome and the narrowest governing contract.
 2. Update that contract only if the requested change alters it.
-3. Implement the smallest complete behavior and its relevant failure path.
-4. Run the narrowest checks first, then `pnpm format:check`, `pnpm check`, and
-   `pnpm test` when available.
+3. Implement coherent increments toward the outcome, including relevant
+   failure paths; commit each stable milestone with a Conventional Commit.
+4. Run targeted checks while iterating, then `pnpm format:check`, `pnpm check`,
+   and `pnpm test` before handoff when available.
 5. Review the diff for scope, correctness, security, evidence, and stale code
    or prose that can be removed.
 6. Commit a coherent, independently reviewable change using Conventional
@@ -63,6 +66,9 @@ an otherwise clear implementation.
 
 - Base work on `main`; use `feat/<short-name>`, `fix/<short-name>`, or
   `chore/<short-name>` branches.
+- Keep a branch open until its defined outcome is complete. Use regular,
+  reviewable commits to record progress; commits are milestones, not a reason
+  to create a new branch.
 - Preserve unrelated working-tree changes. Never rewrite history or discard
   work without explicit approval.
 - Before handoff, run `git diff --check`, report relevant validation, and name
@@ -71,5 +77,5 @@ an otherwise clear implementation.
 ## Definition of done
 
 A change is done when the requested outcome works, relevant invariants and
-safety boundaries hold, focused validation passes, and the diff is minimal,
-clear, and ready to merge.
+safety boundaries hold, focused and repository validation pass, and the diff
+is appropriately scoped, clear, and ready to merge.
