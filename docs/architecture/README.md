@@ -6,3 +6,7 @@ The first implementation target is a controlled investigation path: a question b
 - [Evidence contract](evidence-contract.md) — provenance, claim classes, strength, and citation behavior.
 
 The initial architecture deliberately excludes exploratory SQL and external integrations until their safety and evaluation contracts exist.
+## Runtime contracts
+
+- [Trusted MRR service contract](trusted-mrr-service-contract.md) — the first
+  controlled, evidence-bearing analytics capability.
