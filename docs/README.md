@@ -1,8 +1,13 @@
 # Project documentation
 
-Documentation is the source of truth for the system’s business language and boundaries.
+Documentation is the source of truth for the system’s business language, boundaries, and testable behavior. Read contracts in this order before implementing a capability:
 
-- `discovery/` — client framing, personas, questions, and scope.
-- `architecture/` — system boundaries and runtime decisions.
-- `metrics/` — semantic metric contracts and definitions.
-- `client-deliverables/` — executive-facing artifacts and examples.
+1. [Project brief](../Brief.md)
+2. [Company context](discovery/company-context.md)
+3. [Executive question contract](discovery/question-contract.md)
+4. [Semantic metric catalog](metrics/metric-catalog.md)
+5. [Metric query contract](metrics/query-contract.md)
+6. [Investigation contract](architecture/investigation-contract.md)
+7. [Evidence contract](architecture/evidence-contract.md)
+
+Evaluation cases live in `evals/` and are acceptance criteria, not optional examples.
