@@ -30,6 +30,39 @@ Before tools run, the orchestrator persists a plan with:
 
 Example claims for “Why did MRR fall in August?” are: measure the change, reconcile MRR movements, identify the largest contributing segments/customers, and retrieve dated context for those drivers. “A pricing change caused churn” is not a valid initial claim because it presupposes a conclusion.
 
+## Initial executable investigation
+
+The first runnable investigation is `mrr_decline`. It accepts an explicit
+calendar month and an optional permitted customer scope. It does not parse
+natural language or resolve a missing year; the question boundary must provide
+the normalized request first.
+
+The deterministic plan runs, at most, these five steps in order:
+
+1. Compare whole-company MRR with the immediately preceding month.
+2. Reconcile MRR movements.
+3. Rank the largest customer losses, limited to five customers.
+4. Break down MRR by plan and report any missing-dimension warning.
+5. Search company knowledge only within the ranked customer scope.
+
+The capability completes with evidence and limitations when contextual search
+returns no hits. It becomes `blocked` when required metric evidence is
+unavailable or does not reconcile; it must not replace that evidence with a
+document narrative.
+
+## Follow-up context
+
+The orchestrator retains an immutable investigation record keyed by
+`investigation_id`: the resolved request, approved plan, terminal state,
+warnings, and evidence references. A follow-up receives this record explicitly
+from the caller; no model session memory is an authority for prior scope.
+
+Follow-up handling may reuse the resolved month and permitted customer IDs, but
+it may not broaden filters, customer scope, tool budget, or permissions. A
+request that needs a different period, metric, or scope begins a new
+investigation. Unknown or non-terminal investigation IDs are rejected without
+running a tool.
+
 ## Approved initial tools
 
 | Tool                        | Purpose                                            | Output requirement                         |
