@@ -9,6 +9,6 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "check": "tsc --project tsconfig.json --noEmit",
-    "test": "pnpm run build && node --test test/*.test.mjs"
+    "test": "tsc --project tsconfig.json && node --test test/*.test.mjs"
   }
 }
