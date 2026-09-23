@@ -1,0 +1,223 @@
+import { readFile } from 'node:fs/promises';
+
+import {
+  createSubscriptionMonthRepository,
+  type SubscriptionMonthSnapshot,
+} from '@executive-bi/analytics';
+import {
+  MrrDeclineInvestigationService,
+  type InvestigationRecord,
+} from '@executive-bi/investigations';
+import { TrustedMrrService } from '@executive-bi/metrics';
+import {
+  createCompanyKnowledgeSearch,
+  type KnowledgeDocument,
+} from '@executive-bi/retrieval';
+import {
+  mrrDeclineRequestSchema,
+  mrrDeclineResponseSchema,
+  type MrrDeclineApiResponse,
+} from '@executive-bi/schemas';
+
+const MRR_DECLINE_PATH = '/v1/investigations/mrr-decline';
+
+export { createMrrDeclineServer } from './http-server.js';
+
+export interface SyntheticMrrDeclineDependencies {
+  snapshot: SubscriptionMonthSnapshot;
+  documents: readonly KnowledgeDocument[];
+}
+
+/**
+ * Loads the explicitly labeled development fixtures used by this narrow API
+ * boundary. Production data sources are intentionally outside this adapter.
+ */
+export async function loadSyntheticMrrDeclineDependencies(): Promise<SyntheticMrrDeclineDependencies> {
+  const [snapshotFile, paymentIncident, salesReview] = await Promise.all([
+    readFile(
+      new URL(
+        '../../../data/synthetic/subscription-month-2026.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+    readFile(
+      new URL(
+        '../../../data/synthetic/knowledge/2026-08-payment-incident-281.md',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+    readFile(
+      new URL(
+        '../../../data/synthetic/knowledge/2026-08-sales-review.md',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  ]);
+  const snapshot = parseSyntheticSnapshot(JSON.parse(snapshotFile) as unknown);
+
+  return {
+    snapshot,
+    documents: [
+      {
+        documentId: 'payment-incident-281',
+        title: 'Payment provider incident #281',
+        source: 'synthetic_knowledge',
+        observedAt: '2026-08-16T17:30:00Z',
+        freshness: snapshot.freshness,
+        content: paymentIncident,
+      },
+      {
+        documentId: 'august-sales-review',
+        title: 'August sales review',
+        source: 'synthetic_knowledge',
+        observedAt: '2026-08-31T17:00:00Z',
+        freshness: snapshot.freshness,
+        content: salesReview,
+        customerIds: ['cust_churn'],
+      },
+    ],
+  };
+}
+
+export function createMrrDeclineApi(
+  dependencies: SyntheticMrrDeclineDependencies,
+): MrrDeclineApi {
+  const metrics = new TrustedMrrService(
+    createSubscriptionMonthRepository(dependencies.snapshot),
+  );
+  const knowledge = createCompanyKnowledgeSearch(dependencies.documents);
+  const investigation = new MrrDeclineInvestigationService({
+    compareMrr: metrics.compareMrr.bind(metrics),
+    getMrrMovement: metrics.getMrrMovement.bind(metrics),
+    getCustomerMrrMovement: metrics.getCustomerMrrMovement.bind(metrics),
+    breakdownMrr: metrics.breakdownMrr.bind(metrics),
+    searchCompanyKnowledge: knowledge.search.bind(knowledge),
+  });
+  return new MrrDeclineApi(investigation);
+}
+
+export async function createSyntheticMrrDeclineApi(): Promise<MrrDeclineApi> {
+  return createMrrDeclineApi(await loadSyntheticMrrDeclineDependencies());
+}
+
+export class MrrDeclineApi {
+  constructor(private readonly investigation: MrrDeclineInvestigationService) {}
+
+  async fetch(request: Request): Promise<Response> {
+    if (
+      request.method !== 'POST' ||
+      new URL(request.url).pathname !== MRR_DECLINE_PATH
+    ) {
+      return Response.json(
+        { status: 'not_found', error: 'Route not found.' },
+        { status: 404 },
+      );
+    }
+    if (!request.headers.get('content-type')?.includes('application/json')) {
+      return invalidResponse('Content-Type must be application/json.');
+    }
+
+    const body = await parseJson(request);
+    if (!body.ok) return invalidResponse(body.error);
+    const parsed = mrrDeclineRequestSchema.safeParse(body.value);
+    if (!parsed.success) return invalidResponse(parsed.error.message);
+
+    const result = await this.investigation.start(parsed.data);
+    if (result.status === 'invalid_request') {
+      return validatedResponse(
+        {
+          status: 'invalid_request',
+          warnings: [],
+          error: result.error ?? 'Invalid request.',
+        },
+        result.error?.includes('already been used') ? 409 : 400,
+      );
+    }
+
+    return validatedResponse(
+      {
+        status: result.status,
+        record: toApiRecord(result.record!),
+        warnings: [...result.warnings],
+        ...(result.error === undefined ? {} : { error: result.error }),
+      },
+      result.status === 'completed' ? 201 : 422,
+    );
+  }
+}
+
+function parseSyntheticSnapshot(value: unknown): SubscriptionMonthSnapshot {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    !('label' in value) ||
+    !('freshness' in value) ||
+    !('rows' in value) ||
+    typeof value.label !== 'string' ||
+    !value.label.startsWith('Synthetic data') ||
+    typeof value.freshness !== 'string' ||
+    !Array.isArray(value.rows)
+  ) {
+    throw new Error(
+      'Synthetic subscription snapshot is malformed or unlabeled.',
+    );
+  }
+  return {
+    freshness: value.freshness,
+    rows: value.rows as SubscriptionMonthSnapshot['rows'],
+  };
+}
+
+async function parseJson(
+  request: Request,
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await request.json() };
+  } catch {
+    return { ok: false, error: 'Request body must contain valid JSON.' };
+  }
+}
+
+function invalidResponse(error: string): Response {
+  return validatedResponse(
+    { status: 'invalid_request', warnings: [], error },
+    400,
+  );
+}
+
+function toApiRecord(record: InvestigationRecord) {
+  return {
+    ...record,
+    permittedCustomerIds: [...record.permittedCustomerIds],
+    plan: {
+      ...record.plan,
+      steps: [...record.plan.steps] as [
+        'compare_mrr',
+        'get_mrr_movement',
+        'get_customer_mrr_movement',
+        'breakdown_mrr_by_plan',
+        'search_company_knowledge',
+      ],
+    },
+    evidenceIds: [...record.evidenceIds],
+    warnings: [...record.warnings],
+    driverCustomerIds: [...record.driverCustomerIds],
+  };
+}
+
+function validatedResponse(
+  body: MrrDeclineApiResponse,
+  status: number,
+): Response {
+  const parsed = mrrDeclineResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new Error(
+      `MRR-decline response contract violation: ${parsed.error.message}`,
+    );
+  }
+  return Response.json(parsed.data, { status });
+}
