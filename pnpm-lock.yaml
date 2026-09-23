@@ -19,7 +19,11 @@ importers:
 
   packages/analytics: {}
 
+  packages/investigations: {}
+
   packages/metrics: {}
+
+  packages/retrieval: {}
 
 packages:
   '@turbo/darwin-64@2.11.2':
