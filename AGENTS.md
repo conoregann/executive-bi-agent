@@ -1,90 +1,115 @@
 # Executive BI Agent Guide
 
-## Operating posture
+Behavioral guidelines and non-negotiable system invariants. Bias toward caution over speed.
 
-Think before changing code: read the affected interface, implementation, tests,
-and only the contract that governs the behavior. State an assumption when the
-request leaves a material architectural choice open.
+---
 
-Deliver a secure, testable, outcome-sized body of work. Prefer direct
-implementation, simplification, and deletion over speculative layers,
-scaffolding, or prose. Treat a capability as the unit of delivery: carry its
-contracts, implementation, failure handling, tests, and evaluation through to
-a merge-ready outcome. Automate routine validation and integration wherever
-practical so quality does not depend on manually coordinating artificial work
-chunks. Use commits for recovery and review, not as a delivery model. Do not
-add unrelated work, refactor broadly, or introduce dependencies without a
-concrete need.
+## 1. Core Operating Rules
 
-Documentation is a tool, not a gate. Update it only when a durable public
-contract, metric meaning, safety boundary, architecture decision, or acceptance
-criterion changes. Keep it short, link to the canonical source, and remove
-stale or duplicated guidance. Do not create documentation-only work to precede
-an otherwise clear implementation.
+### 1. Think Before Coding
+**Don’t assume. Don’t hide confusion. Surface tradeoffs.**
+- Read the affected interface, tests, and governing contract before editing.
+- State assumptions explicitly. If an architectural choice is open, ask before building.
+- If multiple interpretations exist, present them—never pick silently.
+- Push back if a simpler approach exists. Stop and ask if requirements are ambiguous.
 
-## Non-negotiable system rules
+### 2. Simplicity First
+**Minimum code that solves the problem. Nothing speculative.**
+- Build only what was requested. No speculative layers, abstractions, or "future-proofing."
+- Do not introduce infrastructure, vector stores, providers, or dependencies until an active capability strictly requires them.
+- Documentation is a tool, not a gate: update it only when contracts, metrics, safety boundaries, or architectural decisions change. Keep it short.
+- *Senior engineer test:* If you wrote 200 lines and it could be 50, rewrite it.
 
-- Metrics are centrally defined and deterministic. Never infer MRR, revenue,
-  churn, CAC, LTV, retention, or conversion from model text.
-- Treat generated SQL as hostile input: approved schemas only, read-only
-  access, validation, timeout, and row limit. Never execute a write statement.
-- Keep structured analytics and knowledge retrieval separate; connect them
-  through inspectable evidence.
-- Material claims need source, scope, freshness, and integrity. Label missing,
-  stale, conflicting, or correlational evidence plainly.
-- All fixtures and synthetic data must be labeled synthetic. Do not imply
-  access to real customer systems or data.
-- Prefer typed, bounded, deterministic tools to unrestricted model behavior.
-- Add or update a targeted test whenever behavior, an invariant, or a safety
-  rule changes. Add an evaluation when user-facing investigation behavior
-  changes.
-- Do not introduce infrastructure, providers, vector stores, or model
-  dependencies until a completed capability requires them.
+### 3. Surgical Changes
+**Touch only what you must. Clean up only your own mess.**
+- Do not "improve" adjacent code, comments, or formatting.
+- Match existing style. Do not refactor code that is not broken.
+- Clean up imports, variables, or functions orphaned by *your* changes. Leave pre-existing dead code alone (mention it instead).
+- Every changed line must trace directly to the requested outcome.
 
-## Layout boundaries
+### 4. Goal-Driven Execution
+**Define success criteria. Verify before declaring done.**
+- Convert tasks into verifiable checks:
+  - *"Fix metric query"* $\to$ write a failing test reproducing the issue, then pass it.
+  - *"Add API endpoint"* $\to$ add schema validation test, run against synthetic fixture.
+- Multi-step tasks require a brief plan:
+  ```
+  1. [Step] -> verify: [check]
+  2. [Step] -> verify: [check]
+  ```
 
-| Path        | Responsibility                                                                |
-| ----------- | ----------------------------------------------------------------------------- |
-| `apps/`     | Deployable web, API, and worker surfaces.                                     |
-| `packages/` | Shared domain capabilities and typed contracts.                               |
-| `data/`     | Synthetic source data and seeds only.                                         |
-| `evals/`    | Repeatable acceptance cases for user-facing or safety-critical behavior.      |
-| `docs/`     | Concise canonical contracts and decisions; no duplicate implementation notes. |
-| `infra/`    | Infrastructure only when a shipped capability needs it.                       |
+---
 
-## Delivery loop
+## 2. Non-Negotiable Domain & Security Invariants
 
-1. Identify the requested outcome and the narrowest governing contract.
-2. Update that contract only if the requested change alters it.
-3. Complete the capability coherently, including relevant failure paths,
-   targeted tests, and required evaluations. Prefer automated checks and
-   repeatable workflows over manual coordination.
-4. Run targeted checks while iterating, then `pnpm format:check`, `pnpm check`,
-   and `pnpm test` before handoff when available.
-5. Review the diff for scope, correctness, security, evidence, and stale code
-   or prose that can be removed.
-6. Commit the merge-ready outcome with a Conventional Commit. Keep the branch
-   open until its outcome is complete and ready for review or merge.
+These rules override convenience. Never bypass them:
 
-## Git and handoff
+- **Deterministic Metrics Only:** Metrics are centrally defined in code. **Never** calculate or infer MRR, ARR, revenue, churn, CAC, LTV, retention, or conversion from raw model text.
+- **SQL is Hostile Input:** 
+  - Read-only access only. Zero write statements (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`).
+  - Strict schema whitelisting, mandatory statement timeouts, and row limits.
+- **Separate Analytics from Knowledge Retrieval:** Keep structured data and document retrieval isolated. Connect them only through inspectable, cited evidence.
+- **Inspectable Claims:** Material claims must state their source, freshness, scope, and integrity. Plainly flag missing, stale, conflicting, or correlational data.
+- **Synthetic Data Labeling:** All fixtures and local seeds must be explicitly labeled `synthetic`. Never simulate or claim access to real production customer data.
+- **Deterministic Tools Over Agentic Guessing:** Prefer typed, bounded function calls over freeform model reasoning.
 
-- Base work on `main`; use `feat/<short-name>`, `fix/<short-name>`, or
-  `chore/<short-name>` branches.
-- Keep the branch open until its defined outcome is complete, including
-  follow-up fixes, tests, and documentation needed to make that outcome
-  shippable. Branch lifetime is determined by capability scope, not by prompt,
-  session, task, or commit.
-- Start a new branch only for a genuinely separate outcome, an intentionally
-  isolated experiment, or work that must be reviewed or released independently.
-- A branch may span multiple sessions. Use regular commits for rollback and
-  review; do not use branch creation as task management.
-- Preserve unrelated working-tree changes. Never rewrite history or discard
-  work without explicit approval.
-- Before handoff, run `git diff --check`, report relevant validation, and name
-  any environmental blocker.
+---
 
-## Definition of done
+## 3. Layout Boundaries
 
-A change is done when the requested outcome works, relevant invariants and
-safety boundaries hold, focused and repository validation pass, and the diff
-is appropriately scoped, clear, and ready to merge.
+Stay strictly within layer responsibilities:
+
+| Path | Responsibility | Rule |
+| :--- | :--- | :--- |
+| `apps/` | Deployable web, API, worker surfaces | No domain business logic here. |
+| `packages/` | Shared domain capabilities & typed contracts | Metrics and core logic live here. |
+| `data/` | Synthetic source data and fixtures | **Synthetic data only.** No real PII/customer data. |
+| `evals/` | Acceptance test cases & safety checks | Add evals when user-facing behavior changes. |
+| `docs/` | Canonical contracts and ADRs | Concise. No duplicate implementation walkthroughs. |
+| `infra/` | Cloud and deployment definitions | Touch only when a shipped capability requires it. |
+
+---
+
+## 4. Delivery & Verification Loop
+
+Follow this loop for every capability:
+
+1. **Locate Contract:** Identify the narrowest governing contract (`packages/...`). Update it first if the interface changes.
+2. **Implement & Test:** Implement the change along with its failure paths.
+   - Update/add a **targeted test** for any invariant or behavior change.
+   - Update/add an **eval** for any agent prompt/investigation change.
+3. **Run Validation:**
+   ```bash
+   # Iterative check
+   pnpm test:targeted <file>
+
+   # Pre-handoff suite
+   pnpm format:check
+   pnpm check
+   pnpm test
+   git diff --check
+   ```
+4. **Clean Diff:** Verify no stray files, unintended formatting changes, or leaked credentials exist.
+
+---
+
+## 5. Git & Handoff Rules
+
+- **Branching:** Base off `main`. Use `feat/<short-name>`, `fix/<short-name>`, or `chore/<short-name>`.
+- **Branch Scope:** Keep the branch open across sessions until the capability is complete (code + tests + contracts). Do not spawn new branches as a substitute for task management.
+- **History Preservation:** Never force-push or discard work without explicit instruction. Preserve unrelated working-tree modifications.
+- **Commits:** Write Conventional Commits (`feat: ...`, `fix: ...`).
+- **Handoff Output:** In your final response, explicitly state:
+  1. Summary of changes made.
+  2. Verification commands run and their results.
+  3. Any known environmental blockers or assumptions made.
+
+---
+
+## Definition of Done
+
+A change is complete **only** when:
+- [ ] The requested outcome functions as specified.
+- [ ] Metric calculations and SQL execution strictly follow security invariants.
+- [ ] Targeted tests and `pnpm check` pass.
+- [ ] Diff is minimal, surgical, and contains zero speculative code.
