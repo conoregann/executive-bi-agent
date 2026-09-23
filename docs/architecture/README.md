@@ -15,3 +15,7 @@ The initial architecture deliberately excludes exploratory SQL and external inte
 
 - [Trusted MRR service contract](trusted-mrr-service-contract.md) — the first
   controlled, evidence-bearing analytics capability.
+- [Investigation contract](investigation-contract.md) — the executable MRR
+  decline plan and bounded follow-up context.
+- [MRR-decline API contract](api-mrr-decline-contract.md) — the narrow
+  synthetic-data integration boundary.
