@@ -9,30 +9,38 @@ Behavioral guidelines, non-negotiable system invariants, and project execution s
 ## 1. Core Operating Rules
 
 ### 1. Think Before Coding
+
 **Don’t assume. Don’t hide confusion. Surface tradeoffs.**
+
 - Read the governing contracts (`packages/schemas`, `docs/SPEC.md`), affected code, and tests before editing.
 - State your assumptions explicitly. If an architectural or modeling choice is open, ask before building.
 - If multiple interpretations exist, present them—do not pick silently.
 - If a simpler approach exists, say so. Push back when warranted.
 
 ### 2. Simplicity First
+
 **Minimum code that solves the problem. Nothing speculative.**
+
 - Build only what was asked. No speculative abstractions or unrequested configurability.
 - Do not introduce new dependencies, vector stores, or infrastructure until an active feature strictly requires them.
-- *Senior engineer test:* If you write 200 lines and it could be 50, rewrite it.
+- _Senior engineer test:_ If you write 200 lines and it could be 50, rewrite it.
 
 ### 3. Surgical Changes
+
 **Touch only what you must. Clean up only your own mess.**
+
 - Do not "improve" adjacent code, comments, or formatting. Match existing style.
 - Do not refactor components that are not broken.
 - When your changes orphan imports, variables, or functions, remove them. Leave pre-existing dead code untouched (mention it instead).
 - Every changed line must trace directly to the requested feature.
 
 ### 4. Goal-Driven Execution
+
 **Define success criteria. Loop until verified.**
+
 - Convert tasks into verifiable goals before modifying implementation:
-  - *"Fix metric query"* $\to$ write a test reproducing the discrepancy, then make it pass.
-  - *"Add API endpoint"* $\to$ write a contract/schema test first, then implement.
+  - _"Fix metric query"_ $\to$ write a test reproducing the discrepancy, then make it pass.
+  - _"Add API endpoint"_ $\to$ write a contract/schema test first, then implement.
 - For multi-step tasks, state a brief plan:
   ```
   1. [Step] → verify: [check]
@@ -48,19 +56,19 @@ This repository is a production-style Executive BI Agent for a fictional B2B Saa
 
 Canonical system specs and data schemas live in **`docs/SPEC.md`**.
 
-| Path | Responsibility | Invariant |
-| :--- | :--- | :--- |
-| `apps/web` | Next.js 15 UI, Recharts rendering | Consumes NestJS API only. No direct DB or model access. |
-| `apps/api` | NestJS API, investigation orchestration | Enforces auth, rate limits, and structured response validation. |
-| `apps/worker` | BullMQ async jobs | Ingestion, heavy queries, and long-running investigations. |
-| `packages/metrics` | Semantic metric catalog & query compiler | **Deterministic pure logic only.** No LLM inference inside metric math. |
-| `packages/database` | PostgreSQL client, migrations, seeds | Strict separation of raw, staging, and analytics schemas. |
-| `packages/retrieval`| Knowledge ingestion, pgvector search | Hybrid search over internal documents with strict metadata filtering. |
-| `packages/ai` | Model adapters, prompts, tool contracts | Provider-independent structured outputs using shared Zod schemas. |
-| `packages/schemas` | Shared typed contracts (Zod) | Single source of truth across web, API, worker, and packages. |
-| `evals/` | Automated benchmark suite (100 cases) | Tests metric correctness, SQL safety, and groundedness. |
-| `data/` | Synthetic data generators & seeds | Strictly synthetic data. No real PII or customer data. |
-| `docs/` | Canonical specifications (`SPEC.md`) and ADRs | Concise documentation only. No duplicated code walkthroughs. |
+| Path                 | Responsibility                                | Invariant                                                               |
+| :------------------- | :-------------------------------------------- | :---------------------------------------------------------------------- |
+| `apps/web`           | Next.js 15 UI, Recharts rendering             | Consumes NestJS API only. No direct DB or model access.                 |
+| `apps/api`           | NestJS API, investigation orchestration       | Enforces auth, rate limits, and structured response validation.         |
+| `apps/worker`        | BullMQ async jobs                             | Ingestion, heavy queries, and long-running investigations.              |
+| `packages/metrics`   | Semantic metric catalog & query compiler      | **Deterministic pure logic only.** No LLM inference inside metric math. |
+| `packages/database`  | PostgreSQL client, migrations, seeds          | Strict separation of raw, staging, and analytics schemas.               |
+| `packages/retrieval` | Knowledge ingestion, pgvector search          | Hybrid search over internal documents with strict metadata filtering.   |
+| `packages/ai`        | Model adapters, prompts, tool contracts       | Provider-independent structured outputs using shared Zod schemas.       |
+| `packages/schemas`   | Shared typed contracts (Zod)                  | Single source of truth across web, API, worker, and packages.           |
+| `evals/`             | Automated benchmark suite (100 cases)         | Tests metric correctness, SQL safety, and groundedness.                 |
+| `data/`              | Synthetic data generators & seeds             | Strictly synthetic data. No real PII or customer data.                  |
+| `docs/`              | Canonical specifications (`SPEC.md`) and ADRs | Concise documentation only. No duplicated code walkthroughs.            |
 
 ---
 
@@ -124,6 +132,7 @@ Work in complete feature scopes, using substantial branches and regular checkpoi
 ## 6. Definition of Done
 
 A task or feature branch is ready for review and merge only when:
+
 - [ ] The feature is completely implemented according to `docs/SPEC.md`.
 - [ ] Metric calculations and SQL execution strictly follow security invariants.
 - [ ] Targeted tests pass and cover both happy paths and edge/failure cases.
