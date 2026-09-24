@@ -25,6 +25,7 @@ test('loads only labeled synthetic fixtures and completes the scoped MRR-decline
     dependencies.documents.map((document) => document.documentId),
     ['payment-incident-281', 'august-sales-review'],
   );
+  assert.deepEqual(dependencies.documents[1]?.customerIds, ['cust_acme']);
 
   await withServer(async (baseUrl) => {
     const response = await fetch(`${baseUrl}/v1/investigations/mrr-decline`, {
@@ -33,7 +34,7 @@ test('loads only labeled synthetic fixtures and completes the scoped MRR-decline
       body: JSON.stringify({
         investigationId: 'august-decline',
         month: '2026-08-01',
-        permittedCustomerIds: ['cust_churn', 'cust_contract'],
+        permittedCustomerIds: ['cust_acme', 'cust_riviera'],
       }),
     });
     const body = await response.json();
@@ -41,12 +42,12 @@ test('loads only labeled synthetic fixtures and completes the scoped MRR-decline
     assert.equal(response.status, 201);
     assert.equal(body.status, 'completed');
     assert.deepEqual(body.record.permittedCustomerIds, [
-      'cust_churn',
-      'cust_contract',
+      'cust_acme',
+      'cust_riviera',
     ]);
     assert.deepEqual(body.record.driverCustomerIds, [
-      'cust_churn',
-      'cust_contract',
+      'cust_acme',
+      'cust_riviera',
     ]);
     assert.equal(body.record.plan.maximumToolCalls, 5);
     assert.ok(body.record.evidenceIds.length >= 5);

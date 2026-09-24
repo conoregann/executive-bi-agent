@@ -2,7 +2,8 @@
 
 ## Fixture
 
-Use a two-month synthetic subscription snapshot:
+Use a two-month synthetic service-test snapshot, separate from the canonical
+local PostgreSQL and JSON fixtures:
 
 | Customer        | July MRR | August MRR | Expected movement  |
 | --------------- | -------: | ---------: | ------------------ |

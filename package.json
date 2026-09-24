@@ -7,6 +7,7 @@
     "check": "turbo run check",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs --follow db",
+    "db:migrate": "docker compose exec -T db sh -c 'psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -f /workspace/migrate.sql'",
     "db:up": "docker compose up --detach db",
     "db:verify": "docker compose exec -T db sh -c 'psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" -v ON_ERROR_STOP=1 -f /workspace/verify.sql'",
     "dev": "turbo run dev",
