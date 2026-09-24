@@ -7,7 +7,7 @@ on:
 
 jobs:
   quality:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,4 +20,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm check
+      - run: docker compose up --detach --wait db
+      - run: pnpm db:migrate
+      - run: pnpm db:verify
       - run: pnpm test
+        env:
+          DATABASE_URL: postgres://executive_bi:executive_bi_local_only@127.0.0.1:5433/executive_bi
