@@ -2,6 +2,11 @@ CREATE SCHEMA IF NOT EXISTS raw;
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS analytics;
 
+CREATE TABLE raw.source_snapshots (
+  source TEXT PRIMARY KEY,
+  freshness TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE raw.customers (
   customer_id TEXT PRIMARY KEY,
   customer_name TEXT NOT NULL,
@@ -20,6 +25,7 @@ CREATE TABLE raw.subscription_month_snapshots (
   month DATE NOT NULL CHECK (month = date_trunc('month', month)::DATE),
   mrr_eur_cents BIGINT NOT NULL CHECK (mrr_eur_cents >= 0),
   subscription_status TEXT NOT NULL CHECK (subscription_status IN ('active', 'cancelled')),
+  cancelled_at TIMESTAMPTZ,
   PRIMARY KEY (customer_id, subscription_id, month)
 );
 
@@ -76,7 +82,8 @@ SELECT
   customer.country,
   customer.region,
   customer.industry,
-  customer.company_size
+  customer.company_size,
+  snapshot.cancelled_at
 FROM raw.subscription_month_snapshots AS snapshot
 JOIN staging.customers AS customer USING (customer_id);
 
@@ -91,8 +98,14 @@ SELECT
   country,
   region,
   industry,
-  company_size
+  company_size,
+  cancelled_at
 FROM staging.subscription_month_snapshots;
+
+CREATE VIEW analytics.subscription_month_freshness AS
+SELECT freshness
+FROM raw.source_snapshots
+WHERE source = 'analytics.subscription_month';
 
 CREATE VIEW analytics.mrr_monthly AS
 SELECT
