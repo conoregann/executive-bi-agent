@@ -35,6 +35,14 @@ The movement reconciles in cents:
 
 Supporting synthetic support and knowledge records provide dated context for the churned customer. They are not evidence of a causal relationship.
 
+`data/synthetic/subscription-month-2026.json` and
+`analytics.subscription_month` contain the same ten subscription-month rows,
+including customer IDs, dimensions, cancellation timestamps, and MRR cents.
+`analytics.subscription_month_freshness` carries the same source freshness as
+the JSON fixture. The read-only PostgreSQL repository in `packages/analytics`
+uses fixed queries against these two approved views, binds the requested month,
+and validates returned rows before metrics consume them.
+
 ## Local operation
 
 ```bash
@@ -44,6 +52,11 @@ pnpm db:verify
 ```
 
 The PostgreSQL image executes `infra/postgres/init/01-schema.sql` and `02-seed.sql` only on first volume initialization. `infra/postgres/verify.sql` asserts the expected MRR values, reconciliation, and churn count.
+
+For an existing local synthetic volume, run `pnpm db:migrate` before
+`pnpm db:verify`. The migration adds the cancellation and freshness fields
+without replacing existing data. Verification also checks every PostgreSQL
+subscription-month row against the mounted JSON fixture.
 
 To deliberately reseed local data, stop the service and remove the named Docker volume, then run `pnpm db:up`. Do not use that operation for real environments.
 
