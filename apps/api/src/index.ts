@@ -76,7 +76,7 @@ export async function loadSyntheticMrrDeclineDependencies(): Promise<SyntheticMr
         observedAt: '2026-08-31T17:00:00Z',
         freshness: snapshot.freshness,
         content: salesReview,
-        customerIds: ['cust_churn'],
+        customerIds: ['cust_acme'],
       },
     ],
   };
