@@ -22,11 +22,20 @@ test('accepts only the narrow MRR-decline request shape', () => {
     }).success,
     false,
   );
+  assert.equal(
+    mrrDeclineRequestSchema.safeParse({
+      investigationId: 'dup',
+      month: '2026-08-01',
+      permittedCustomerIds: ['cust_a', 'cust_a'],
+    }).success,
+    false,
+  );
 });
 
 test('requires a retained investigation record for terminal API results', () => {
   const parsed = mrrDeclineResponseSchema.safeParse({
     status: 'completed',
+    accessToken: 'a'.repeat(43),
     record: {
       investigationId: 'august-decline',
       kind: 'mrr_decline',

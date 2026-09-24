@@ -52,6 +52,11 @@ These cases are fixture-backed acceptance criteria for the first implementation.
 | Required behavior | Return the stored resolved month and permitted customer IDs without running another tool or broadening scope. |
 | Prohibited answer | Infer a different period from the current date or search another customer's data.                             |
 
+The executable acceptance test additionally restarts the service over the same
+store, verifies that source-backed evidence remains readable with its token,
+rejects an invalid token, and rejects a changed period or customer scope
+without making a new tool call.
+
 ## Case: unreconciled movement
 
 | Field             | Expected contract                                                                                   |

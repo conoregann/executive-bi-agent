@@ -55,4 +55,6 @@ SELECT freshness
 FROM raw.source_snapshots
 WHERE source = 'analytics.subscription_month';
 
+\ir init/02-investigations.sql
+
 COMMIT;
