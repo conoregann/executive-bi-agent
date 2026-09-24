@@ -1,12 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { MrrDeclineInvestigationService } from '../dist/index.js';
+import {
+  InMemoryInvestigationStore,
+  MrrDeclineInvestigationService,
+} from '../dist/index.js';
 import { TrustedMrrService } from '../../metrics/dist/index.js';
 import { createCompanyKnowledgeSearch } from '../../retrieval/dist/index.js';
 
 function evidence(id, integrity = 'valid') {
-  return { evidenceId: id, integrity };
+  return {
+    evidenceId: id,
+    type: 'calculation',
+    source: 'synthetic_test',
+    sourceRef: id,
+    observedAt: '2026-09-01T00:00:00Z',
+    retrievedAt: '2026-09-01T00:00:00Z',
+    scope: {},
+    content: {},
+    freshness: '2026-09-01T00:00:00Z',
+    integrity,
+  };
 }
 
 function ok(value, id, warnings = []) {
@@ -127,7 +141,12 @@ test('runs the fixed MRR-decline plan with scoped evidence and retained context'
     ],
   ]);
 
-  const context = service.getFollowUpContext('investigation_2026_08');
+  const context = await service.getFollowUpContext(
+    'investigation_2026_08',
+    result.accessToken,
+    '2026-08-01',
+    ['cust_churn', 'cust_contract'],
+  );
   assert.equal(context.status, 'ok');
   assert.deepEqual(context.record, result.record);
   assert.equal(fixture.calls.length, 5);
@@ -191,6 +210,14 @@ test('rejects malformed and duplicate requests before starting tools', async () 
   assert.equal(malformed.status, 'invalid_request');
   assert.equal(fixture.calls.length, 0);
 
+  const duplicateScope = await service.start({
+    investigationId: 'duplicate-scope',
+    month: '2026-08-01',
+    permittedCustomerIds: ['cust_a', 'cust_a'],
+  });
+  assert.equal(duplicateScope.status, 'invalid_request');
+  assert.equal(fixture.calls.length, 0);
+
   await service.start({ investigationId: 'one-time', month: '2026-08-01' });
   const duplicate = await service.start({
     investigationId: 'one-time',
@@ -199,7 +226,110 @@ test('rejects malformed and duplicate requests before starting tools', async () 
   assert.equal(duplicate.status, 'invalid_request');
   assert.match(duplicate.error ?? '', /already been used/);
   assert.equal(fixture.calls.length, 5);
-  assert.equal(service.getFollowUpContext('missing').status, 'not_found');
+  assert.equal(
+    (await service.getFollowUpContext('missing', 'missing', '2026-08-01', []))
+      .status,
+    'not_found',
+  );
+});
+
+test('retains evidence across service instances and enforces token and exact follow-up scope', async () => {
+  const fixture = fixtureTools();
+  const store = new InMemoryInvestigationStore();
+  const result = await new MrrDeclineInvestigationService(
+    fixture.tools,
+    store,
+  ).start({
+    investigationId: 'persistent-context',
+    month: '2026-08-01',
+    permittedCustomerIds: ['cust_churn'],
+  });
+  assert.equal(result.status, 'completed');
+  const service = new MrrDeclineInvestigationService(fixture.tools, store);
+  const found = await service.getInvestigation(
+    'persistent-context',
+    result.accessToken,
+  );
+  assert.equal(found.status, 'ok');
+  assert.equal(found.evidence.length, result.record.evidenceIds.length);
+  assert.equal(
+    (await service.getInvestigation('persistent-context', 'wrong')).status,
+    'forbidden',
+  );
+  assert.equal(
+    (
+      await service.getFollowUpContext(
+        'persistent-context',
+        result.accessToken,
+        '2026-08-01',
+        [],
+      )
+    ).status,
+    'scope_mismatch',
+  );
+  assert.equal(
+    (
+      await service.getFollowUpContext(
+        'persistent-context',
+        result.accessToken,
+        '2026-07-01',
+        ['cust_churn'],
+      )
+    ).status,
+    'scope_mismatch',
+  );
+  assert.equal(
+    (
+      await service.getFollowUpContext(
+        'persistent-context',
+        result.accessToken,
+        '2026-08-01',
+        ['cust_churn'],
+      )
+    ).status,
+    'ok',
+  );
+  assert.equal(fixture.calls.length, 5);
+});
+
+test('reserves an ID before tools and blocks safely when a tool throws', async () => {
+  const fixture = fixtureTools({
+    async compareMrr() {
+      throw new Error('private upstream detail');
+    },
+  });
+  const store = new InMemoryInvestigationStore();
+  const service = new MrrDeclineInvestigationService(fixture.tools, store);
+  const first = await service.start({
+    investigationId: 'failed-tool',
+    month: '2026-08-01',
+  });
+  assert.equal(first.status, 'blocked');
+  assert.deepEqual(first.warnings, [
+    'tool_execution_failed',
+    'mrr_comparison_unavailable',
+  ]);
+  assert.equal(first.error, undefined);
+  assert.equal(
+    (await service.getInvestigation('failed-tool', first.accessToken)).status,
+    'ok',
+  );
+  assert.equal(
+    (
+      await service.getFollowUpContext(
+        'failed-tool',
+        first.accessToken,
+        '2026-08-01',
+        [],
+      )
+    ).status,
+    'not_found',
+  );
+  const duplicate = await new MrrDeclineInvestigationService(
+    fixture.tools,
+    store,
+  ).start({ investigationId: 'failed-tool', month: '2026-08-01' });
+  assert.equal(duplicate.status, 'invalid_request');
 });
 
 test('composes trusted metric and knowledge capabilities without generated claims', async () => {

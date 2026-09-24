@@ -51,6 +51,58 @@ test('loads only labeled synthetic fixtures and completes the scoped MRR-decline
     ]);
     assert.equal(body.record.plan.maximumToolCalls, 5);
     assert.ok(body.record.evidenceIds.length >= 5);
+    assert.match(body.accessToken, /^[A-Za-z0-9_-]{43}$/u);
+    const evidenceId = body.record.evidenceIds[0];
+    const detail = await fetch(`${baseUrl}/v1/investigations/august-decline`, {
+      headers: { authorization: `Bearer ${body.accessToken}` },
+    });
+    assert.equal(detail.status, 200);
+    assert.deepEqual((await detail.json()).record, body.record);
+    const evidence = await fetch(
+      `${baseUrl}/v1/investigations/august-decline/evidence/${evidenceId}`,
+      { headers: { authorization: `Bearer ${body.accessToken}` } },
+    );
+    assert.equal(evidence.status, 200);
+    const evidenceBody = await evidence.json();
+    assert.equal(evidenceBody.evidence.evidenceId, evidenceId);
+    assert.ok(evidenceBody.evidence.source);
+    assert.ok(evidenceBody.evidence.freshness);
+    assert.equal(
+      (
+        await fetch(`${baseUrl}/v1/investigations/august-decline`, {
+          headers: { authorization: `Bearer ${'x'.repeat(43)}` },
+        })
+      ).status,
+      404,
+    );
+    const followUp = await fetch(
+      `${baseUrl}/v1/investigations/august-decline/follow-up-context`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${body.accessToken}`,
+        },
+        body: JSON.stringify({
+          month: '2026-08-01',
+          permittedCustomerIds: ['cust_acme', 'cust_riviera'],
+        }),
+      },
+    );
+    assert.equal(followUp.status, 200);
+    assert.deepEqual((await followUp.json()).record, body.record);
+    const broader = await fetch(
+      `${baseUrl}/v1/investigations/august-decline/follow-up-context`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${body.accessToken}`,
+        },
+        body: JSON.stringify({ month: '2026-08-01' }),
+      },
+    );
+    assert.equal(broader.status, 403);
   });
 });
 

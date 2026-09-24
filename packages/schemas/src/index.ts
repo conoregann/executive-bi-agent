@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 const calendarMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/u);
 const opaqueIdentifier = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/u);
-const customerIds = z.array(z.string().trim().min(1)).min(1);
+const customerIds = z
+  .array(z.string().trim().min(1))
+  .min(1)
+  .max(50)
+  .refine(
+    (ids) => new Set(ids).size === ids.length,
+    'Customer IDs must be unique.',
+  );
 
 export const mrrDeclineRequestSchema = z
   .object({
@@ -40,10 +47,40 @@ export const mrrDeclineRecordSchema = z
   })
   .strict();
 
+export const investigationEvidenceSchema = z
+  .object({
+    evidenceId: z.string().min(1),
+    type: z.enum(['metric_query', 'calculation', 'document_chunk']),
+    source: z.string().min(1),
+    sourceRef: z.string().min(1),
+    observedAt: z.union([calendarMonth, z.string().datetime()]),
+    retrievedAt: z.string().datetime(),
+    scope: z.record(z.string(), z.unknown()),
+    content: z.record(z.string(), z.unknown()),
+    freshness: z.string().datetime(),
+    integrity: z.enum(['valid', 'warning', 'invalid']),
+  })
+  .strict();
+
+export const followUpContextRequestSchema = z
+  .object({
+    month: calendarMonth,
+    permittedCustomerIds: z
+      .array(z.string().trim().min(1))
+      .max(50)
+      .refine(
+        (ids) => new Set(ids).size === ids.length,
+        'Customer IDs must be unique.',
+      )
+      .default([]),
+  })
+  .strict();
+
 const completedOrBlockedResponseSchema = z
   .object({
     status: z.enum(['completed', 'blocked']),
     record: mrrDeclineRecordSchema,
+    accessToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
     warnings: z.array(z.string().min(1)),
     error: z.string().min(1).optional(),
   })
