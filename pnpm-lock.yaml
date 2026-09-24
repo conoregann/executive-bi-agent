@@ -17,9 +17,41 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  apps/api:
+    dependencies:
+      '@executive-bi/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
+      '@executive-bi/investigations':
+        specifier: workspace:*
+        version: link:../../packages/investigations
+      '@executive-bi/metrics':
+        specifier: workspace:*
+        version: link:../../packages/metrics
+      '@executive-bi/retrieval':
+        specifier: workspace:*
+        version: link:../../packages/retrieval
+      '@executive-bi/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.4
+
   packages/analytics: {}
 
+  packages/investigations: {}
+
   packages/metrics: {}
+
+  packages/retrieval: {}
+
+  packages/schemas:
+    dependencies:
+      zod:
+        specifier: ^3.24.4
+        version: 3.25.76
 
 packages:
   '@turbo/darwin-64@2.11.2':
@@ -70,6 +102,12 @@ packages:
     cpu: [arm64]
     os: [win32]
 
+  '@types/node@22.20.4':
+    resolution:
+      {
+        integrity: sha512-zJRE40jpHtKqE/C4fgHrAKQLJuSpzEnP9ff9Y7YtoR3Wd2pwqzlekDeEuUQXjRd+QCYnVnNwuJYmhdk9XV8gvA==,
+      }
+
   prettier@3.9.8:
     resolution:
       {
@@ -93,6 +131,18 @@ packages:
     engines: { node: '>=14.17' }
     hasBin: true
 
+  undici-types@6.21.0:
+    resolution:
+      {
+        integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==,
+      }
+
+  zod@3.25.76:
+    resolution:
+      {
+        integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==,
+      }
+
 snapshots:
   '@turbo/darwin-64@2.11.2':
     optional: true
@@ -112,6 +162,10 @@ snapshots:
   '@turbo/windows-arm64@2.11.2':
     optional: true
 
+  '@types/node@22.20.4':
+    dependencies:
+      undici-types: 6.21.0
+
   prettier@3.9.8: {}
 
   turbo@2.11.2:
@@ -124,3 +178,7 @@ snapshots:
       '@turbo/windows-arm64': 2.11.2
 
   typescript@5.9.3: {}
+
+  undici-types@6.21.0: {}
+
+  zod@3.25.76: {}

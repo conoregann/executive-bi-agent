@@ -1,0 +1,25 @@
+{
+  "name": "@executive-bi/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "check": "pnpm --filter @executive-bi/analytics build && pnpm --filter @executive-bi/investigations build && pnpm --filter @executive-bi/metrics build && pnpm --filter @executive-bi/retrieval build && pnpm --filter @executive-bi/schemas build && tsc --project tsconfig.json --noEmit",
+    "start": "node dist/main.js",
+    "test": "pnpm run check && tsc --project tsconfig.json && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@executive-bi/analytics": "workspace:*",
+    "@executive-bi/investigations": "workspace:*",
+    "@executive-bi/metrics": "workspace:*",
+    "@executive-bi/retrieval": "workspace:*",
+    "@executive-bi/schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
+  }
+}
