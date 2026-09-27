@@ -129,3 +129,61 @@ test('Germany and UK comparison continues through reconciled country accounts to
       .content.usageComparisons.some((row) => row.activeUserChange === -40),
   );
 });
+
+test('mixed model synthesis retains valid explanations with inspectable partial-result warnings', async () => {
+  const valid = [
+    {
+      kind: 'pricing',
+      supportingEvidenceIds: ['ops_crm', 'cross_doc_0'],
+      contradictoryEvidenceIds: ['ops_crm'],
+    },
+    {
+      kind: 'support',
+      supportingEvidenceIds: ['ops_support', 'cross_doc_0'],
+      contradictoryEvidenceIds: [],
+    },
+  ];
+  const { api, child, store, dependencies } = await scenario({
+    async complete(phase) {
+      return phase === 'plan'
+        ? { tools: ['crm', 'support', 'usage'] }
+        : {
+            hypotheses: [
+              ...valid,
+              {
+                kind: 'usage',
+                supportingEvidenceIds: ['ops_usage'],
+                contradictoryEvidenceIds: [],
+              },
+            ],
+          };
+    },
+  });
+  assert.equal(child.record.modelStatus, 'completed');
+  assert.deepEqual(child.record.hypotheses, valid);
+  assert.ok(
+    child.warnings.includes(
+      'Rejected usage hypothesis: cited evidence is stale, incomplete or invalid.',
+    ),
+  );
+  assert.ok(
+    child.warnings.includes(
+      'Model synthesis is partial; only validated hypotheses are shown.',
+    ),
+  );
+  const answer = await (
+    await send(api, 'cross/answer', undefined, child.accessToken)
+  ).json();
+  assert.equal(answer.status, 'ok');
+  assert.equal(
+    answer.answer.evidence.find((e) => e.evidenceId === 'ops_usage').integrity,
+    'warning',
+  );
+  const restarted = createMrrDeclineApi(dependencies, store);
+  assert.deepEqual(
+    await (
+      await send(restarted, 'cross/answer', undefined, child.accessToken)
+    ).json(),
+    answer,
+  );
+});

@@ -307,9 +307,18 @@ export async function runCrossSource(
           deadline,
         ),
       );
-      if (!validHypotheses(proposal.hypotheses, evidence))
-        throw new Error('Unsupported references');
-      hypotheses = proposal.hypotheses;
+      hypotheses = proposal.hypotheses.filter((hypothesis) => {
+        const reason = hypothesisRejection(hypothesis, evidence);
+        if (reason)
+          warnings.push(`Rejected ${hypothesis.kind} hypothesis: ${reason}.`);
+        return reason === undefined;
+      });
+      if (proposal.hypotheses.length > 0 && hypotheses.length === 0)
+        throw new Error('No supported hypotheses');
+      if (hypotheses.length < proposal.hypotheses.length)
+        warnings.push(
+          'Model synthesis is partial; only validated hypotheses are shown.',
+        );
       modelStatus = 'completed';
     } catch {
       warnings.push('model_synthesis_unavailable');
@@ -352,47 +361,53 @@ function validHypotheses(
   hypotheses: CrossSourceRecord['hypotheses'],
   evidence: readonly InvestigationEvidence[],
 ): boolean {
+  return hypotheses.every(
+    (hypothesis) => hypothesisRejection(hypothesis, evidence) === undefined,
+  );
+}
+function hypothesisRejection(
+  h: CrossSourceRecord['hypotheses'][number],
+  evidence: readonly InvestigationEvidence[],
+): string | undefined {
   const byId = new Map(evidence.map((item) => [item.evidenceId, item]));
-  return hypotheses.every((h) => {
-    const required = h.kind === 'pricing' ? 'crm' : h.kind;
-    return (
-      [...h.supportingEvidenceIds, ...h.contradictoryEvidenceIds].every(
-        (id) =>
-          byId.has(id) &&
-          id !== 'cross_parent' &&
-          byId.get(id)!.integrity === 'valid',
-      ) &&
-      h.supportingEvidenceIds.some((id) => {
-        const item = byId.get(id)!;
-        if (item.scope.source !== required || !Array.isArray(item.content.rows))
-          return false;
-        const rows = operationalSnapshotSchema.safeParse({
-          label: 'synthetic',
-          rows: item.content.rows,
-        });
-        if (!rows.success) return false;
-        if (h.kind === 'pricing')
-          return rows.data.rows.some(
-            (row) => row.category === 'pricing_objection',
-          );
-        if (h.kind === 'support')
-          return rows.data.rows.some((row) => row.category === 'escalation');
-        return rows.data.rows.some(
-          (row) =>
-            row.month === item.scope.month &&
-            rows.data.rows.some(
-              (prior) =>
-                prior.customerId === row.customerId &&
-                prior.month === item.scope.previousMonth &&
-                row.activeUsers !== null &&
-                prior.activeUsers !== null &&
-                row.activeUsers < prior.activeUsers,
-            ),
-        );
-      })
+  const references = [
+    ...h.supportingEvidenceIds,
+    ...h.contradictoryEvidenceIds,
+  ];
+  if (references.some((id) => !byId.has(id) || id === 'cross_parent'))
+    return 'cited evidence is unavailable or disallowed';
+  if (references.some((id) => byId.get(id)!.integrity !== 'valid'))
+    return 'cited evidence is stale, incomplete or invalid';
+  const required = h.kind === 'pricing' ? 'crm' : h.kind;
+  const supported = h.supportingEvidenceIds.some((id) => {
+    const item = byId.get(id)!;
+    if (item.scope.source !== required || !Array.isArray(item.content.rows))
+      return false;
+    const rows = operationalSnapshotSchema.safeParse({
+      label: 'synthetic',
+      rows: item.content.rows,
+    });
+    if (!rows.success) return false;
+    if (h.kind === 'pricing')
+      return rows.data.rows.some((row) => row.category === 'pricing_objection');
+    if (h.kind === 'support')
+      return rows.data.rows.some((row) => row.category === 'escalation');
+    return rows.data.rows.some(
+      (row) =>
+        row.month === item.scope.month &&
+        rows.data.rows.some(
+          (prior) =>
+            prior.customerId === row.customerId &&
+            prior.month === item.scope.previousMonth &&
+            row.activeUsers !== null &&
+            prior.activeUsers !== null &&
+            row.activeUsers < prior.activeUsers,
+        ),
     );
   });
+  return supported ? undefined : 'matching operational facts do not support it';
 }
+
 export function readCrossSourceAnswer(
   record: CrossSourceRecord,
   evidence: readonly InvestigationEvidence[],

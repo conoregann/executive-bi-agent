@@ -293,7 +293,41 @@ add('model-deadline', async () => {
   assert.equal(result.child.status, 'blocked');
   assert.ok(result.child.record.elapsedMs < 32000);
 });
-assert.equal(cases.length, 45);
+add('mixed-synthesis-stale-usage', async () => {
+  const valid = ['pricing', 'support'].map((kind) => ({
+    kind,
+    supportingEvidenceIds: [kind === 'pricing' ? 'ops_crm' : 'ops_support'],
+    contradictoryEvidenceIds: [],
+  }));
+  const result = await scenario({
+    async complete(phase) {
+      return phase === 'plan'
+        ? { tools: ['crm', 'support', 'usage'] }
+        : {
+            hypotheses: [
+              ...valid,
+              {
+                kind: 'usage',
+                supportingEvidenceIds: ['ops_usage'],
+                contradictoryEvidenceIds: [],
+              },
+            ],
+          };
+    },
+  });
+  assert.equal(result.child.record.modelStatus, 'completed');
+  assert.deepEqual(result.child.record.hypotheses, valid);
+  assert.ok(
+    result.child.warnings.includes(
+      'Rejected usage hypothesis: cited evidence is stale, incomplete or invalid.',
+    ),
+  );
+  const answer = await (
+    await send(result.api, 'cross/answer', undefined, result.child.accessToken)
+  ).json();
+  assert.equal(answer.status, 'ok');
+});
+assert.equal(cases.length, 46);
 const results = [];
 for (const entry of cases) {
   const started = performance.now();

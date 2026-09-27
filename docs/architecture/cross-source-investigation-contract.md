@@ -49,9 +49,15 @@ reserved before source execution. Malformed or failed planning retains a blocked
 child; failed synthesis retains observed evidence with an explicit limitation.
 
 Synthesis accepts only tentative pricing, support or usage hypotheses backed by
-matching operational facts. Unknown citations, stale evidence and unsupported
-categories are rejected. Numerical observations and documents are displayed from
-structured source results and cited excerpts. Retrieved content is untrusted
+matching operational facts. Unknown citations, stale evidence and explanations
+without matching facts are rejected per hypothesis. Valid hypotheses remain available when
+other hypotheses fail evidence validation; the retained warnings describe each
+rejection and label partial synthesis. `modelStatus: completed` means accepted
+hypotheses passed validation (or the model proposed none), not that every proposal
+was accepted. If every proposed hypothesis is rejected, synthesis remains
+`unavailable`. Malformed responses still fail as a whole. No evidence-integrity
+restriction is relaxed, including for contradictory citations. Numerical
+observations and documents are displayed from structured source results and cited excerpts. Retrieved content is untrusted
 input. Coverage, freshness, conflicts and unconfirmed causality remain visible,
 even when the model omits them. Missing contextual evidence does not replace or
 block valid retained metrics.

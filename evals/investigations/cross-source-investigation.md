@@ -2,7 +2,7 @@
 
 Contract: [cross-source investigations](../../docs/architecture/cross-source-investigation-contract.md).
 
-Run `pnpm eval:cross-source` after building the workspace. It executes 45 synthetic
+Run `pnpm eval:cross-source` after building the workspace. It executes 46 synthetic
 cases against the API and retained-answer boundaries: malformed plans and
 synthesis, unknown citations, permissions, customer/date overrides, unsupported
 questions, missing sources, contradictory CRM context, stale coverage, malicious
@@ -24,3 +24,9 @@ Provider tests separately verify Gemini structured proposals, credential headers
 blocked and truncated responses, invalid JSON and rate-limit failures using a
 mock transport. Configuration tests verify explicit provider selection and no
 silent provider fallback. These checks do not measure live Gemini quality.
+
+`mixed-synthesis-stale-usage` retains valid pricing/support hypotheses while
+rejecting the stale usage citation, preserves observed evidence and reports a
+partial synthesis warning. Package tests additionally cover unknown references,
+stale contradictory references, unsupported facts and all-rejected proposals;
+retained reads still reject tampered hypotheses.
