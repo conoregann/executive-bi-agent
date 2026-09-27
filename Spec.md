@@ -24,6 +24,7 @@ focused contract, surface the conflict before changing that boundary.
 
 | Location                  | Current responsibility                                                                                                                                                                                                           |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                | React/Vite interface for structured synthetic MRR investigations, cited answers, and authenticated evidence inspection. No natural-language input or streaming.                                                                  |
 | `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context, deterministic cited answers. Not NestJS or a production tenant/RBAC service. |
 | `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                                                  |
 | `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                                                           |
@@ -44,8 +45,9 @@ separately; the API currently uses the JSON analytics fixture.
 
 The topology, package responsibilities, broad data model, tool examples, output
 interface, state machine, benchmark targets, and milestones in sections 1–10
-are intended architecture. `apps/web`, `apps/worker`, `packages/ai`, and
-`packages/observability` do not exist. Natural-language resolution, NestJS/SSE,
+are intended architecture. `apps/worker`, `packages/ai`, and `packages/observability` do not exist.
+The React/Vite `apps/web` supports the existing structured MRR workflow; the
+SSE streaming remains future scope. Natural-language resolution, NestJS/SSE,
 BullMQ/Redis, dbt, embeddings/pgvector retrieval, exploratory SQL, external
 connectors, production authorization/rate limits, and telemetry are not
 implemented. SQL safety requirements below are mandatory prerequisites before
@@ -56,7 +58,7 @@ any generated-SQL capability can be exposed, not an existing execution path.
 ```text
                        ┌─────────────────────────┐
                        │   Executive Dashboard   │
-                       │   Next.js 15 / Recharts │
+                       │   React / Recharts     │
                        └────────────┬────────────┘
                                     │ HTTP / SSE
                                     ▼
@@ -93,7 +95,7 @@ any generated-SQL capability can be exposed, not an existing execution path.
 
 | Path                     | Responsibility                                                              | Invariant                                                                   |
 | :----------------------- | :-------------------------------------------------------------------------- | :-------------------------------------------------------------------------- |
-| `apps/web`               | Executive Next.js interface, chat/investigation feed, Recharts visualizer   | Presentation and state streaming only. Zero direct database or LLM queries. |
+| `apps/web`               | Executive React interface, chat/investigation feed, Recharts visualizer     | Presentation and state streaming only. Zero direct database or LLM queries. |
 | `apps/api`               | NestJS application, REST/SSE endpoints, auth, orchestrator entrypoint       | Enforces rate limits, authorization, and tenant context.                    |
 | `apps/worker`            | BullMQ worker for heavy async investigations, dbt runs, and ingestion       | Offloads long-running investigations (>5s).                                 |
 | `packages/metrics`       | Semantic metric definitions, compiler, and analytical execution engine      | Deterministic code only. Zero model inference inside metric math.           |
@@ -588,7 +590,7 @@ Milestone 5: Benchmark Evaluation & Production Hardening
 
 ### Milestone 4: Executive Web App & Live Visualization
 
-- `apps/web`: Next.js 15 interface with streaming SSE investigation progress.
+- `apps/web`: React interface with streaming SSE investigation progress.
 - Collapsible _"How this answer was generated"_ audit trail with inspectable SQL and document cards.
 - Recharts visualizations for metric movements, cohort retention, and driver waterfalls.
 

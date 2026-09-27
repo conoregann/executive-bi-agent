@@ -22,3 +22,5 @@ The initial architecture deliberately excludes exploratory SQL and external inte
 
 - [Evidence-backed answer contract](investigation-answer-contract.md) — deterministic
   executive presentation of persisted investigations and inspectable citations.
+
+- [Executive web interface](executive-web-contract.md) — structured synthetic MRR submissions and authenticated citation inspection.
