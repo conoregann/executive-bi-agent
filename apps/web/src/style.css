@@ -1,163 +1,41 @@
-:root {
-  font-family: Inter, system-ui, sans-serif;
-  color: #182c32;
-  background: #f0f4f2;
-  font-synthesis: none;
-  line-height: 1.6;
-}
-* {
-  box-sizing: border-box;
-}
-body {
-  margin: 0;
-}
-main {
-  max-width: 1040px;
-  margin: auto;
-  padding: 48px 24px;
-}
-header {
-  padding: 20px 0 36px;
-}
-.brand {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-}
-.badge {
-  display: inline-block;
-  margin-left: 16px;
-  padding: 3px 12px;
-  border: 1px solid #657d75;
-  border-radius: 20px;
-  font-size: 0.8rem;
-}
-h1 {
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  line-height: 1.15;
-  max-width: 720px;
-  margin: 28px 0 18px;
-}
-h2 {
-  font-size: 1.25rem;
-  margin: 0 0 16px;
-}
-h3 {
-  font-size: 1rem;
-}
-section {
-  background: white;
-  border: 1px solid #d2ddd7;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 20px;
-}
-form {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 16px;
-}
-label {
-  display: flex;
-  flex-direction: column;
-  font-weight: 600;
-  gap: 8px;
-}
-input {
-  font: inherit;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid #788d86;
-  border-radius: 6px;
-}
-form p {
-  grid-column: 1/-1;
-  margin: 0;
-  font-size: 0.9rem;
-}
-button {
-  font: inherit;
-  cursor: pointer;
-  border: 1px solid #5a756c;
-  background: #f5faf7;
-  color: #254e42;
-  border-radius: 6px;
-  padding: 7px 12px;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-button.primary {
-  background: #174b3a;
-  color: white;
-  width: fit-content;
-  padding: 10px 20px;
-}
-button:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-:focus-visible {
-  outline: 3px solid #b87715;
-  outline-offset: 3px;
-}
-.muted,
-.scope {
-  color: #50645c;
-  font-size: 0.9rem;
-}
-small {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #52685e;
-}
-.claim {
-  padding: 14px 0;
-  border-top: 1px solid #e3eae6;
-}
-.citations {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.evidence-list {
-  padding-left: 20px;
-}
-.evidence-list li {
-  margin-bottom: 14px;
-}
-.evidence-list span {
-  display: block;
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
-}
-pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  background: #f2f6f3;
-  border-radius: 6px;
-  padding: 16px;
-  font-size: 0.85rem;
-}
-dd {
-  margin: 0 0 10px;
-  overflow-wrap: anywhere;
-}
-dt {
-  font-weight: 600;
-}
-@media (max-width: 600px) {
-  main {
-    padding: 24px 14px;
+@import 'tailwindcss';
+
+@layer base {
+  html {
+    @apply bg-[#f0f4f2] font-sans leading-[1.6] text-[#182c32];
+    font-synthesis: none;
   }
-  section {
-    padding: 18px;
+  h2 {
+    @apply mb-4 text-xl font-bold;
   }
-  form {
-    grid-template-columns: 1fr;
+  h3 {
+    @apply my-4 text-base font-bold;
   }
-  .badge {
-    margin: 12px 0 0;
-    display: block;
-    width: fit-content;
+  p {
+    @apply my-4;
+  }
+  small {
+    @apply text-[0.8rem] tracking-[0.08em] text-[#52685e] uppercase;
+  }
+  input {
+    @apply min-w-0 rounded-md border border-[#788d86] p-2.5;
+  }
+  button {
+    @apply cursor-pointer rounded-md border border-[#5a756c] bg-[#f5faf7] px-3 py-[7px] text-left text-[#254e42] [overflow-wrap:anywhere] disabled:cursor-wait disabled:opacity-70;
+  }
+  :focus-visible {
+    @apply outline-[3px] outline-offset-[3px] outline-[#b87715];
+  }
+  ul {
+    @apply my-4 list-disc pl-10;
+  }
+  pre {
+    @apply my-4 rounded-md bg-[#f2f6f3] p-4 text-[0.85rem] whitespace-pre-wrap [overflow-wrap:anywhere];
+  }
+  dt {
+    @apply font-semibold;
+  }
+  dd {
+    @apply mb-2.5 [overflow-wrap:anywhere];
   }
 }

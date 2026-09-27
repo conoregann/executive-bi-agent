@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+import tailwindcss from '@tailwindcss/vite';
 import {
   createSyntheticMrrDeclineApi,
   createMrrDeclineServer,
@@ -17,6 +18,7 @@ before(async () => {
   });
   web = await createServer({
     configFile: false,
+    plugins: [tailwindcss()],
     root: fileURLToPath(new URL('..', import.meta.url)),
     server: {
       host: '127.0.0.1',

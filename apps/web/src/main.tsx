@@ -81,10 +81,10 @@ function App() {
   }
   function claim(item: Claim, index = 0) {
     return (
-      <div className="claim" key={index}>
+      <div className="border-t border-[#e3eae6] py-3.5" key={index}>
         <small>{item.classification.replaceAll('_', ' ')}</small>
         <p>{item.text}</p>
-        <div className="citations">
+        <div className="flex flex-wrap gap-2">
           {item.evidenceIds.map((id) => (
             <button
               type="button"
@@ -100,20 +100,32 @@ function App() {
     );
   }
   return (
-    <main>
-      <header>
-        <span className="brand">NORTHSTAR / EXECUTIVE BI</span>
-        <span className="badge">Synthetic data</span>
-        <h1>Understand your MRR movement.</h1>
+    <main className="mx-auto max-w-[1040px] px-3.5 py-6 min-[601px]:px-6 min-[601px]:py-12">
+      <header className="pt-5 pb-9">
+        <span className="text-[0.8rem] font-bold tracking-[0.15em]">
+          NORTHSTAR / EXECUTIVE BI
+        </span>
+        <span className="mt-3 block w-fit rounded-full border border-[#657d75] px-3 py-[3px] text-[0.8rem] min-[601px]:ml-4 min-[601px]:mt-0 min-[601px]:inline-block">
+          Synthetic data
+        </span>
+        <h1 className="mt-7 mb-[18px] max-w-[720px] text-[clamp(2rem,5vw,3.4rem)] leading-[1.15] font-bold">
+          Understand your MRR movement.
+        </h1>
         <p>
           Investigate a reporting month with trusted metrics and inspectable
           company evidence.
         </p>
       </header>
-      <section aria-labelledby="request-heading">
+      <section
+        className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
+        aria-labelledby="request-heading"
+      >
         <h2 id="request-heading">MRR investigation</h2>
-        <form onSubmit={(event) => void submit(event)}>
-          <label>
+        <form
+          className="grid grid-cols-1 gap-4 min-[601px]:grid-cols-[1fr_2fr] [&>p]:col-span-full [&>p]:m-0 [&>p]:text-[0.9rem]"
+          onSubmit={(event) => void submit(event)}
+        >
+          <label className="flex flex-col gap-2 font-semibold">
             Reporting month
             <input
               required
@@ -123,7 +135,7 @@ function App() {
               disabled={busy}
             />
           </label>
-          <label>
+          <label className="flex flex-col gap-2 font-semibold">
             Customer IDs (optional)
             <input
               value={customers}
@@ -138,23 +150,26 @@ function App() {
             for the full synthetic dataset. July and August 2026 are available;
             August supports comparison with July.
           </p>
-          <button className="primary" disabled={busy}>
+          <button
+            className="w-fit bg-[#174b3a] px-5 py-2.5 text-white"
+            disabled={busy}
+          >
             {busy ? 'Investigating…' : 'Investigate MRR'}
           </button>
         </form>
         <p role="status" aria-live="polite">
           {message}
         </p>
-        <p className="muted">
+        <p className="text-[0.9rem] text-[#50645c]">
           Access is held only for this page session. Reloading clears the
           investigation token.
         </p>
       </section>
       {answer && (
         <article aria-label="Executive answer">
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Answer</h2>
-            <p className="scope">
+            <p className="scope text-[0.9rem] text-[#50645c]">
               Reporting month: {answer.scope.month.slice(0, 7)} · Comparison:
               previous month · Customers:{' '}
               {answer.scope.permittedCustomerIds.join(', ') ||
@@ -162,7 +177,7 @@ function App() {
             </p>
             {claim(answer.answer)}
           </section>
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Drivers</h2>
             {answer.drivers.length ? (
               answer.drivers.map(claim)
@@ -170,7 +185,7 @@ function App() {
               <p>No negative customer movements were found.</p>
             )}
           </section>
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Context</h2>
             {answer.context.length ? (
               answer.context.map(claim)
@@ -178,7 +193,7 @@ function App() {
               <p>No scoped company context was retrieved.</p>
             )}
           </section>
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Limitations</h2>
             <ul>
               {answer.limitations.map((text, index) => (
@@ -186,9 +201,9 @@ function App() {
               ))}
             </ul>
           </section>
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Evidence</h2>
-            <ul className="evidence-list">
+            <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
               {answer.evidence.map((item) => (
                 <li key={item.evidenceId}>
                   <button
@@ -206,7 +221,7 @@ function App() {
               ))}
             </ul>
           </section>
-          <section>
+          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Recommended next step</h2>
             <p>{answer.recommendedNextStep.text}</p>
             <p>Owner: {answer.recommendedNextStep.owner}</p>
@@ -214,6 +229,7 @@ function App() {
         </article>
       )}
       <section
+        className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
         id="evidence-detail"
         aria-labelledby="evidence-heading"
         aria-busy={evidenceBusy}
