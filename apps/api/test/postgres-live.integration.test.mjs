@@ -53,9 +53,21 @@ test(
       const originalAnswer = await first.fetch(answerRequest.clone());
       const retainedAnswer = await second.fetch(answerRequest);
       assert.equal(retainedAnswer.status, 200);
+      const retainedBody = await retainedAnswer.json();
+      assert.deepEqual(retainedBody, await originalAnswer.json());
+      assert.deepEqual(retainedBody.answer.chart.permittedCustomerIds, [
+        'cust_acme',
+      ]);
+      const chartEvidence = await second.fetch(
+        new Request(
+          `http://api.test/v1/investigations/${investigationId}/evidence/${retainedBody.answer.chart.sourceEvidenceId}`,
+          { headers },
+        ),
+      );
+      assert.equal(chartEvidence.status, 200);
       assert.deepEqual(
-        await retainedAnswer.json(),
-        await originalAnswer.json(),
+        retainedBody.answer.chart.data,
+        (await chartEvidence.json()).evidence.content.rows,
       );
       const evidence = await second.fetch(
         new Request(

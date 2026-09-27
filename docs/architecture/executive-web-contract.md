@@ -26,6 +26,21 @@ storage. Reloading clears access; a new submission clears the previous result.
 Only the latest evidence request may update the evidence panel. Reads use
 `no-store`; the API also marks responses `no-store`.
 
+## Visualization and retained investigation trail
+
+Completed answers show a current-month MRR-by-plan bar chart with EUR labels,
+resolved scope, an accessible value table, and an authenticated source citation.
+The browser formats trusted cents and scales bars; it calculates no metric.
+Incomplete breakdowns label unassigned MRR separately and cannot imply complete
+coverage. Missing chart evidence shows an unavailable message without hiding the
+executive answer. Empty named rows show an explicit no-plan-data outcome.
+
+A keyboard-operable “How this answer was generated” disclosure shows the
+recorded five-step plan, terminal outcome, and supporting cited evidence. It is
+a retained plan, not execution timing or live progress. It uses the creation
+response's validated record and the answer's cited evidence; opening it runs no
+tools. New submissions and reloads clear the prior trail with the answer.
+
 ## Deployment boundary and failures
 
 Local Vite development proxies `/v1/investigations` to the fixed separate Node API
@@ -38,5 +53,5 @@ blocked evidence, unavailable services, and failed evidence reads have visible
 outcomes that allow retry. Inputs and citations support keyboard use and narrow
 screens. Synthetic data labeling remains visible.
 
-Natural-language resolution, new metrics, charts, SSE streaming, production
+Natural-language resolution, new metrics, additional chart types, SSE streaming, production
 identity/tenant authorization, and NestJS migration remain planned scope.

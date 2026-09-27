@@ -1,5 +1,6 @@
 import {
   investigationAnswerSchema,
+  mrrPlanChartSchema,
   investigationEvidenceSchema,
   mrrDeclineRecordSchema,
   type InvestigationAnswer,
@@ -143,7 +144,46 @@ export function synthesizeMrrDeclineAnswer(
     ...drivers,
     ...context,
   ];
+  const breakdown = items.find(
+    (item) =>
+      item.type === 'metric_query' &&
+      item.integrity !== 'invalid' &&
+      item.scope.metric === 'mrr' &&
+      item.scope.groupBy === 'plan' &&
+      item.scope.month === record.month &&
+      sameFilters(item, record) &&
+      item.content.month === record.month &&
+      item.content.groupBy === 'plan' &&
+      item.content.totalMrrEurCents === current.content.mrrEurCents &&
+      (item.integrity === 'valid'
+        ? item.content.reconciles === true
+        : item.content.reconciles === false),
+  );
+  const chartResult = mrrPlanChartSchema.safeParse(
+    breakdown && {
+      chartType: 'bar',
+      month: record.month,
+      permittedCustomerIds: [...record.permittedCustomerIds],
+      sourceEvidenceId: breakdown.evidenceId,
+      reconciles: breakdown.content.reconciles,
+      unassignedMrrEurCents: breakdown.content.unassignedMrrEurCents,
+      data: breakdown.content.rows,
+    },
+  );
+  // Validate retained reconciliation; no derived metric is exposed here.
+  const chart =
+    chartResult.success &&
+    breakdown &&
+    cents(breakdown.content.groupedMrrEurCents) &&
+    chartResult.data.data.reduce((sum, row) => sum + row.mrrEurCents, 0) ===
+      breakdown.content.groupedMrrEurCents &&
+    breakdown.content.groupedMrrEurCents +
+      chartResult.data.unassignedMrrEurCents ===
+      breakdown.content.totalMrrEurCents
+      ? chartResult.data
+      : undefined;
   const citedIds = new Set(claims.flatMap((claim) => claim.evidenceIds));
+  if (chart) citedIds.add(chart.sourceEvidenceId);
   const result = investigationAnswerSchema.safeParse({
     investigationId: record.investigationId,
     scope: {
@@ -157,6 +197,13 @@ export function synthesizeMrrDeclineAnswer(
     limitations: [
       ...new Set([
         ...record.warnings,
+        ...(!chart
+          ? [
+              'MRR by plan chart is unavailable: usable breakdown evidence is missing.',
+            ]
+          : !chart.reconciles
+            ? ['MRR by plan is incomplete; unassigned MRR is shown separately.']
+            : []),
         'Customer drivers show at most five ranked movements; they are not a complete decomposition.',
         ...(context.length === 0
           ? ['No usable company knowledge was retrieved for these drivers.']
@@ -173,6 +220,7 @@ export function synthesizeMrrDeclineAnswer(
         type: item.type,
         freshness: item.freshness,
       })),
+    ...(chart ? { chart } : {}),
     recommendedNextStep: {
       owner: 'Revenue operations',
       text:

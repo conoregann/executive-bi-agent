@@ -46,6 +46,7 @@ test('returns a deterministic executive answer with inspectable metric and docum
     'context',
     'limitations',
     'evidence',
+    'chart',
     'recommendedNextStep',
   ]);
   assert.match(
@@ -277,4 +278,71 @@ test('an answer-named investigation or evidence ID retains its original route me
     ).status,
     200,
   );
+});
+
+test('synthetic chart copies immutable plan evidence and fails closed independently', async () => {
+  const { store } = await syntheticInvestigation({
+    permittedCustomerIds: ['cust_riviera'],
+  });
+  const stored = await store.get('synthetic-answer');
+  const source = stored.evidence.find((item) => item.scope.groupBy === 'plan');
+  const result = synthesizeMrrDeclineAnswer(stored.record, stored.evidence);
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.answer.chart.data, source.content.rows);
+  assert.deepEqual(result.answer.chart.permittedCustomerIds, ['cust_riviera']);
+  assert.equal(result.answer.chart.data[0].mrrEurCents, 30000);
+  assert.equal(result.answer.chart.sourceEvidenceId, source.evidenceId);
+  for (const mutate of [
+    (item) => {
+      item.integrity = 'invalid';
+    },
+    (item) => {
+      item.scope.filters = {};
+    },
+    (item) => {
+      item.scope.month = '2026-07-01';
+    },
+    (item) => {
+      item.content.rows[0].mrrEurCents = -1;
+    },
+    (item) => {
+      item.content.rows.push(item.content.rows[0]);
+    },
+    (item) => {
+      item.content.totalMrrEurCents = 123;
+    },
+  ]) {
+    const changed = structuredClone(stored);
+    mutate(changed.evidence.find((item) => item.scope.groupBy === 'plan'));
+    const answer = synthesizeMrrDeclineAnswer(changed.record, changed.evidence);
+    assert.equal(answer.status, 'ok');
+    assert.equal(answer.answer.chart, undefined);
+    assert.match(answer.answer.limitations.join(' '), /chart is unavailable/);
+  }
+  const missing = structuredClone(stored);
+  missing.evidence = missing.evidence.filter(
+    (item) => item.evidenceId !== source.evidenceId,
+  );
+  missing.record.evidenceIds = missing.record.evidenceIds.filter(
+    (id) => id !== source.evidenceId,
+  );
+  assert.equal(
+    synthesizeMrrDeclineAnswer(missing.record, missing.evidence).answer.chart,
+    undefined,
+  );
+  const incomplete = structuredClone(stored);
+  const item = incomplete.evidence.find(
+    (item) => item.scope.groupBy === 'plan',
+  );
+  item.integrity = 'warning';
+  item.content.reconciles = false;
+  item.content.rows = [];
+  item.content.groupedMrrEurCents = 0;
+  item.content.unassignedMrrEurCents = 30000;
+  const partial = synthesizeMrrDeclineAnswer(
+    incomplete.record,
+    incomplete.evidence,
+  );
+  assert.equal(partial.answer.chart.reconciles, false);
+  assert.equal(partial.answer.chart.unassignedMrrEurCents, 30000);
 });

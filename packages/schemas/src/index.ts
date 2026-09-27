@@ -110,6 +110,32 @@ const answerClaimSchema = z
   })
   .strict();
 
+export const mrrPlanChartSchema = z
+  .object({
+    chartType: z.literal('bar'),
+    month: calendarMonth,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    sourceEvidenceId: z.string().min(1),
+    reconciles: z.boolean(),
+    unassignedMrrEurCents: z.number().int().nonnegative().safe(),
+    data: z.array(
+      z
+        .object({
+          dimensionValue: z.string().min(1),
+          mrrEurCents: z.number().int().nonnegative().safe(),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+  .refine(
+    (chart) =>
+      new Set(chart.data.map((row) => row.dimensionValue)).size ===
+        chart.data.length &&
+      chart.reconciles === (chart.unassignedMrrEurCents === 0),
+    'Chart rows must be unique and reconciliation must match unassigned MRR.',
+  );
+
 export const investigationAnswerSchema = z
   .object({
     investigationId: opaqueIdentifier,
@@ -142,6 +168,7 @@ export const investigationAnswerSchema = z
           .strict(),
       )
       .min(1),
+    chart: mrrPlanChartSchema.optional(),
     recommendedNextStep: z
       .object({
         owner: z.literal('Revenue operations'),
@@ -161,6 +188,23 @@ export const investigationAnswerSchema = z
         message: 'Duplicate evidence IDs.',
       });
     }
+    if (
+      answer.chart &&
+      (evidence.get(answer.chart.sourceEvidenceId)?.type !== 'metric_query' ||
+        answer.chart.month !== answer.scope.month ||
+        answer.chart.permittedCustomerIds.length !==
+          answer.scope.permittedCustomerIds.length ||
+        new Set(answer.chart.permittedCustomerIds).size !==
+          answer.chart.permittedCustomerIds.length ||
+        !answer.chart.permittedCustomerIds.every((id) =>
+          answer.scope.permittedCustomerIds.includes(id),
+        ))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Chart requires matching scope and inspectable metric evidence.',
+      });
     for (const claim of [answer.answer, ...answer.drivers, ...answer.context]) {
       const citations = claim.evidenceIds.map((id) => evidence.get(id));
       if (

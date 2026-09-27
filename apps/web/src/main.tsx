@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { InvestigationAnswer } from '@executive-bi/schemas';
+import type {
+  InvestigationAnswer,
+  MrrDeclineApiResponse,
+} from '@executive-bi/schemas';
 import { readAnswer, readEvidence, startInvestigation } from './client.ts';
 import './style.css';
 
@@ -13,6 +16,8 @@ function App() {
   const [customers, setCustomers] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [record, setRecord] =
+    useState<Extract<MrrDeclineApiResponse, { record: unknown }>['record']>();
   const [answer, setAnswer] = useState<InvestigationAnswer>();
   const [evidence, setEvidence] =
     useState<Awaited<ReturnType<typeof readEvidence>>>();
@@ -29,6 +34,7 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setRecord(undefined);
     setEvidence(undefined);
     setEvidenceError('');
     setEvidenceBusy(false);
@@ -36,6 +42,7 @@ function App() {
     setMessage('Running the five-step MRR investigation…');
     try {
       const result = await startInvestigation(month, customers);
+      setRecord(result.record);
       session.current = {
         id: result.record.investigationId,
         token: result.accessToken,
@@ -185,6 +192,84 @@ function App() {
               <p>No negative customer movements were found.</p>
             )}
           </section>
+          <section
+            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
+            aria-labelledby="chart-heading"
+          >
+            <h2 id="chart-heading">MRR by plan</h2>
+            {answer.chart ? (
+              <>
+                <p>
+                  Month: {answer.chart.month.slice(0, 7)} · Customers:{' '}
+                  {answer.chart.permittedCustomerIds.join(', ') ||
+                    'Full synthetic dataset'}
+                </p>
+                <p>
+                  {answer.chart.reconciles
+                    ? 'Complete plan breakdown.'
+                    : 'Incomplete breakdown: some MRR has no assigned plan.'}
+                </p>
+                <div aria-hidden="true" className="space-y-3">
+                  {answer.chart.data.map((row) => (
+                    <div key={row.dimensionValue}>
+                      <div className="flex justify-between gap-3">
+                        <span>{row.dimensionValue}</span>
+                        <span>{eur(row.mrrEurCents)}</span>
+                      </div>
+                      <div className="h-5 rounded bg-[#edf2ef]">
+                        <div
+                          className="h-5 rounded bg-[#174b3a]"
+                          style={{
+                            width: `${(row.mrrEurCents / Math.max(1, ...answer.chart!.data.map((item) => item.mrrEurCents))) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <table className="my-4 w-full text-left">
+                  <caption className="text-left font-semibold">
+                    Plan MRR values (EUR)
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Plan</th>
+                      <th scope="col">MRR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {answer.chart.data.map((row) => (
+                      <tr key={row.dimensionValue}>
+                        <th scope="row">{row.dimensionValue}</th>
+                        <td>{eur(row.mrrEurCents)}</td>
+                      </tr>
+                    ))}
+                    {!answer.chart.reconciles && (
+                      <tr>
+                        <th scope="row">Unassigned</th>
+                        <td>{eur(answer.chart.unassignedMrrEurCents)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {!answer.chart.data.length && (
+                  <p>No named plan MRR is available.</p>
+                )}
+                <button
+                  type="button"
+                  aria-controls="evidence-detail"
+                  onClick={() => void inspect(answer.chart!.sourceEvidenceId)}
+                >
+                  Inspect chart evidence
+                </button>
+              </>
+            ) : (
+              <p>
+                MRR by plan chart unavailable. Usable breakdown evidence is
+                missing.
+              </p>
+            )}
+          </section>
           <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
             <h2>Context</h2>
             {answer.context.length ? (
@@ -226,6 +311,40 @@ function App() {
             <p>{answer.recommendedNextStep.text}</p>
             <p>Owner: {answer.recommendedNextStep.owner}</p>
           </section>
+          {record && (
+            <details className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6">
+              <summary className="cursor-pointer font-semibold">
+                How this answer was generated
+              </summary>
+              <p>
+                Stored investigation: {record.investigationId} · Outcome:{' '}
+                {record.status}
+              </p>
+              <p>Recorded plan in tool order.</p>
+              <ol className="list-decimal pl-5">
+                {record.plan.steps.map((step) => (
+                  <li key={step}>{step.replaceAll('_', ' ')}</li>
+                ))}
+              </ol>
+              <h3>Supporting cited evidence</h3>
+              <ul>
+                {answer.evidence.map((item) => (
+                  <li key={item.evidenceId}>
+                    <span className="[overflow-wrap:anywhere]">
+                      {item.sourceRef} ·{' '}
+                    </span>
+                    <button
+                      type="button"
+                      aria-controls="evidence-detail"
+                      onClick={() => void inspect(item.evidenceId)}
+                    >
+                      Inspect trail {item.evidenceId}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </article>
       )}
       <section
@@ -267,5 +386,9 @@ function App() {
       </section>
     </main>
   );
+}
+function eur(cents: number) {
+  const digits = cents.toString().padStart(3, '0');
+  return `EUR ${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 createRoot(document.getElementById('root')!).render(<App />);
