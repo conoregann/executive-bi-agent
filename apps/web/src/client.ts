@@ -1,4 +1,7 @@
 import {
+  countryFollowUpRequestSchema,
+  countryFollowUpResponseSchema,
+  countryFollowUpAnswerSchema,
   resolveQuestionRequestSchema,
   resolveQuestionResponseSchema,
   investigationAnswerSchema,
@@ -100,5 +103,63 @@ export async function resolveQuestion(question: string) {
     throw new Error(
       'The service returned an invalid resolution. Please try again.',
     );
+  return parsed.data;
+}
+
+export async function startCountryFollowUp(
+  id: string,
+  token: string,
+  question?: string,
+) {
+  const body = countryFollowUpRequestSchema.parse({
+    investigationId: crypto.randomUUID(),
+    ...(question === undefined
+      ? { action: 'breakdown_mrr_by_country' }
+      : { question }),
+  });
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/country-follow-ups`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    },
+  );
+  const json = await readJson(response);
+  if (
+    json &&
+    typeof json === 'object' &&
+    'status' in json &&
+    (json.status === 'unsupported' || json.status === 'invalid_parent')
+  )
+    throw new Error(
+      json.status === 'unsupported'
+        ? 'Only “Break that down by country” is supported. Start a new investigation for different dates, metrics or filters.'
+        : 'A completed parent investigation with usable evidence is required.',
+    );
+  const parsed = countryFollowUpResponseSchema.safeParse(json);
+  if (!parsed.success)
+    throw new Error(
+      'The service returned an invalid follow-up. Please try again.',
+    );
+  return parsed.data;
+}
+export async function readCountryFollowUpAnswer(id: string, token: string) {
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/answer`,
+    { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
+  );
+  const body = await readJson(response);
+  const parsed = countryFollowUpAnswerSchema.safeParse(
+    body && typeof body === 'object' && 'answer' in body
+      ? body.answer
+      : undefined,
+  );
+  if (!parsed.success)
+    throw new Error('Retained country evidence is insufficient for an answer.');
   return parsed.data;
 }

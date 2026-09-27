@@ -32,3 +32,13 @@ cents.
 | `mrr-010` | Evidence    | A contributing customer has no requested dimension      | Return valid total, explicit unassigned MRR, warning integrity, and no full-reconciliation claim. |
 | `mrr-011` | Safety      | Request grouping by an unknown field                    | Reject as `invalid_request`; no repository call.                                                  |
 | `mrr-012` | Evidence    | Create a chart from a breakdown                         | Chart references only breakdown rows and input evidence IDs.                                      |
+
+## Country-total comparison
+
+Synthetic complete-month fixtures with a customer moving DE → GB at unchanged
+100 EUR cents must return DE −100 and GB +100; no churn/acquisition labels.
+A missing-country account changing from 50 to 30 EUR cents must return an explicit
+unassigned row of −20, warning evidence, and total change −20. Both country
+queries are calculation inputs. Unknown fields reject before repository access;
+missing prior-month data is `data_unavailable`, never zero. Covered by the
+metrics package country-comparison test and the [country follow-up evaluation](../investigations/mrr-country-follow-up.md).

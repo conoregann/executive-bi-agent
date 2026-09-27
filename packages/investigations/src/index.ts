@@ -1,3 +1,13 @@
+import {
+  countryFollowUpRequestSchema,
+  countryFollowUpRecordSchema,
+  countryMrrComparisonSchema,
+  type CountryFollowUpRecord,
+  type CountryFollowUpPlan,
+} from '@executive-bi/schemas';
+import { synthesizeMrrDeclineAnswer } from './answer.js';
+import { synthesizeCountryFollowUpAnswer } from './country-answer.js';
+export { synthesizeCountryFollowUpAnswer } from './country-answer.js';
 export {
   synthesizeMrrDeclineAnswer,
   type InvestigationAnswerResult,
@@ -62,6 +72,7 @@ export interface MrrDeclineTools {
   ): Promise<ToolResult<CustomerMrrMovement>>;
   breakdownMrr(input: unknown): Promise<ToolResult<MrrBreakdown>>;
   searchCompanyKnowledge(input: unknown): Promise<KnowledgeSearch>;
+  compareCountryMrr?(input: unknown): Promise<ToolResult<unknown>>;
 }
 
 export interface MrrDeclineInvestigationRequest {
@@ -108,18 +119,21 @@ export interface FollowUpContextResult {
   error?: string;
 }
 
+export type StoredRecord = InvestigationRecord | CountryFollowUpRecord;
+export type StoredPlan = InvestigationPlan | CountryFollowUpPlan;
+
 export interface StoredInvestigation {
-  plan: InvestigationPlan;
+  plan: StoredPlan;
   accessTokenHash: string;
-  record?: InvestigationRecord;
+  record?: StoredRecord;
   evidence: readonly InvestigationEvidence[];
 }
 
 export interface InvestigationStore {
-  reserve(plan: InvestigationPlan, accessTokenHash: string): Promise<boolean>;
+  reserve(plan: StoredPlan, accessTokenHash: string): Promise<boolean>;
   finalize(
     investigationId: string,
-    record: InvestigationRecord,
+    record: StoredRecord,
     evidence: readonly InvestigationEvidence[],
   ): Promise<void>;
   get(investigationId: string): Promise<StoredInvestigation | undefined>;
@@ -128,10 +142,7 @@ export interface InvestigationStore {
 export class InMemoryInvestigationStore implements InvestigationStore {
   private readonly records = new Map<string, StoredInvestigation>();
 
-  async reserve(
-    plan: InvestigationPlan,
-    accessTokenHash: string,
-  ): Promise<boolean> {
+  async reserve(plan: StoredPlan, accessTokenHash: string): Promise<boolean> {
     if (this.records.has(plan.investigationId)) return false;
     this.records.set(plan.investigationId, {
       plan,
@@ -143,7 +154,7 @@ export class InMemoryInvestigationStore implements InvestigationStore {
 
   async finalize(
     investigationId: string,
-    record: InvestigationRecord,
+    record: StoredRecord,
     evidence: readonly InvestigationEvidence[],
   ): Promise<void> {
     const existing = this.records.get(investigationId);
@@ -308,7 +319,7 @@ export class MrrDeclineInvestigationService {
   ): Promise<
     | {
         status: 'ok';
-        record: InvestigationRecord;
+        record: StoredRecord;
         evidence: readonly InvestigationEvidence[];
       }
     | { status: 'not_found' | 'forbidden' }
@@ -339,13 +350,119 @@ export class MrrDeclineInvestigationService {
         error: 'No completed investigation exists for investigationId.',
       };
     }
-    if (found.record.status !== 'completed') return { status: 'not_found' };
+    if (
+      found.record.status !== 'completed' ||
+      found.record.kind !== 'mrr_decline'
+    )
+      return { status: 'not_found' };
     if (
       found.record.month !== month ||
       !sameScope(found.record.permittedCustomerIds, permittedCustomerIds)
     )
       return { status: 'scope_mismatch' };
     return { status: 'ok', record: found.record };
+  }
+
+  async startCountryFollowUp(parentId: string, token: string, input: unknown) {
+    const parent = await this.getInvestigation(parentId, token);
+    if (parent.status !== 'ok') return { status: 'not_found' as const };
+    if (
+      parent.record.kind !== 'mrr_decline' ||
+      parent.record.status !== 'completed'
+    )
+      return { status: 'invalid_parent' as const };
+    const parsed = countryFollowUpRequestSchema.safeParse(input);
+    if (!parsed.success)
+      return {
+        status: 'invalid_request' as const,
+        error: parsed.error.message,
+      };
+    if (
+      parsed.data.question !== undefined &&
+      !/^break that down by country[.!?]?$/iu.test(parsed.data.question)
+    )
+      return {
+        status: 'unsupported' as const,
+        error:
+          'Only “Break that down by country” is supported. Use a new investigation for other periods, metrics or filters.',
+      };
+    const parentAnswer = synthesizeMrrDeclineAnswer(
+      parent.record,
+      parent.evidence,
+    );
+    if (parentAnswer.status !== 'ok')
+      return { status: 'invalid_parent' as const };
+    const plan: CountryFollowUpPlan = {
+      investigationId: parsed.data.investigationId,
+      steps: [
+        'breakdown_mrr_by_country_previous',
+        'breakdown_mrr_by_country_current',
+      ],
+      maximumToolCalls: 2,
+    };
+    Object.freeze(plan.steps);
+    Object.freeze(plan);
+    const accessToken = randomBytes(32).toString('base64url');
+    if (!(await this.store.reserve(plan, hashToken(accessToken))))
+      return { status: 'conflict' as const };
+    // Snapshot the parent's total queries with local IDs. Neither parent's evidence nor token is modified.
+    const parentEvidence = parent.evidence
+      .filter(
+        (item) =>
+          item.type === 'metric_query' &&
+          item.scope.metric === 'mrr' &&
+          item.scope.groupBy === undefined,
+      )
+      .map((item) => ({
+        ...structuredClone(item),
+        evidenceId: `parent_${item.evidenceId}`,
+      }));
+    const result = await safeMetric(() =>
+      this.tools.compareCountryMrr
+        ? this.tools.compareCountryMrr({
+            month: parent.record.month,
+            ...(parent.record.permittedCustomerIds.length
+              ? { filters: { customerIds: parent.record.permittedCustomerIds } }
+              : {}),
+          })
+        : Promise.resolve({
+            status: 'data_unavailable',
+            evidence: [],
+            warnings: ['country_comparison_unavailable'],
+          }),
+    );
+    const evidence = [...parentEvidence, ...result.evidence];
+    const record: CountryFollowUpRecord = {
+      investigationId: plan.investigationId,
+      parentInvestigationId: parentId,
+      kind: 'mrr_country_follow_up',
+      month: parent.record.month,
+      permittedCustomerIds: [...parent.record.permittedCustomerIds],
+      plan,
+      status: 'completed',
+      evidenceIds: evidence.map((item) => item.evidenceId),
+      warnings: [...result.warnings],
+    };
+    if (
+      !isUsable(result) ||
+      !countryMrrComparisonSchema.safeParse(result.value).success ||
+      synthesizeCountryFollowUpAnswer(record, evidence).status !== 'ok'
+    ) {
+      record.status = 'blocked';
+      record.warnings.push('country_comparison_unavailable_or_not_reconciled');
+    }
+    countryFollowUpRecordSchema.parse(record);
+    Object.freeze(record.permittedCustomerIds);
+    Object.freeze(record.evidenceIds);
+    Object.freeze(record.warnings);
+    Object.freeze(record);
+    await this.store.finalize(record.investigationId, record, evidence);
+    return {
+      status: record.status,
+      record,
+      accessToken,
+      warnings: record.warnings,
+    };
   }
 
   private async block(

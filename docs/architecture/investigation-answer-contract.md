@@ -62,6 +62,28 @@ unassigned value. Missing, malformed, invalid, or mismatched chart evidence
 omits the chart and adds a limitation while retaining an otherwise valid answer.
 Reads reuse immutable evidence and run no additional tools.
 
+## Country follow-up answers
+
+The existing authenticated answer route also presents completed
+`mrr_country_follow_up` records as `countryFollowUpAnswerSchema`. It returns
+parent/child IDs, exact customer scope, the trusted comparison, limitations,
+inspectable evidence and `sourceEvidenceIds` (previous-country query,
+current-country query, calculation). Each comparison row supplies country,
+previous MRR, current MRR and signed change in EUR cents, ranked by change
+ascending, then country. `null` country explicitly means unassigned MRR.
+Totals include that row and reconcile exactly to both retained parent totals.
+
+The country comparison is also the chart payload: the UI uses its trusted
+signed changes and rows for chart labels and the table. Every chart/table value
+cites the retained calculation and its two query inputs. No percentage share,
+churn/acquisition classification, contextual explanation or causal claim is
+added. Country migration can change totals even with unchanged customer MRR.
+
+Reads verify evidence identity, exact scope, consecutive months, query rows,
+input references, integrity and parent totals. Missing, malformed, mismatched
+or blocked evidence returns `422 answer_unavailable`; it cannot yield a partial
+executive comparison. Reads run no tools and preserve parent and child records.
+
 ## Scope
 
 This feature presents the existing synthetic MRR capability. Natural-language

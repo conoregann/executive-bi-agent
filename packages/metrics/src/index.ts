@@ -112,6 +112,21 @@ export interface MrrBreakdown {
   rows: readonly MrrBreakdownRow[];
 }
 
+export interface CountryMrrComparison {
+  currentMonth: string;
+  previousMonth: string;
+  previousMrrEurCents: number;
+  currentMrrEurCents: number;
+  mrrChangeEurCents: number;
+  missingDimensions: boolean;
+  rows: readonly {
+    country: string | null;
+    previousMrrEurCents: number;
+    currentMrrEurCents: number;
+    mrrChangeEurCents: number;
+  }[];
+}
+
 export interface MrrBreakdownChart {
   chartType: 'bar';
   title: string;
@@ -354,6 +369,96 @@ export class TrustedMrrService {
       value: breakdown,
       evidence: [evidence],
       warnings: breakdown.reconciles ? [] : ['missing_breakdown_dimension'],
+    };
+  }
+
+  async compareCountryMrr(
+    input: unknown,
+  ): Promise<MetricResult<CountryMrrComparison>> {
+    const parsed = parseRequest(input);
+    if (!parsed.ok) return invalidRequest(parsed.error);
+    const previous = await this.breakdownMrr({
+      ...parsed.value,
+      month: priorMonth(parsed.value.month),
+      groupBy: 'country',
+    });
+    if (previous.status !== 'ok' || !previous.value)
+      return { ...previous, value: undefined };
+    const current = await this.breakdownMrr({
+      ...parsed.value,
+      groupBy: 'country',
+    });
+    const evidence = [...previous.evidence, ...current.evidence];
+    const warnings = [...new Set([...previous.warnings, ...current.warnings])];
+    if (current.status !== 'ok' || !current.value)
+      return {
+        status: current.status,
+        evidence,
+        warnings,
+        error: current.error,
+      };
+    const before = new Map(
+      previous.value.rows.map((row) => [row.dimensionValue, row.mrrEurCents]),
+    );
+    const after = new Map(
+      current.value.rows.map((row) => [row.dimensionValue, row.mrrEurCents]),
+    );
+    const rows: CountryMrrComparison['rows'][number][] = [
+      ...new Set([...before.keys(), ...after.keys()]),
+    ].map((country) => {
+      const previousMrrEurCents = before.get(country) ?? 0;
+      const currentMrrEurCents = after.get(country) ?? 0;
+      return {
+        country,
+        previousMrrEurCents,
+        currentMrrEurCents,
+        mrrChangeEurCents: currentMrrEurCents - previousMrrEurCents,
+      };
+    });
+    const missingDimensions =
+      !current.value.reconciles || !previous.value.reconciles;
+    if (missingDimensions)
+      rows.push({
+        country: null,
+        previousMrrEurCents: previous.value.unassignedMrrEurCents,
+        currentMrrEurCents: current.value.unassignedMrrEurCents,
+        mrrChangeEurCents:
+          current.value.unassignedMrrEurCents -
+          previous.value.unassignedMrrEurCents,
+      });
+    rows.sort(
+      (a, b) =>
+        a.mrrChangeEurCents - b.mrrChangeEurCents ||
+        (a.country ?? '').localeCompare(b.country ?? ''),
+    );
+    const value: CountryMrrComparison = {
+      currentMonth: current.value.month,
+      previousMonth: previous.value.month,
+      previousMrrEurCents: previous.value.totalMrrEurCents,
+      currentMrrEurCents: current.value.totalMrrEurCents,
+      mrrChangeEurCents:
+        current.value.totalMrrEurCents - previous.value.totalMrrEurCents,
+      missingDimensions,
+      rows,
+    };
+    const reconciles =
+      sum(rows.map((row) => row.previousMrrEurCents)) ===
+        value.previousMrrEurCents &&
+      sum(rows.map((row) => row.currentMrrEurCents)) ===
+        value.currentMrrEurCents &&
+      sum(rows.map((row) => row.mrrChangeEurCents)) === value.mrrChangeEurCents;
+    const calculation = this.calculationEvidence(
+      'country_change = current_country_mrr - previous_country_mrr; includes explicit unassigned MRR',
+      evidence.map((item) => item.evidenceId),
+      value,
+      await this.repository.freshness(),
+      reconciles ? (missingDimensions ? 'warning' : 'valid') : 'invalid',
+    );
+    return {
+      status: 'ok',
+      value,
+      evidence: [...evidence, calculation],
+      warnings,
     };
   }
 
