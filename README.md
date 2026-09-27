@@ -58,6 +58,18 @@ pnpm db:verify
 pnpm build
 ```
 
+If you already had a `.env` from an earlier version, copying the example is
+skipped. Ensure it also contains `DATABASE_URL`. With the default local
+PostgreSQL credentials and port 5433, add:
+
+```dotenv
+DATABASE_URL=postgres://executive_bi:executive_bi_local_only@127.0.0.1:5433/executive_bi
+```
+
+If you changed the database user, password, name, or port, use matching values
+in that connection URL. `POSTGRES_PORT` alone configures Docker; the API requires
+`DATABASE_URL`.
+
 Keep these processes running in separate terminals from the repository root.
 Terminal 1 starts the separate backend and loads the local database configuration:
 
@@ -81,10 +93,14 @@ the full synthetic dataset, or enter `cust_acme` for a scoped investigation.
 Click **Investigate MRR**, then open any **Inspect** citation to view evidence.
 
 The frontend can render without the API, but investigations require the API and
-PostgreSQL. If the API reports `DATABASE_URL is required`, load `.env` in its
-terminal as shown above. If it cannot connect to PostgreSQL, check
+PostgreSQL. If the API reports `DATABASE_URL is required`, confirm that key
+exists in `.env`, then load the file in its terminal as shown above. If it cannot connect to PostgreSQL, check
 `pnpm db:logs` and confirm the port/credentials in `.env`. Allow PostgreSQL to
 become healthy before running migrations; retry them if it is still starting.
+A password-authentication error can also mean an existing Docker volume retains
+the original database role password: changing `.env` does not update that stored
+password. Use the original credential or explicitly update the local database
+role to match the intended configuration; do not delete the volume to fix this.
 Reloading the page clears the in-memory investigation token. All data is synthetic.
 See [the database guide](packages/database/README.md) for database details.
 
