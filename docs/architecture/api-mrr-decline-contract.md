@@ -6,6 +6,14 @@ The development API exposes one integration boundary over the deterministic
 MRR, company-knowledge, and MRR-decline investigation services. It reads the local synthetic PostgreSQL analytics views and labeled knowledge
 fixtures in `data/synthetic`; it is not a production data-source adapter.
 
+## Question resolution
+
+`POST /v1/investigations/resolve-question` resolves bounded MRR-decline wording
+without running tools or reserving an investigation. See the
+[question contract](../discovery/question-contract.md) for inputs, typed outcomes,
+UTC date rules and unsupported scope. Resolved months feed the endpoint below;
+customer permissions remain explicit structured input.
+
 ## Endpoint
 
 `POST /v1/investigations/mrr-decline` requires `application/json` and accepts:

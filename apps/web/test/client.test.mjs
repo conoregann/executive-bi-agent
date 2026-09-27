@@ -9,3 +9,18 @@ test('rejects unavailable, unauthorized and malformed upstream responses', async
     );
   assert.equal(await readJson(new Response('not json')), null);
 });
+
+test('question resolution fails closed for malformed upstream interpretations', async (t) => {
+  const { resolveQuestion } = await import('../src/client.ts');
+  const original = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = original;
+  });
+  globalThis.fetch = async () =>
+    Response.json({ status: 'resolved', month: '2026-08-01' });
+  await assert.rejects(
+    resolveQuestion('Why did MRR fall in August 2026?'),
+    /invalid resolution/,
+  );
+  await assert.rejects(resolveQuestion(' '), /Enter a question/);
+});

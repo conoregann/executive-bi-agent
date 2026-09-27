@@ -3,7 +3,8 @@
 ## Scope
 
 `apps/web` is a React/Vite interface for the existing structured synthetic
-MRR-decline API. It does not interpret natural-language questions or calculate
+MRR-decline API. It resolves bounded natural-language MRR-decline questions
+through the [question resolver](../discovery/question-contract.md); it calculates no
 metrics. Routes are explicit API paths; there is no filesystem URL routing.
 
 The form accepts a reporting month and an optional comma-separated list of at
@@ -11,6 +12,13 @@ most 50 unique customer IDs. Empty scope means the full synthetic dataset, not
 production permission discovery. August 2026 supports comparison against July;
 missing comparison evidence produces a blocked outcome. Each submission uses a
 new investigation identifier.
+
+An optional question field and “Resolve question” action populate the reporting
+month and display the previous-period interpretation. Resolution runs no
+investigation tools and preserves the explicit customer scope. Clarification,
+unsupported wording, and service failures are visible and allow editing/retry.
+The user reviews the structured fields and selects “Investigate MRR” to execute.
+The structured form remains available independently.
 
 ## Answers and evidence
 
@@ -53,5 +61,5 @@ blocked evidence, unavailable services, and failed evidence reads have visible
 outcomes that allow retry. Inputs and citations support keyboard use and narrow
 screens. Synthetic data labeling remains visible.
 
-Natural-language resolution, new metrics, additional chart types, SSE streaming, production
+General natural-language resolution, new metrics, additional chart types, SSE streaming, production
 identity/tenant authorization, and NestJS migration remain planned scope.

@@ -10,6 +10,8 @@ import {
   mrrDeclineResponseSchema,
   type MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
+import { resolveQuestion } from './resolve-question.js';
+import { resolveQuestionRequestSchema } from '@executive-bi/schemas';
 import { parseJson } from '../../http/json.js';
 const MRR_DECLINE_PATH = '/v1/investigations/mrr-decline';
 
@@ -18,6 +20,18 @@ export class MrrDeclineApi {
 
   async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
+    if (
+      pathname === '/v1/investigations/resolve-question' &&
+      request.method === 'POST'
+    ) {
+      if (!request.headers.get('content-type')?.includes('application/json'))
+        return invalidResponse('Content-Type must be application/json.');
+      const body = await parseJson(request);
+      if (!body.ok) return invalidResponse(body.error);
+      const parsed = resolveQuestionRequestSchema.safeParse(body.value);
+      if (!parsed.success) return invalidResponse(parsed.error.message);
+      return Response.json(resolveQuestion(parsed.data.question));
+    }
     const detail =
       /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context|\/answer)?$/u.exec(
         pathname,

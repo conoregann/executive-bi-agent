@@ -1,4 +1,6 @@
 import {
+  resolveQuestionRequestSchema,
+  resolveQuestionResponseSchema,
   investigationAnswerSchema,
   investigationEvidenceSchema,
   mrrDeclineRequestSchema,
@@ -79,4 +81,24 @@ export async function readEvidence(
   return investigationEvidenceSchema.parse(
     ((await readJson(response)) as { evidence: unknown }).evidence,
   );
+}
+
+export async function resolveQuestion(question: string) {
+  const request = resolveQuestionRequestSchema.safeParse({ question });
+  if (!request.success)
+    throw new Error('Enter a question of at most 1000 characters.');
+  const response = await fetch('/v1/investigations/resolve-question', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request.data),
+    cache: 'no-store',
+  });
+  const parsed = resolveQuestionResponseSchema.safeParse(
+    await readJson(response),
+  );
+  if (!parsed.success)
+    throw new Error(
+      'The service returned an invalid resolution. Please try again.',
+    );
+  return parsed.data;
 }

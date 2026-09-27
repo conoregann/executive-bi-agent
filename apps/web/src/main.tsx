@@ -4,7 +4,12 @@ import type {
   InvestigationAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
-import { readAnswer, readEvidence, startInvestigation } from './client.ts';
+import {
+  readAnswer,
+  readEvidence,
+  startInvestigation,
+  resolveQuestion,
+} from './client.ts';
 import './style.css';
 
 type Claim =
@@ -12,6 +17,9 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [question, setQuestion] = useState('');
+  const [resolution, setResolution] = useState('');
+  const [resolving, setResolving] = useState(false);
   const [month, setMonth] = useState('2026-08');
   const [customers, setCustomers] = useState('');
   const [busy, setBusy] = useState(false);
@@ -128,6 +136,49 @@ function App() {
         aria-labelledby="request-heading"
       >
         <h2 id="request-heading">MRR investigation</h2>
+        <label className="flex flex-col gap-2 font-semibold">
+          Ask an MRR question
+          <input
+            value={question}
+            maxLength={1000}
+            disabled={busy || resolving}
+            placeholder="Why did MRR fall in August 2026?"
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              setResolution('');
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={busy || resolving}
+          onClick={async () => {
+            setResolving(true);
+            setResolution('Resolving question…');
+            try {
+              const result = await resolveQuestion(question);
+              if (result.status === 'resolved') {
+                setMonth(result.month.slice(0, 7));
+                setResolution(
+                  `Resolved MRR investigation for ${result.month.slice(0, 7)}, compared with the previous month. Review the month and customer scope below, then select Investigate MRR.`,
+                );
+              } else setResolution(result.message);
+            } catch (error) {
+              setResolution(
+                error instanceof Error
+                  ? error.message
+                  : 'Question resolution unavailable.',
+              );
+            } finally {
+              setResolving(false);
+            }
+          }}
+        >
+          Resolve question
+        </button>
+        <p role="status" aria-live="polite">
+          {resolution}
+        </p>
         <form
           className="grid grid-cols-1 gap-4 min-[601px]:grid-cols-[1fr_2fr] [&>p]:col-span-full [&>p]:m-0 [&>p]:text-[0.9rem]"
           onSubmit={(event) => void submit(event)}
@@ -139,7 +190,7 @@ function App() {
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              disabled={busy}
+              disabled={busy || resolving}
             />
           </label>
           <label className="flex flex-col gap-2 font-semibold">
@@ -149,7 +200,7 @@ function App() {
               onChange={(event) => setCustomers(event.target.value)}
               placeholder="cust_acme, cust_beta"
               aria-describedby="scope-help"
-              disabled={busy}
+              disabled={busy || resolving}
             />
           </label>
           <p id="scope-help">
@@ -159,7 +210,7 @@ function App() {
           </p>
           <button
             className="w-fit bg-[#174b3a] px-5 py-2.5 text-white"
-            disabled={busy}
+            disabled={busy || resolving}
           >
             {busy ? 'Investigating…' : 'Investigate MRR'}
           </button>
