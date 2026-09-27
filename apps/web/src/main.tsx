@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client';
 import type {
   InvestigationAnswer,
   CountryFollowUpAnswer,
+  CustomerFollowUpAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 import {
+  startCustomerFollowUp,
+  readCustomerFollowUpAnswer,
   readAnswer,
   startCountryFollowUp,
   readCountryFollowUpAnswer,
@@ -20,6 +23,12 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [customerAnswer, setCustomerAnswer] =
+    useState<CustomerFollowUpAnswer>();
+  const [customerMessage, setCustomerMessage] = useState('');
+  const customerSession = useRef<{ id: string; token: string } | undefined>(
+    undefined,
+  );
   const [followQuestion, setFollowQuestion] = useState('');
   const [followAnswer, setFollowAnswer] = useState<CountryFollowUpAnswer>();
   const [followMessage, setFollowMessage] = useState('');
@@ -51,6 +60,9 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setCustomerAnswer(undefined);
+    setCustomerMessage('');
+    customerSession.current = undefined;
     setFollowAnswer(undefined);
     setFollowMessage('');
     followSession.current = undefined;
@@ -109,6 +121,9 @@ function App() {
     const active = session.current;
     if (!active) return;
     setBusy(true);
+    setCustomerAnswer(undefined);
+    setCustomerMessage('');
+    customerSession.current = undefined;
     setFollowAnswer(undefined);
     followSession.current = undefined;
     setFollowMessage('Comparing country MRR against the previous month…');
@@ -138,6 +153,48 @@ function App() {
     } catch (error) {
       setFollowMessage(
         error instanceof Error ? error.message : 'Follow-up unavailable.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function showAccounts(country: string | null) {
+    const active = followSession.current;
+    if (!active) return;
+    setBusy(true);
+    setCustomerAnswer(undefined);
+    customerSession.current = undefined;
+    setCustomerMessage(
+      `Loading customer contributions for ${country ?? 'unassigned country'}…`,
+    );
+    try {
+      const result = await startCustomerFollowUp(
+        active.id,
+        active.token,
+        country,
+      );
+      customerSession.current = {
+        id: result.record.investigationId,
+        token: result.accessToken,
+      };
+      if (result.status === 'blocked') {
+        setCustomerMessage(
+          `Customer drill-down blocked: required evidence is unavailable or no longer matches the country comparison. Retained record: ${result.record.investigationId}. ${result.warnings.join(' ')}`,
+        );
+      } else {
+        setCustomerAnswer(
+          await readCustomerFollowUpAnswer(
+            result.record.investigationId,
+            result.accessToken,
+          ),
+        );
+        setCustomerMessage('Customer drill-down complete.');
+      }
+    } catch (error) {
+      setCustomerMessage(
+        error instanceof Error
+          ? error.message
+          : 'Customer drill-down unavailable.',
       );
     } finally {
       setBusy(false);
@@ -513,6 +570,15 @@ function App() {
                             >
                               Inspect country {row.country ?? 'unassigned'}
                             </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void showAccounts(row.country)}
+                              aria-label={`Show accounts for ${row.country ?? 'unassigned country'}`}
+                              aria-controls="customer-drilldown"
+                            >
+                              Show accounts
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -567,6 +633,126 @@ function App() {
                       aria-controls="evidence-detail"
                     >
                       Inspect country evidence {item.evidenceId}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+          <section
+            id="customer-drilldown"
+            aria-labelledby="customer-heading"
+            aria-busy={busy}
+            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6"
+          >
+            <h2 id="customer-heading">Customer contributions</h2>
+            <p role="status" aria-live="polite">
+              {customerMessage}
+            </p>
+            {customerAnswer && (
+              <>
+                <h3>
+                  {customerAnswer.contributions.country ?? 'Unassigned country'}{' '}
+                  · {customerAnswer.contributions.previousMonth.slice(0, 7)} →{' '}
+                  {customerAnswer.contributions.currentMonth.slice(0, 7)}
+                </h3>
+                <div
+                  className="overflow-x-auto"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Customer contributions table"
+                >
+                  <table className="my-4 w-full min-w-[620px] text-left">
+                    <caption className="text-left font-semibold">
+                      Five largest negative customer contributions (EUR)
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Previous MRR</th>
+                        <th scope="col">Current MRR</th>
+                        <th scope="col">Contribution</th>
+                        <th scope="col">Evidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customerAnswer.contributions.largestLosses.map((row) => (
+                        <tr key={row.customerId}>
+                          <th scope="row">{row.customerId}</th>
+                          <td>{eur(row.previousMrrEurCents)}</td>
+                          <td>{eur(row.currentMrrEurCents)}</td>
+                          <td>{eur(row.mrrChangeEurCents)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void inspect(
+                                  customerAnswer.sourceEvidenceIds[2]!,
+                                  customerSession.current,
+                                )
+                              }
+                              aria-controls="evidence-detail"
+                            >
+                              Inspect contribution {row.customerId}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {customerAnswer.contributions.largestLosses.length === 0 && (
+                  <p>No negative customer contributions in this country.</p>
+                )}
+                <dl>
+                  <dt>Positive offsets</dt>
+                  <dd>
+                    {eur(customerAnswer.contributions.positiveOffsetsEurCents)}
+                  </dd>
+                  <dt>Remaining net movement</dt>
+                  <dd>
+                    {eur(
+                      customerAnswer.contributions.remainingNetMovementEurCents,
+                    )}
+                  </dd>
+                  <dt>Country MRR: previous → current</dt>
+                  <dd>
+                    {eur(customerAnswer.contributions.previousMrrEurCents)} →{' '}
+                    {eur(customerAnswer.contributions.currentMrrEurCents)}
+                  </dd>
+                  <dt>Country net movement</dt>
+                  <dd>{eur(customerAnswer.contributions.mrrChangeEurCents)}</dd>
+                </dl>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void inspect(
+                      customerAnswer.sourceEvidenceIds[2]!,
+                      customerSession.current,
+                    )
+                  }
+                  aria-controls="evidence-detail"
+                >
+                  Inspect offsets, remainder and country totals
+                </button>
+                <ul>
+                  {customerAnswer.limitations.map((text) => (
+                    <li key={text}>{text}</li>
+                  ))}
+                </ul>
+                <p>
+                  Stored drill-down: {customerAnswer.investigationId} · Parent:{' '}
+                  {customerAnswer.parentInvestigationId}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {customerAnswer.sourceEvidenceIds.map((id) => (
+                    <button
+                      type="button"
+                      key={id}
+                      onClick={() => void inspect(id, customerSession.current)}
+                      aria-controls="evidence-detail"
+                    >
+                      Inspect customer evidence {id}
                     </button>
                   ))}
                 </div>

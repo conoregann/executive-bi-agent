@@ -127,6 +127,19 @@ export interface CountryMrrComparison {
   }[];
 }
 
+export interface CustomerCountryContributions {
+  country: string | null;
+  currentMonth: string;
+  previousMonth: string;
+  previousMrrEurCents: number;
+  currentMrrEurCents: number;
+  mrrChangeEurCents: number;
+  rows: Omit<CustomerMrrMovementRow, 'movement'>[];
+  largestLosses: Omit<CustomerMrrMovementRow, 'movement'>[];
+  positiveOffsetsEurCents: number;
+  remainingNetMovementEurCents: number;
+}
+
 export interface MrrBreakdownChart {
   chartType: 'bar';
   title: string;
@@ -459,6 +472,142 @@ export class TrustedMrrService {
       value,
       evidence: [...evidence, calculation],
       warnings,
+    };
+  }
+
+  async getCustomerCountryContributions(
+    input: unknown,
+  ): Promise<MetricResult<CustomerCountryContributions>> {
+    if (
+      !isRecord(input) ||
+      !hasOnlyKeys(input, ['month', 'filters', 'country']) ||
+      !(
+        input.country === null ||
+        (typeof input.country === 'string' && input.country.trim().length > 0)
+      )
+    )
+      return invalidRequest('A country or explicit null country is required.');
+    const parsed = parseRequest({ month: input.month, filters: input.filters });
+    if (!parsed.ok) return invalidRequest(parsed.error);
+    if (Object.keys(parsed.value.filters).some((key) => key !== 'customerIds'))
+      return invalidRequest('Only inherited customer scope is supported.');
+    const country = input.country as string | null;
+    const previousMonth = priorMonth(parsed.value.month);
+    const previous = await this.loadMonth({
+      month: previousMonth,
+      filters: parsed.value.filters,
+    });
+    if (!previous.ok) return previous.result;
+    const current = await this.loadMonth(parsed.value);
+    if (!current.ok) return current.result;
+    const inCountry = (row: SubscriptionMonthRecord) =>
+      country === null ? row.country.trim() === '' : row.country === country;
+    const before = customerMrr(previous.rows.filter(inCountry));
+    const after = customerMrr(current.rows.filter(inCountry));
+    const rows = [...new Set([...before.keys(), ...after.keys()])]
+      .map((customerId) => ({
+        customerId,
+        previousMrrEurCents: before.get(customerId) ?? 0,
+        currentMrrEurCents: after.get(customerId) ?? 0,
+        mrrChangeEurCents:
+          (after.get(customerId) ?? 0) - (before.get(customerId) ?? 0),
+      }))
+      .sort(
+        (a, b) =>
+          a.mrrChangeEurCents - b.mrrChangeEurCents ||
+          a.customerId.localeCompare(b.customerId),
+      );
+    const largestLosses = rows
+      .filter((row) => row.mrrChangeEurCents < 0)
+      .slice(0, 5);
+    const previousMrrEurCents = sum(before.values());
+    const currentMrrEurCents = sum(after.values());
+    const mrrChangeEurCents = currentMrrEurCents - previousMrrEurCents;
+    const positiveOffsetsEurCents = sum(
+      rows
+        .filter((row) => row.mrrChangeEurCents > 0)
+        .map((row) => row.mrrChangeEurCents),
+    );
+    const value = {
+      country,
+      currentMonth: parsed.value.month,
+      previousMonth,
+      previousMrrEurCents,
+      currentMrrEurCents,
+      mrrChangeEurCents,
+      rows,
+      largestLosses,
+      positiveOffsetsEurCents,
+      remainingNetMovementEurCents:
+        mrrChangeEurCents -
+        positiveOffsetsEurCents -
+        sum(largestLosses.map((row) => row.mrrChangeEurCents)),
+    };
+    const reconciles =
+      [
+        previousMrrEurCents,
+        currentMrrEurCents,
+        mrrChangeEurCents,
+        positiveOffsetsEurCents,
+        value.remainingNetMovementEurCents,
+      ].every(Number.isSafeInteger) &&
+      rows.every((row) =>
+        [
+          row.previousMrrEurCents,
+          row.currentMrrEurCents,
+          row.mrrChangeEurCents,
+        ].every(Number.isSafeInteger),
+      ) &&
+      sum(rows.map((row) => row.previousMrrEurCents)) === previousMrrEurCents &&
+      sum(rows.map((row) => row.currentMrrEurCents)) === currentMrrEurCents &&
+      sum(rows.map((row) => row.mrrChangeEurCents)) === mrrChangeEurCents;
+    const freshness = await this.repository.freshness();
+    const queries = [previousMonth, parsed.value.month].map(
+      (month, index): Evidence => ({
+        ...this.metricEvidence(
+          {
+            month,
+            mrrEurCents: index === 0 ? previousMrrEurCents : currentMrrEurCents,
+          },
+          parsed.value.filters,
+          freshness,
+        ),
+        sourceRef: `mrr:${month}:country_customers`,
+        scope: {
+          month,
+          filters: parsed.value.filters,
+          country,
+          metric: 'customer_country_mrr',
+          definitionVersion: METRIC_DEFINITION_VERSION,
+        },
+        content: {
+          month,
+          country,
+          rows: rows.map((row) => ({
+            customerId: row.customerId,
+            mrrEurCents:
+              index === 0 ? row.previousMrrEurCents : row.currentMrrEurCents,
+          })),
+          mrrEurCents: index === 0 ? previousMrrEurCents : currentMrrEurCents,
+        },
+      }),
+    );
+    return {
+      status: 'ok',
+      value,
+      evidence: [
+        ...queries,
+        this.calculationEvidence(
+          'customer_country_change = current - previous; net = largest_losses + positive_offsets + remainder',
+          queries.map((item) => item.evidenceId),
+          value,
+          freshness,
+          reconciles ? 'valid' : 'invalid',
+        ),
+      ],
+      warnings: reconciles
+        ? []
+        : ['customer_country_contributions_not_reconciled'],
     };
   }
 

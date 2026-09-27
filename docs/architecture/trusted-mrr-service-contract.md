@@ -108,3 +108,25 @@ use opaque identifiers.
 - No free-form SQL or database credentials.
 - No document retrieval or causal conclusions.
 - No silent coercion of malformed dates, filters, or zero denominators.
+
+## Customer contributions to country MRR
+
+`getCustomerCountryContributions` accepts `month`, an explicit `country` (or
+`null` for unassigned MRR), and optional inherited `filters.customerIds` only.
+Unknown keys, other filters, limits and malformed requests are rejected before
+repository reads. Both complete months must exist before country filtering;
+a customer absent from a complete country snapshot contributes zero for that
+month, while an unavailable month returns `data_unavailable`.
+
+Active subscriptions are summed per customer within the selected country for
+each month. Signed contribution is current minus previous country MRR. Country
+transfers therefore contribute to country movement without lifecycle labels.
+Rows include unchanged customers, sort by signed change ascending then customer
+ID, and reconcile exactly to both country totals and their delta. The five
+largest negative rows are also returned as `largestLosses`.
+`positiveOffsetsEurCents` sums all positive contributions;
+`remainingNetMovementEurCents` is the delta less those offsets and displayed
+losses. It includes undisplayed losses. All rows remain retained; presentation
+truncation never truncates the reconciliation. Two customer-country query
+snapshots and linked calculation evidence support every value. No contextual
+retrieval or causal inference runs.

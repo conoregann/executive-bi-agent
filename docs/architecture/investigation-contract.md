@@ -95,7 +95,7 @@ The child retains its own query/calculation evidence plus copies of the parent's
 total queries under local evidence IDs. It has a separate bearer token and
 immutable linked record; the parent remains unchanged. Retained child answers
 and evidence are readable after restart without querying analytics or requiring
-the parent token. Child records cannot themselves be parents in this slice.
+the parent token. Country children may become parents only for the bounded customer drill-down below.
 Country movements mean changes in country totals, including country migration;
 they do not classify churn, acquisition or causes.
 
@@ -140,3 +140,27 @@ no investigation may make extra speculative calls to find a convenient narrative
 - Label a relationship as correlation unless causal evidence is explicitly present.
 - State material data gaps and unresolved contradictions.
 - Recommendations must be bounded, reversible when possible, and assigned to a human decision-maker.
+
+## Executable customer drill-down
+
+Only a completed `mrr_country_follow_up` can parent `mrr_customer_follow_up`.
+The structured request supplies a new ID and a country present in the retained
+comparison, including explicit `null` for unassigned MRR. Month and permitted
+customer IDs are inherited exactly; overrides and unknown fields are rejected.
+Authentication precedes reservation and execution. An invalid parent kind,
+blocked parent or unknown country cannot reserve a child or run tools.
+
+The child reserves its ID and one-step `get_customer_country_contributions`
+plan before tools run. Missing or invalid retained country evidence produces a
+retained blocked child without tools. Otherwise the deterministic contribution
+operation runs once. Both returned totals and the delta must equal the selected
+retained country row. Unavailable, malformed or changed evidence blocks the
+child; there is no partial answer or scope broadening.
+
+The child retains its own query and calculation evidence and a self-contained
+snapshot of the parent record and evidence with local IDs and remapped input
+links. A separate bearer token protects its record, answer and citations.
+Retained reads validate both provenance chains and run no analytics tools;
+they remain available after restart without analytics access or the parent
+token. Parent records remain immutable. Customer drill-downs cannot become
+parents; the supported maximum path is MRR → country → customers.
