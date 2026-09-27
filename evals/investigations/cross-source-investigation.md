@@ -19,3 +19,8 @@ isolation, retained cross-source reads with analytics unavailable, deterministic
 usage deltas and waterfall reconciliation. The browser case completes MRR →
 country → German accounts → scoped operational context and protected citations
 at mobile width. No source coincidence is presented as a proven cause.
+
+Provider tests separately verify Gemini structured proposals, credential headers,
+blocked and truncated responses, invalid JSON and rate-limit failures using a
+mock transport. Configuration tests verify explicit provider selection and no
+silent provider fallback. These checks do not measure live Gemini quality.

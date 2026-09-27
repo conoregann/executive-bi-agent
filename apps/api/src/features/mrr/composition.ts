@@ -4,7 +4,11 @@ import {
   createPostgresOperationalRepository,
   type OperationalRepository,
 } from '@executive-bi/operations';
-import { createOpenAIModel, type InvestigationModel } from '@executive-bi/ai';
+import {
+  createGeminiModel,
+  createOpenAIModel,
+  type InvestigationModel,
+} from '@executive-bi/ai';
 import {
   createSubscriptionMonthRepository,
   createPostgresSubscriptionMonthRepository,
@@ -106,8 +110,22 @@ export async function createPostgresMrrDeclineApi(
   );
 }
 
-function configuredModel(): InvestigationModel | undefined {
-  const key = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_INVESTIGATION_MODEL;
+export function configuredModel(
+  environment: Record<string, string | undefined> = process.env,
+): InvestigationModel | undefined {
+  const provider =
+    environment.INVESTIGATION_MODEL_PROVIDER ??
+    (environment.GEMINI_API_KEY ? 'gemini' : 'openai');
+  if (provider === 'gemini')
+    return environment.GEMINI_API_KEY
+      ? createGeminiModel({
+          apiKey: environment.GEMINI_API_KEY,
+          model: environment.GEMINI_INVESTIGATION_MODEL ?? 'gemini-3.8-flash',
+        })
+      : undefined;
+  if (provider !== 'openai')
+    throw new Error('Unsupported investigation model provider.');
+  const key = environment.OPENAI_API_KEY;
+  const model = environment.OPENAI_INVESTIGATION_MODEL;
   return key && model ? createOpenAIModel({ apiKey: key, model }) : undefined;
 }

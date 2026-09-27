@@ -33,6 +33,13 @@ mean missing coverage, not evidence that no event occurred.
 The optional OpenAI Responses adapter uses structured outputs with `store:false`.
 Set both `OPENAI_API_KEY` and `OPENAI_INVESTIGATION_MODEL` to enable it; otherwise
 approved deterministic source selection remains usable and is labelled disabled.
+Alternatively, set `GEMINI_API_KEY` to select the Gemini generate-content adapter;
+`GEMINI_INVESTIGATION_MODEL` defaults to `gemini-3.8-flash`. Gemini wins when both
+keys exist unless `INVESTIGATION_MODEL_PROVIDER=openai` is explicit. An explicit
+`gemini` selection without a key remains disabled; an unknown provider prevents
+startup. The Gemini key is sent only in an API header. Safety refusals, incomplete
+candidates, malformed JSON and provider errors produce the same safe failures;
+provider errors never trigger a silent fallback to another provider.
 An injected adapter supports deterministic tests. The model proposes only source
 names and hypothesis categories with evidence references. The application checks
 unique tools against question-specific approvals, caps contextual tools at four
