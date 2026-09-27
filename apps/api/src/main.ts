@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 
 import { createSyntheticMrrDeclineApi } from './index.js';
 import { createMrrDeclineServer } from './http-server.js';
-import { PostgresInvestigationStore } from './postgres-store.js';
+import { PostgresInvestigationStore } from './persistence/postgres-investigation-store.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const connectionString = process.env.DATABASE_URL;
