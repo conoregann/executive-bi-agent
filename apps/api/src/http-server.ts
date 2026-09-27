@@ -26,11 +26,21 @@ export function createMrrDeclineServer(api: MrrDeclineApi): Server {
       headers,
       ...(body === undefined ? {} : { body, duplex: 'half' }),
     } as RequestInit & { duplex?: 'half' });
-    const apiResponse = await api.fetch(apiRequest);
-    response.writeHead(
-      apiResponse.status,
-      Object.fromEntries(apiResponse.headers),
-    );
-    response.end(Buffer.from(await apiResponse.arrayBuffer()));
+    try {
+      const apiResponse = await api.fetch(apiRequest);
+      response.writeHead(apiResponse.status, {
+        ...Object.fromEntries(apiResponse.headers),
+        'cache-control': 'no-store',
+      });
+      response.end(Buffer.from(await apiResponse.arrayBuffer()));
+    } catch {
+      response.writeHead(503, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          status: 'unavailable',
+          error: 'Investigation service unavailable.',
+        }),
+      );
+    }
   });
 }

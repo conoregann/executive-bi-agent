@@ -5,6 +5,6 @@
     "check": { "dependsOn": ["^check"] },
     "dev": { "cache": false, "persistent": true },
     "lint": { "dependsOn": ["^lint"] },
-    "test": { "dependsOn": ["^test"], "outputs": ["coverage/**"] }
+    "test": { "dependsOn": ["^test"], "cache": false, "env": ["DATABASE_URL"] }
   }
 }

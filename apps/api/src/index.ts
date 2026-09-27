@@ -6,6 +6,7 @@ import {
 } from '@executive-bi/analytics';
 import {
   MrrDeclineInvestigationService,
+  type InvestigationStore,
   type InvestigationRecord,
 } from '@executive-bi/investigations';
 import { TrustedMrrService } from '@executive-bi/metrics';
@@ -16,6 +17,8 @@ import {
 import {
   mrrDeclineRequestSchema,
   mrrDeclineResponseSchema,
+  followUpContextRequestSchema,
+  investigationEvidenceSchema,
   type MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 
@@ -84,33 +87,46 @@ export async function loadSyntheticMrrDeclineDependencies(): Promise<SyntheticMr
 
 export function createMrrDeclineApi(
   dependencies: SyntheticMrrDeclineDependencies,
+  store?: InvestigationStore,
 ): MrrDeclineApi {
   const metrics = new TrustedMrrService(
     createSubscriptionMonthRepository(dependencies.snapshot),
   );
   const knowledge = createCompanyKnowledgeSearch(dependencies.documents);
-  const investigation = new MrrDeclineInvestigationService({
-    compareMrr: metrics.compareMrr.bind(metrics),
-    getMrrMovement: metrics.getMrrMovement.bind(metrics),
-    getCustomerMrrMovement: metrics.getCustomerMrrMovement.bind(metrics),
-    breakdownMrr: metrics.breakdownMrr.bind(metrics),
-    searchCompanyKnowledge: knowledge.search.bind(knowledge),
-  });
+  const investigation = new MrrDeclineInvestigationService(
+    {
+      compareMrr: metrics.compareMrr.bind(metrics),
+      getMrrMovement: metrics.getMrrMovement.bind(metrics),
+      getCustomerMrrMovement: metrics.getCustomerMrrMovement.bind(metrics),
+      breakdownMrr: metrics.breakdownMrr.bind(metrics),
+      searchCompanyKnowledge: knowledge.search.bind(knowledge),
+    },
+    store,
+  );
   return new MrrDeclineApi(investigation);
 }
 
-export async function createSyntheticMrrDeclineApi(): Promise<MrrDeclineApi> {
-  return createMrrDeclineApi(await loadSyntheticMrrDeclineDependencies());
+export async function createSyntheticMrrDeclineApi(
+  store?: InvestigationStore,
+): Promise<MrrDeclineApi> {
+  return createMrrDeclineApi(
+    await loadSyntheticMrrDeclineDependencies(),
+    store,
+  );
 }
 
 export class MrrDeclineApi {
   constructor(private readonly investigation: MrrDeclineInvestigationService) {}
 
   async fetch(request: Request): Promise<Response> {
-    if (
-      request.method !== 'POST' ||
-      new URL(request.url).pathname !== MRR_DECLINE_PATH
-    ) {
+    const pathname = new URL(request.url).pathname;
+    const detail =
+      /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context)?$/u.exec(
+        pathname,
+      );
+    if (detail && pathname !== MRR_DECLINE_PATH)
+      return this.fetchStored(request, detail[1]!, detail[2]);
+    if (request.method !== 'POST' || pathname !== MRR_DECLINE_PATH) {
       return Response.json(
         { status: 'not_found', error: 'Route not found.' },
         { status: 404 },
@@ -141,12 +157,84 @@ export class MrrDeclineApi {
       {
         status: result.status,
         record: toApiRecord(result.record!),
+        accessToken: result.accessToken!,
         warnings: [...result.warnings],
         ...(result.error === undefined ? {} : { error: result.error }),
       },
       result.status === 'completed' ? 201 : 422,
     );
   }
+
+  private async fetchStored(
+    request: Request,
+    investigationId: string,
+    evidenceId?: string,
+  ): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    const followUp = pathname.endsWith('/follow-up-context');
+    if (request.method !== (followUp ? 'POST' : 'GET')) return notFound();
+    const authorization = request.headers.get('authorization');
+    if (
+      !authorization?.startsWith('Bearer ') ||
+      !/^[A-Za-z0-9_-]{43}$/u.test(authorization.slice(7))
+    ) {
+      return Response.json(
+        { status: 'unauthorized', error: 'Bearer access token required.' },
+        { status: 401 },
+      );
+    }
+    const token = authorization.slice(7);
+    if (followUp) {
+      if (!request.headers.get('content-type')?.includes('application/json'))
+        return invalidResponse('Content-Type must be application/json.');
+      const body = await parseJson(request);
+      if (!body.ok) return invalidResponse(body.error);
+      const parsed = followUpContextRequestSchema.safeParse(body.value);
+      if (!parsed.success) return invalidResponse(parsed.error.message);
+      const context = await this.investigation.getFollowUpContext(
+        investigationId,
+        token,
+        parsed.data.month,
+        parsed.data.permittedCustomerIds,
+      );
+      if (context.status === 'scope_mismatch')
+        return Response.json(
+          {
+            status: 'scope_mismatch',
+            error: 'Follow-up scope must match the original investigation.',
+          },
+          { status: 403 },
+        );
+      if (context.status !== 'ok') return notFound();
+      return Response.json({
+        status: 'ok',
+        record: toApiRecord(context.record!),
+      });
+    }
+    const found = await this.investigation.getInvestigation(
+      investigationId,
+      token,
+    );
+    if (found.status !== 'ok') return notFound();
+    if (evidenceId !== undefined) {
+      const evidence = found.evidence.find(
+        (item) => item.evidenceId === evidenceId,
+      );
+      if (!evidence) return notFound();
+      return Response.json({
+        status: 'ok',
+        evidence: investigationEvidenceSchema.parse(evidence),
+      });
+    }
+    return Response.json({ status: 'ok', record: toApiRecord(found.record) });
+  }
+}
+
+function notFound(): Response {
+  return Response.json(
+    { status: 'not_found', error: 'Resource not found.' },
+    { status: 404 },
+  );
 }
 
 function parseSyntheticSnapshot(value: unknown): SubscriptionMonthSnapshot {
@@ -176,7 +264,25 @@ async function parseJson(
   request: Request,
 ): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
   try {
-    return { ok: true, value: await request.json() };
+    const reader = request.body?.getReader();
+    if (!reader)
+      return { ok: false, error: 'Request body must contain valid JSON.' };
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      size += chunk.value.byteLength;
+      if (size > 16_384) {
+        await reader.cancel();
+        return { ok: false, error: 'Request body exceeds 16 KiB.' };
+      }
+      chunks.push(chunk.value);
+    }
+    return {
+      ok: true,
+      value: JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown,
+    };
   } catch {
     return { ok: false, error: 'Request body must contain valid JSON.' };
   }

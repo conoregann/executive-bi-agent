@@ -63,6 +63,12 @@ request that needs a different period, metric, or scope begins a new
 investigation. Unknown or non-terminal investigation IDs are rejected without
 running a tool.
 
+The current executable API requires an exact month/customer-scope match and a
+per-investigation bearer token. The token is issued once at creation and only
+its SHA-256 hash is stored. The plan is reserved before tool execution;
+terminal records and evidence are retained in PostgreSQL. See the
+[API contract](api-mrr-decline-contract.md) for routes and responses.
+
 ## Approved initial tools
 
 | Tool                        | Purpose                                            | Output requirement                         |

@@ -10,5 +10,8 @@
     "build": "tsc --project tsconfig.json",
     "check": "tsc --project tsconfig.json --noEmit",
     "test": "tsc --project tsconfig.json && node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4"
   }
 }

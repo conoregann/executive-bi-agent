@@ -17,9 +17,11 @@
     "@executive-bi/investigations": "workspace:*",
     "@executive-bi/metrics": "workspace:*",
     "@executive-bi/retrieval": "workspace:*",
-    "@executive-bi/schemas": "workspace:*"
+    "@executive-bi/schemas": "workspace:*",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
-    "@types/node": "^22.15.3"
+    "@types/node": "^22.15.3",
+    "@types/pg": "^8.23.1"
   }
 }
