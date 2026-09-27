@@ -38,6 +38,8 @@ function composeMrrDeclineApi(
   const knowledge = createCompanyKnowledgeSearch(documents);
   const investigation = new MrrDeclineInvestigationService(
     {
+      getCustomerCountryContributions:
+        metrics.getCustomerCountryContributions.bind(metrics),
       compareCountryMrr: metrics.compareCountryMrr.bind(metrics),
       compareMrr: metrics.compareMrr.bind(metrics),
       getMrrMovement: metrics.getMrrMovement.bind(metrics),

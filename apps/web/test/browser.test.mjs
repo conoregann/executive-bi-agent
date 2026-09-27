@@ -404,3 +404,116 @@ test('country follow-up action and bounded phrase show compared values and prote
     fullPage: true,
   });
 });
+
+test('synthetic country account drill-down shows cited contributions and uses a separate in-memory token on mobile', async (t) => {
+  const page = await pageForTest(t, { width: 390, height: 844 });
+  await complete(page);
+  await page
+    .getByRole('button', { name: 'Break down by country', exact: true })
+    .click();
+  const action = page.getByRole('button', {
+    name: 'Show accounts for DE',
+    exact: true,
+  });
+  await action.waitFor();
+  const createPromise = page.waitForResponse((response) =>
+    response.url().endsWith('/customer-follow-ups'),
+  );
+  await action.click();
+  const created = await (await createPromise).json();
+  await page
+    .getByRole('status')
+    .filter({ hasText: 'Customer drill-down complete.' })
+    .waitFor();
+  const table = page.getByRole('table', {
+    name: 'Five largest negative customer contributions (EUR)',
+  });
+  assert.match(await table.textContent(), /cust_acme.*EUR -2400.00/);
+  const section = page.locator('#customer-drilldown');
+  assert.match(
+    await section.textContent(),
+    /Positive offsets.*Remaining net movement.*Country net movement/s,
+  );
+  const evidencePromise = page.waitForRequest((request) =>
+    request.url().includes('/evidence/'),
+  );
+  await section
+    .getByRole('button', { name: /^Inspect contribution / })
+    .first()
+    .click();
+  const evidence = await evidencePromise;
+  assert.equal(
+    evidence.headers().authorization,
+    `Bearer ${created.accessToken}`,
+  );
+  await page
+    .getByRole('heading', { name: 'Supporting values or document excerpt' })
+    .waitFor();
+  assert.match(
+    await page.locator('#evidence-detail').textContent(),
+    /customer_country_change/,
+  );
+  assert.equal(
+    await page.evaluate(() => localStorage.length + sessionStorage.length),
+    0,
+  );
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+    true,
+  );
+  await page.screenshot({
+    path: '/tmp/executive-bi-customer-mobile.png',
+    fullPage: true,
+  });
+  await page
+    .getByRole('button', { name: 'Break down by country', exact: true })
+    .click();
+  await action.waitFor();
+  assert.equal(await table.count(), 0);
+  await page.route('**/customer-follow-ups', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
+  );
+  await action.click();
+  await section
+    .getByRole('status')
+    .filter({ hasText: 'unavailable' })
+    .waitFor();
+  assert.equal(await action.isEnabled(), true);
+});
+
+test('synthetic account drill-down announces empty losses and retained blocked results', async (t) => {
+  const page = await pageForTest(t);
+  await complete(page);
+  await page
+    .getByRole('button', { name: 'Break down by country', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Show accounts for SE', exact: true })
+    .click();
+  const section = page.locator('#customer-drilldown');
+  await section
+    .getByText('No negative customer contributions in this country.')
+    .waitFor();
+  await page.route('**/customer-follow-ups', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.status = 'blocked';
+    body.record.status = 'blocked';
+    body.warnings = ['synthetic_changed_totals'];
+    await route.fulfill({ status: 422, json: body });
+  });
+  await page
+    .getByRole('button', { name: 'Show accounts for DE', exact: true })
+    .click();
+  await section
+    .getByRole('status')
+    .filter({ hasText: 'Retained record:' })
+    .waitFor();
+  assert.equal(await section.getByRole('table').count(), 0);
+  assert.equal(
+    await page.getByRole('article', { name: 'Executive answer' }).count(),
+    1,
+  );
+});

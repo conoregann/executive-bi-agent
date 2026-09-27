@@ -99,7 +99,8 @@ export function synthesizeCountryFollowUpAnswer(
     const query = queries.find((item) => item?.scope.month === month);
     const parentTotal = evidence.find(
       (item) =>
-        item.evidenceId.startsWith('parent_') &&
+        (item.evidenceId.startsWith('parent_') ||
+          item.evidenceId.startsWith('country_parent_')) &&
         item.type === 'metric_query' &&
         item.scope.month === month &&
         item.scope.metric === 'mrr' &&

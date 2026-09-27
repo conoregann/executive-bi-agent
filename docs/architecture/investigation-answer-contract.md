@@ -89,3 +89,20 @@ executive comparison. Reads run no tools and preserve parent and child records.
 This feature presents the existing synthetic MRR capability. Natural-language
 question resolution, new metrics, causal inference, generated prose, additional chart types,
 streaming, and production tenant authorization remain separate capabilities.
+
+## Customer drill-down answers
+
+Completed `mrr_customer_follow_up` records return
+`customerFollowUpAnswerSchema`: parent/child IDs, inherited customer scope,
+`contributions`, limitations, evidence and three `sourceEvidenceIds` (previous
+customer-country query, current query, calculation). Contributions include the
+selected country, consecutive months, prior/current totals, signed delta, full
+ranked customer rows, up to five `largestLosses`, positive offsets and remaining
+net movement. All amounts are safe integer EUR cents. Every displayed numerical
+claim cites the calculation with links to both query inputs.
+
+Reads reject duplicate IDs/customers, altered query rows or scope, missing input
+links, invalid integrity, wrong months, changed parent totals, incorrect ranking
+or unreconciled offsets/remainder. The copied country provenance is validated as
+well. Only trusted retained values are presented; no tools run. Transfers mean
+country contributions, without churn/acquisition labels or business causes.

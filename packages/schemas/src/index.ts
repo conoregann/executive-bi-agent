@@ -358,10 +358,7 @@ export const countryFollowUpRecordSchema = z
     warnings: z.array(z.string().min(1)),
   })
   .strict();
-export const storedInvestigationRecordSchema = z.union([
-  mrrDeclineRecordSchema,
-  countryFollowUpRecordSchema,
-]);
+
 export const countryFollowUpAnswerSchema = z
   .object({
     investigationId: opaqueIdentifier,
@@ -408,3 +405,169 @@ export const countryFollowUpFailureSchema = z
 export type CountryFollowUpRecord = z.infer<typeof countryFollowUpRecordSchema>;
 export type CountryFollowUpAnswer = z.infer<typeof countryFollowUpAnswerSchema>;
 export type CountryFollowUpPlan = z.infer<typeof countryFollowUpPlanSchema>;
+
+export const customerFollowUpRequestSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    country: z
+      .string()
+      .min(1)
+      .refine((value) => value.trim().length > 0)
+      .nullable(),
+  })
+  .strict();
+const contributionRowSchema = z
+  .object({
+    customerId: z.string().min(1),
+    previousMrrEurCents: z.number().int().nonnegative().safe(),
+    currentMrrEurCents: z.number().int().nonnegative().safe(),
+    mrrChangeEurCents: z.number().int().safe(),
+  })
+  .strict();
+export const customerCountryContributionsSchema = z
+  .object({
+    country: customerFollowUpRequestSchema.shape.country,
+    currentMonth: calendarMonth,
+    previousMonth: calendarMonth,
+    previousMrrEurCents: z.number().int().nonnegative().safe(),
+    currentMrrEurCents: z.number().int().nonnegative().safe(),
+    mrrChangeEurCents: z.number().int().safe(),
+    rows: z.array(contributionRowSchema),
+    largestLosses: z.array(contributionRowSchema).max(5),
+    positiveOffsetsEurCents: z.number().int().nonnegative().safe(),
+    remainingNetMovementEurCents: z.number().int().safe(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const date = new Date(`${value.currentMonth}T00:00:00Z`);
+    date.setUTCMonth(date.getUTCMonth() - 1);
+    const losses = value.rows
+      .filter((row) => row.mrrChangeEurCents < 0)
+      .slice(0, 5);
+    if (
+      date.toISOString().slice(0, 10) !== value.previousMonth ||
+      new Set(value.rows.map((row) => row.customerId)).size !==
+        value.rows.length ||
+      value.rows.some(
+        (row, index) =>
+          row.currentMrrEurCents - row.previousMrrEurCents !==
+            row.mrrChangeEurCents ||
+          (index > 0 &&
+            (value.rows[index - 1]!.mrrChangeEurCents > row.mrrChangeEurCents ||
+              (value.rows[index - 1]!.mrrChangeEurCents ===
+                row.mrrChangeEurCents &&
+                value.rows[index - 1]!.customerId.localeCompare(
+                  row.customerId,
+                ) > 0))),
+      ) ||
+      JSON.stringify(losses) !== JSON.stringify(value.largestLosses) ||
+      value.currentMrrEurCents - value.previousMrrEurCents !==
+        value.mrrChangeEurCents ||
+      (
+        [
+          'previousMrrEurCents',
+          'currentMrrEurCents',
+          'mrrChangeEurCents',
+        ] as const
+      ).some(
+        (key) =>
+          value.rows.reduce((sum, row) => sum + row[key], 0) !== value[key],
+      ) ||
+      value.positiveOffsetsEurCents !==
+        value.rows
+          .filter((row) => row.mrrChangeEurCents > 0)
+          .reduce((sum, row) => sum + row.mrrChangeEurCents, 0) ||
+      value.remainingNetMovementEurCents !==
+        value.mrrChangeEurCents -
+          value.positiveOffsetsEurCents -
+          losses.reduce((sum, row) => sum + row.mrrChangeEurCents, 0)
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Customer contributions must rank and reconcile exactly.',
+      });
+  });
+export const customerCountryQueryEvidenceSchema = investigationEvidenceSchema
+  .extend({
+    type: z.literal('metric_query'),
+    source: z.literal('analytics.subscription_month'),
+    integrity: z.literal('valid'),
+    scope: z
+      .object({
+        month: calendarMonth,
+        country: customerFollowUpRequestSchema.shape.country,
+        filters: z.object({ customerIds: customerIds.optional() }).strict(),
+        metric: z.literal('customer_country_mrr'),
+        definitionVersion: z.string().min(1),
+      })
+      .strict(),
+    content: z
+      .object({
+        month: calendarMonth,
+        country: customerFollowUpRequestSchema.shape.country,
+        mrrEurCents: z.number().int().nonnegative().safe(),
+        rows: z.array(
+          z
+            .object({
+              customerId: z.string().min(1),
+              mrrEurCents: z.number().int().nonnegative().safe(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+  })
+  .strict();
+export const customerFollowUpPlanSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    steps: z.tuple([z.literal('get_customer_country_contributions')]),
+    maximumToolCalls: z.literal(1),
+  })
+  .strict();
+export const customerFollowUpRecordSchema = countryFollowUpRecordSchema
+  .extend({
+    kind: z.literal('mrr_customer_follow_up'),
+    country: customerFollowUpRequestSchema.shape.country,
+    plan: customerFollowUpPlanSchema,
+  })
+  .strict();
+export const storedInvestigationRecordSchema = z.union([
+  mrrDeclineRecordSchema,
+  countryFollowUpRecordSchema,
+  customerFollowUpRecordSchema,
+]);
+export const customerFollowUpAnswerSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    contributions: customerCountryContributionsSchema,
+    evidence: z.array(investigationEvidenceSchema).min(4),
+    sourceEvidenceIds: z.array(z.string().min(1)).length(3),
+    limitations: z.array(z.string().min(1)),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      new Set(value.sourceEvidenceIds).size === 3 &&
+      value.sourceEvidenceIds.every((id, index) =>
+        value.evidence.some(
+          (item) =>
+            item.evidenceId === id &&
+            item.integrity === 'valid' &&
+            item.type === (index === 2 ? 'calculation' : 'metric_query'),
+        ),
+      ),
+    'Contributions require query and calculation citations.',
+  );
+export const customerFollowUpResponseSchema = countryFollowUpResponseSchema
+  .extend({ record: customerFollowUpRecordSchema })
+  .strict();
+export type CustomerFollowUpRecord = z.infer<
+  typeof customerFollowUpRecordSchema
+>;
+export type CustomerFollowUpPlan = z.infer<typeof customerFollowUpPlanSchema>;
+export type CustomerFollowUpAnswer = z.infer<
+  typeof customerFollowUpAnswerSchema
+>;

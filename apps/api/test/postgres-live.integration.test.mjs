@@ -240,3 +240,108 @@ test(
     }
   },
 );
+
+test(
+  'synthetic PostgreSQL retains account drill-downs across restart without analytics access',
+  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  async () => {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+    });
+    const analytics = new Pool({
+      connectionString: process.env.ANALYTICS_DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+    });
+    const parentId = `synthetic_${randomUUID().replaceAll('-', '')}`;
+    const countryId = `synthetic_${randomUUID().replaceAll('-', '')}`;
+    const childId = `synthetic_${randomUUID().replaceAll('-', '')}`;
+    const request = (id, token, body) =>
+      new Request(`http://api.test/v1/investigations/${id}`, {
+        method: body ? 'POST' : 'GET',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    try {
+      const first = await createPostgresMrrDeclineApi(
+        analytics,
+        new PostgresInvestigationStore(pool),
+      );
+      const created = await first.fetch(
+        request('mrr-decline', undefined, {
+          investigationId: parentId,
+          month: '2026-08-01',
+          permittedCustomerIds: ['cust_acme'],
+        }),
+      );
+      assert.equal(created.status, 201);
+      const parent = await created.json();
+      const followResponse = await first.fetch(
+        request(`${parentId}/country-follow-ups`, parent.accessToken, {
+          investigationId: countryId,
+          action: 'breakdown_mrr_by_country',
+        }),
+      );
+      assert.equal(followResponse.status, 201);
+      const country = await followResponse.json();
+      const accounts = await first.fetch(
+        request(`${countryId}/customer-follow-ups`, country.accessToken, {
+          investigationId: childId,
+          country: 'DE',
+        }),
+      );
+      assert.equal(accounts.status, 201);
+      const follow = await accounts.json();
+      const original = await (
+        await first.fetch(request(`${childId}/answer`, follow.accessToken))
+      ).json();
+      const second = await createPostgresMrrDeclineApi(
+        {
+          query: async () => {
+            throw new Error('analytics offline');
+          },
+        },
+        new PostgresInvestigationStore(pool),
+      );
+      const retained = await second.fetch(
+        request(`${childId}/answer`, follow.accessToken),
+      );
+      assert.equal(retained.status, 200);
+      assert.deepEqual(await retained.json(), original);
+      assert.equal(original.answer.contributions.mrrChangeEurCents, -240000);
+      assert.deepEqual(original.answer.permittedCustomerIds, ['cust_acme']);
+      for (const id of original.answer.sourceEvidenceIds)
+        assert.equal(
+          (
+            await second.fetch(
+              request(`${childId}/evidence/${id}`, follow.accessToken),
+            )
+          ).status,
+          200,
+        );
+      assert.deepEqual(
+        (
+          await (
+            await second.fetch(request(parentId, parent.accessToken))
+          ).json()
+        ).record,
+        parent.record,
+      );
+      assert.equal(
+        (await second.fetch(request(`${childId}/answer`, parent.accessToken)))
+          .status,
+        404,
+      );
+    } finally {
+      await pool.query(
+        'DELETE FROM app.investigations WHERE investigation_id = ANY($1::text[])',
+        [[parentId, countryId, childId]],
+      );
+      await analytics.end();
+      await pool.end();
+    }
+  },
+);

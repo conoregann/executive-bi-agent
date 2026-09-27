@@ -103,3 +103,25 @@ defaults to read-only transactions, and has a five-second statement timeout.
 Run `pnpm db:migrate` for an existing volume. Analytics tool failures produce a retained blocked investigation (`422`);
 persistence failures return a sanitized `503`. There is no JSON metric fallback. Retained evidence
 remains readable independently of the analytics connection.
+
+## Customer drill-down route
+
+`POST /v1/investigations/:id/customer-follow-ups` requires the completed country
+comparison's bearer token and a strict JSON body
+`{ "investigationId": "opaque-child-id", "country": "DE" }`. `country: null`
+selects an existing unassigned row. Dates, scope, filters and question text are
+not accepted. Only country comparisons can parent this one additional level.
+
+Responses are `201 completed` or `422 blocked`, with a retained
+`customerFollowUpRecordSchema`, separate `accessToken` and warnings. A blocked
+child has no answer. Invalid bodies or unknown countries return `400`;
+unsupported parent kinds/states return `422 invalid_parent`; reused child IDs
+return `409 conflict`. Missing authentication returns `401`, and unknown IDs or
+incorrect tokens return `404`, before reservation or execution.
+
+The existing authenticated record, answer and evidence routes support customer
+children. Answers validate the retained country snapshot and the new customer
+queries/calculation, including exact totals and customer scope. Invalid evidence
+returns `422 answer_unavailable`. Reads require only app persistence, including
+after restart. Storage uses the existing JSON record/evidence columns; no SQL
+schema migration is needed, and existing records remain readable.

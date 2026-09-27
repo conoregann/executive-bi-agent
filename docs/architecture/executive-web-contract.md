@@ -82,3 +82,19 @@ screens. Synthetic data labeling remains visible.
 
 General natural-language resolution, new metrics, additional chart types, SSE streaming, production
 identity/tenant authorization, and NestJS migration remain planned scope.
+
+## Customer drill-down
+
+Each retained country row offers a keyboard-operable “Show accounts” action.
+It uses the country child's token and inherited scope. The result shows the
+five largest negative customer contributions with prior/current MRR and signed
+change, aggregate positive offsets, remaining net movement and country totals.
+Every numerical group has an authenticated citation; full customer rows and
+parent provenance remain inspectable. Limitations explain transfers, truncation
+and the absence of business-cause evidence. Empty losses have an explicit state.
+
+Loading, blocked records and service failures are announced and permit retry.
+Blocked children expose their retained identifier without numerical claims.
+Tokens stay in separate page-memory references. A new investigation, country
+comparison or page reload clears prior customer access/results; stored server
+results remain available through their token-protected routes after restart.

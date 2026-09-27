@@ -1,4 +1,7 @@
 import {
+  customerFollowUpRequestSchema,
+  customerFollowUpResponseSchema,
+  customerFollowUpAnswerSchema,
   countryFollowUpRequestSchema,
   countryFollowUpResponseSchema,
   countryFollowUpAnswerSchema,
@@ -161,5 +164,53 @@ export async function readCountryFollowUpAnswer(id: string, token: string) {
   );
   if (!parsed.success)
     throw new Error('Retained country evidence is insufficient for an answer.');
+  return parsed.data;
+}
+
+export async function startCustomerFollowUp(
+  id: string,
+  token: string,
+  country: string | null,
+) {
+  const body = customerFollowUpRequestSchema.parse({
+    investigationId: crypto.randomUUID(),
+    country,
+  });
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/customer-follow-ups`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    },
+  );
+  const parsed = customerFollowUpResponseSchema.safeParse(
+    await readJson(response),
+  );
+  if (!parsed.success)
+    throw new Error(
+      'Customer drill-down unavailable. A completed country comparison is required.',
+    );
+  return parsed.data;
+}
+export async function readCustomerFollowUpAnswer(id: string, token: string) {
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/answer`,
+    { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
+  );
+  const body = await readJson(response);
+  const parsed = customerFollowUpAnswerSchema.safeParse(
+    body && typeof body === 'object' && 'answer' in body
+      ? body.answer
+      : undefined,
+  );
+  if (!parsed.success)
+    throw new Error(
+      'Retained customer evidence is insufficient for an answer.',
+    );
   return parsed.data;
 }

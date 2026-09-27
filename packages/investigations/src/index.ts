@@ -1,4 +1,8 @@
 import {
+  customerFollowUpRequestSchema,
+  customerFollowUpRecordSchema,
+  type CustomerFollowUpRecord,
+  type CustomerFollowUpPlan,
   countryFollowUpRequestSchema,
   countryFollowUpRecordSchema,
   countryMrrComparisonSchema,
@@ -6,6 +10,8 @@ import {
   type CountryFollowUpPlan,
 } from '@executive-bi/schemas';
 import { synthesizeMrrDeclineAnswer } from './answer.js';
+import { synthesizeCustomerFollowUpAnswer } from './customer-answer.js';
+export { synthesizeCustomerFollowUpAnswer } from './customer-answer.js';
 import { synthesizeCountryFollowUpAnswer } from './country-answer.js';
 export { synthesizeCountryFollowUpAnswer } from './country-answer.js';
 export {
@@ -72,6 +78,9 @@ export interface MrrDeclineTools {
   ): Promise<ToolResult<CustomerMrrMovement>>;
   breakdownMrr(input: unknown): Promise<ToolResult<MrrBreakdown>>;
   searchCompanyKnowledge(input: unknown): Promise<KnowledgeSearch>;
+  getCustomerCountryContributions?(
+    input: unknown,
+  ): Promise<ToolResult<unknown>>;
   compareCountryMrr?(input: unknown): Promise<ToolResult<unknown>>;
 }
 
@@ -119,8 +128,10 @@ export interface FollowUpContextResult {
   error?: string;
 }
 
-export type StoredRecord = InvestigationRecord | CountryFollowUpRecord;
-export type StoredPlan = InvestigationPlan | CountryFollowUpPlan;
+export type StoredRecord =
+  InvestigationRecord | CountryFollowUpRecord | CustomerFollowUpRecord;
+export type StoredPlan =
+  InvestigationPlan | CountryFollowUpPlan | CustomerFollowUpPlan;
 
 export interface StoredInvestigation {
   plan: StoredPlan;
@@ -452,6 +463,142 @@ export class MrrDeclineInvestigationService {
       record.warnings.push('country_comparison_unavailable_or_not_reconciled');
     }
     countryFollowUpRecordSchema.parse(record);
+    Object.freeze(record.permittedCustomerIds);
+    Object.freeze(record.evidenceIds);
+    Object.freeze(record.warnings);
+    Object.freeze(record);
+    await this.store.finalize(record.investigationId, record, evidence);
+    return {
+      status: record.status,
+      record,
+      accessToken,
+      warnings: record.warnings,
+    };
+  }
+
+  async startCustomerFollowUp(parentId: string, token: string, input: unknown) {
+    const parent = await this.getInvestigation(parentId, token);
+    if (parent.status !== 'ok') return { status: 'not_found' as const };
+    if (
+      parent.record.kind !== 'mrr_country_follow_up' ||
+      parent.record.status !== 'completed'
+    )
+      return { status: 'invalid_parent' as const };
+    const parsed = customerFollowUpRequestSchema.safeParse(input);
+    if (!parsed.success)
+      return {
+        status: 'invalid_request' as const,
+        error: parsed.error.message,
+      };
+    const parentAnswer = synthesizeCountryFollowUpAnswer(
+      parent.record,
+      parent.evidence,
+    );
+    if (
+      parentAnswer.status === 'ok' &&
+      !parentAnswer.answer.comparison.rows.some(
+        (row) => row.country === parsed.data.country,
+      )
+    )
+      return {
+        status: 'invalid_request' as const,
+        error: 'Country must exist in the retained comparison.',
+      };
+    const plan: CustomerFollowUpPlan = {
+      investigationId: parsed.data.investigationId,
+      steps: ['get_customer_country_contributions'],
+      maximumToolCalls: 1,
+    };
+    Object.freeze(plan.steps);
+    Object.freeze(plan);
+    const accessToken = randomBytes(32).toString('base64url');
+    if (!(await this.store.reserve(plan, hashToken(accessToken))))
+      return { status: 'conflict' as const };
+    // Prefix copied evidence and its input links, preserving the country answer's provenance.
+    const copied = parent.evidence.map((item) => ({
+      ...structuredClone(item),
+      evidenceId: `country_${item.evidenceId}`,
+      content: {
+        ...structuredClone(item.content),
+        ...(Array.isArray(item.content.inputEvidenceIds)
+          ? {
+              inputEvidenceIds: item.content.inputEvidenceIds.map(
+                (id) => `country_${id}`,
+              ),
+            }
+          : {}),
+      },
+    }));
+    const snapshotRecord = {
+      ...structuredClone(parent.record),
+      evidenceIds: copied.map((item) => item.evidenceId),
+    };
+    const now = new Date().toISOString();
+    const snapshot: Evidence = {
+      evidenceId: 'country_snapshot',
+      type: 'calculation',
+      source: 'investigation_snapshot',
+      sourceRef: parentId,
+      observedAt: parent.record.month,
+      retrievedAt: now,
+      freshness: now,
+      integrity: 'valid',
+      scope: { parentInvestigationId: parentId },
+      content: {
+        record: snapshotRecord,
+        formula: 'immutable country comparison snapshot',
+        inputEvidenceIds: copied.map((item) => item.evidenceId),
+      },
+    };
+    const result =
+      parentAnswer.status === 'ok'
+        ? await safeMetric(() =>
+            this.tools.getCustomerCountryContributions
+              ? this.tools.getCustomerCountryContributions({
+                  month: parent.record.month,
+                  country: parsed.data.country,
+                  ...(parent.record.permittedCustomerIds.length
+                    ? {
+                        filters: {
+                          customerIds: parent.record.permittedCustomerIds,
+                        },
+                      }
+                    : {}),
+                })
+              : Promise.resolve({
+                  status: 'data_unavailable',
+                  evidence: [],
+                  warnings: ['customer_contributions_unavailable'],
+                }),
+          )
+        : {
+            status: 'data_unavailable' as const,
+            evidence: [],
+            warnings: ['parent_evidence_unavailable'],
+          };
+    const evidence = [...copied, snapshot, ...result.evidence];
+    const record: CustomerFollowUpRecord = {
+      investigationId: plan.investigationId,
+      parentInvestigationId: parentId,
+      kind: 'mrr_customer_follow_up',
+      month: parent.record.month,
+      country: parsed.data.country,
+      permittedCustomerIds: [...parent.record.permittedCustomerIds],
+      plan,
+      status: 'completed',
+      evidenceIds: evidence.map((item) => item.evidenceId),
+      warnings: [...result.warnings],
+    };
+    if (
+      !isUsable(result) ||
+      synthesizeCustomerFollowUpAnswer(record, evidence).status !== 'ok'
+    ) {
+      record.status = 'blocked';
+      record.warnings.push(
+        'customer_contributions_unavailable_or_not_reconciled',
+      );
+    }
+    customerFollowUpRecordSchema.parse(record);
     Object.freeze(record.permittedCustomerIds);
     Object.freeze(record.evidenceIds);
     Object.freeze(record.warnings);

@@ -385,3 +385,137 @@ test('country comparison reconciles both months, includes entering/exiting count
     'data_unavailable',
   );
 });
+
+test('synthetic country contributions aggregate subscriptions and transfers without lifecycle labels', async () => {
+  const repo = fixtureRepository({
+    [JULY]: [
+      record('transfer', JULY, 100),
+      record('multi', JULY, 50),
+      record('multi', JULY, 70, { suffix: 'two' }),
+    ],
+    [AUGUST]: [
+      record('transfer', AUGUST, 100, { country: 'GB' }),
+      record('multi', AUGUST, 80),
+      record('gain', AUGUST, 40),
+    ],
+  });
+  const result = await service(repo).getCustomerCountryContributions({
+    month: AUGUST,
+    country: 'DE',
+  });
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(
+    result.value.largestLosses.map((row) => [
+      row.customerId,
+      row.mrrChangeEurCents,
+    ]),
+    [
+      ['transfer', -100],
+      ['multi', -40],
+    ],
+  );
+  assert.equal(result.value.previousMrrEurCents, 220);
+  assert.equal(result.value.currentMrrEurCents, 120);
+  assert.equal(result.value.positiveOffsetsEurCents, 40);
+  assert.equal(result.value.remainingNetMovementEurCents, 0);
+  assert.ok(result.value.rows.every((row) => !('movement' in row)));
+});
+test('synthetic contributions retain five losses, all offsets and remaining losses deterministically', async () => {
+  const repo = fixtureRepository({
+    [JULY]: Array.from({ length: 7 }, (_, index) =>
+      record(`loss_${index}`, JULY, 100),
+    ),
+    [AUGUST]: [record('gain', AUGUST, 50)],
+  });
+  const result = await service(repo).getCustomerCountryContributions({
+    month: AUGUST,
+    country: 'DE',
+  });
+  assert.equal(result.value.largestLosses.length, 5);
+  assert.deepEqual(
+    result.value.largestLosses.map((row) => row.customerId),
+    ['loss_0', 'loss_1', 'loss_2', 'loss_3', 'loss_4'],
+  );
+  assert.equal(result.value.positiveOffsetsEurCents, 50);
+  assert.equal(result.value.remainingNetMovementEurCents, -200);
+  assert.equal(result.value.mrrChangeEurCents, -650);
+  assert.equal(result.value.rows.length, 8);
+});
+test('synthetic contributions reject invalid requests before reads and never zero missing months', async () => {
+  const repo = fixture();
+  const metrics = service(repo);
+  for (const input of [
+    { month: AUGUST },
+    { month: AUGUST, country: '' },
+    { month: AUGUST, country: 'DE', limit: 5 },
+    { month: AUGUST, country: 'DE', filters: { plan: 'enterprise' } },
+  ])
+    assert.equal(
+      (await metrics.getCustomerCountryContributions(input)).status,
+      'invalid_request',
+    );
+  assert.equal(repo.calls(), 0);
+  assert.equal(
+    (
+      await metrics.getCustomerCountryContributions({
+        month: JULY,
+        country: 'DE',
+      })
+    ).status,
+    'data_unavailable',
+  );
+  const scoped = await metrics.getCustomerCountryContributions({
+    month: AUGUST,
+    country: 'DE',
+    filters: { customerIds: ['cust_expand'] },
+  });
+  assert.deepEqual(
+    scoped.value.rows.map((row) => row.customerId),
+    ['cust_expand'],
+  );
+  assert.equal(scoped.value.largestLosses.length, 0);
+  assert.equal(scoped.value.positiveOffsetsEurCents, 20000);
+});
+
+test('synthetic unassigned country and empty selected country reconcile without substituting missing months', async () => {
+  const metrics = service(
+    fixtureRepository({
+      [JULY]: [record('synthetic_unassigned', JULY, 100, { country: '' })],
+      [AUGUST]: [record('synthetic_unassigned', AUGUST, 50, { country: '' })],
+    }),
+  );
+  const result = await metrics.getCustomerCountryContributions({
+    month: AUGUST,
+    country: null,
+  });
+  assert.equal(result.value.mrrChangeEurCents, -50);
+  assert.equal(result.value.country, null);
+  const empty = await metrics.getCustomerCountryContributions({
+    month: AUGUST,
+    country: 'DE',
+  });
+  assert.equal(empty.status, 'ok');
+  assert.equal(empty.value.currentMrrEurCents, 0);
+  assert.equal(empty.value.previousMrrEurCents, 0);
+  assert.deepEqual(empty.value.rows, []);
+});
+
+test('synthetic unsafe contribution totals never carry valid calculation evidence', async () => {
+  const metrics = service(
+    fixtureRepository({
+      [JULY]: [
+        record('synthetic_large', JULY, Number.MAX_SAFE_INTEGER),
+        record('synthetic_extra', JULY, 1),
+      ],
+      [AUGUST]: [record('synthetic_large', AUGUST, 100)],
+    }),
+  );
+  const result = await metrics.getCustomerCountryContributions({
+    month: AUGUST,
+    country: 'DE',
+  });
+  assert.equal(result.evidence.at(-1).integrity, 'invalid');
+  assert.deepEqual(result.warnings, [
+    'customer_country_contributions_not_reconciled',
+  ]);
+});
