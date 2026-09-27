@@ -42,6 +42,22 @@ customer row returns prior MRR, current MRR, signed change, and exactly one of
 `new`, `expansion`, `contraction`, or `churn`. The operation carries the same
 filter scope and metric-query evidence as other MRR operations.
 
+### Country comparison
+
+`compareCountryMrr` accepts the same strict month/filter input as `compareMrr`.
+It reuses `breakdownMrr` for the preceding and current months with `country`
+grouping. The union of country rows supplies zero only for a country absent from
+a complete month's breakdown. Missing months never become zeros. Signed deltas
+are current country MRR minus previous country MRR, ordered ascending, then
+country. No customer movement classification is attached to country totals.
+
+Both months' unassigned MRR is included in one explicit `null` country row when
+needed. Previous/current totals and all row deltas must reconcile; calculation
+evidence references both returned country queries. Missing dimension evidence
+has warning integrity. The existing analytics adapters reject malformed blank
+dimensions; controlled repositories that represent missing dimensions exercise
+this metric warning path. No adapter validation is relaxed by this operation.
+
 ## Input validation
 
 - A month is exactly `YYYY-MM-01` and represents the first UTC day of a

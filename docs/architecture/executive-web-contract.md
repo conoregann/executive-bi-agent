@@ -49,6 +49,25 @@ a retained plan, not execution timing or live progress. It uses the creation
 response's validated record and the answer's cited evidence; opening it runs no
 tools. New submissions and reloads clear the prior trail with the answer.
 
+## Country comparison follow-up
+
+Completed parent answers offer “Break down by country” and a dedicated
+“Follow-up question” field accepting the bounded country phrase. Both execute
+against the stored parent scope, independently of edits to the new-investigation
+form. Loading, unsupported wording, blocked results and service failures are
+announced and permit retry. A blocked child shows its retained identifier and
+warnings; it does not display invented values.
+
+The child displays previous/current month labels, exact customer scope, a chart
+of signed country-total changes (largest loss first), and an accessible table of
+previous MRR, current MRR and change. Missing dimensions show an explicit
+unassigned-country row and limitation. Row and total citations open the child's
+retained calculation; its input queries and parent total snapshots are also
+inspectable. Separate page-memory tokens protect parent and child citations.
+The parent answer and trail remain visible and unchanged. Reload/new parent
+submission clears child access with parent access; server records remain retained.
+Country migration is explicitly distinguished from churn and acquisition.
+
 ## Deployment boundary and failures
 
 Local Vite development proxies `/v1/investigations` to the fixed separate Node API

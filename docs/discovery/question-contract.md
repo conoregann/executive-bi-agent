@@ -27,10 +27,22 @@ a retained blocked outcome when comparison evidence is missing.
 
 All unmatched wording is rejected without silently dropping constraints. Other
 metrics, dimensions, country/plan/customer filters in prose, custom comparisons,
-quarters, and conversational follow-ups remain unsupported. Customer scope stays
+quarters, and general conversational follow-ups remain unsupported. Customer scope stays
 in the separate explicit form field. The UI shows the resolution for review;
 the user submits the existing structured MRR request to run the investigation.
 Question text is not persisted as investigation evidence or used as authorization.
+
+### Authenticated conversational follow-up
+
+A completed MRR-decline investigation supports exactly “Break that down by
+country” through the authenticated country-follow-up endpoint, with an optional
+single terminal `.`, `!` or `?`, case-insensitive and outer whitespace trimmed.
+It executes both months at the parent's exact customer scope. The standalone
+question resolver remains for new investigations and does not infer parent
+context. The UI provides a dedicated follow-up question field and action.
+Additional dates, customer/country filters, other metrics, combined dimensions
+and all unmatched wording return `unsupported` without running tools. Requests
+needing a changed scope require a new investigation.
 
 The general fields and rules below remain planned beyond this bounded slice.
 

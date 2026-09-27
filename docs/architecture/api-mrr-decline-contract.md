@@ -58,6 +58,36 @@ Read routes require `Authorization: Bearer <accessToken>`:
   returns the completed record only when month and customer scope exactly
   match the stored request. It does not run tools.
 
+### Executable country follow-ups
+
+`POST /v1/investigations/:investigationId/country-follow-ups` authenticates with
+the completed MRR-decline parent's bearer token and accepts exactly one input
+mode, plus a new opaque child `investigationId`:
+
+```json
+{
+  "investigationId": "august-countries",
+  "action": "breakdown_mrr_by_country"
+}
+```
+
+Alternatively, provide `question: "Break that down by country"` instead of
+`action`. Matching is case-insensitive, trims outer whitespace and permits one
+terminal period, exclamation mark or question mark. Unmatched wording returns
+`422 unsupported`; no constraints are discarded. Unknown fields or both/neither
+input modes return `400 invalid_request`. No caller-provided month or scope is
+accepted. Authentication failures use the existing `401`/`404` outcomes.
+Non-completed parents, child parents or insufficient parent evidence return
+`422 invalid_parent`. Reused child IDs return `409 conflict`.
+
+Success returns `201 completed`, or `422 blocked`, with `record`, `accessToken`
+and `warnings`, validated by `countryFollowUpResponseSchema`. The child record
+includes `parentInvestigationId`, kind `mrr_country_follow_up`, inherited scope,
+its two-step plan, evidence IDs, warnings and terminal state. Existing record,
+answer and evidence GET routes accept the child's token. Parent and child tokens
+are not interchangeable. Records use the existing JSON persistence table; no
+migration is required.
+
 Missing tokens return `401`; unknown IDs, missing evidence, and invalid tokens
 return indistinguishable `404` responses. Scope mismatch returns `403` only
 after valid token authentication. JSON request bodies are limited to 16 KiB.

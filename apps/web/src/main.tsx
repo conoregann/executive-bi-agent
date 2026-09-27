@@ -2,10 +2,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   InvestigationAnswer,
+  CountryFollowUpAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 import {
   readAnswer,
+  startCountryFollowUp,
+  readCountryFollowUpAnswer,
   readEvidence,
   startInvestigation,
   resolveQuestion,
@@ -17,6 +20,12 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [followQuestion, setFollowQuestion] = useState('');
+  const [followAnswer, setFollowAnswer] = useState<CountryFollowUpAnswer>();
+  const [followMessage, setFollowMessage] = useState('');
+  const followSession = useRef<{ id: string; token: string } | undefined>(
+    undefined,
+  );
   const [question, setQuestion] = useState('');
   const [resolution, setResolution] = useState('');
   const [resolving, setResolving] = useState(false);
@@ -42,6 +51,9 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setFollowAnswer(undefined);
+    setFollowMessage('');
+    followSession.current = undefined;
     setRecord(undefined);
     setEvidence(undefined);
     setEvidenceError('');
@@ -75,8 +87,7 @@ function App() {
       setBusy(false);
     }
   }
-  async function inspect(id: string) {
-    const active = session.current;
+  async function inspect(id: string, active = session.current) {
     if (!active) return;
     const version = ++evidenceRequest.current;
     setEvidence(undefined);
@@ -92,6 +103,44 @@ function App() {
         );
     } finally {
       if (version === evidenceRequest.current) setEvidenceBusy(false);
+    }
+  }
+  async function followUp(question?: string) {
+    const active = session.current;
+    if (!active) return;
+    setBusy(true);
+    setFollowAnswer(undefined);
+    followSession.current = undefined;
+    setFollowMessage('Comparing country MRR against the previous month…');
+    try {
+      const result = await startCountryFollowUp(
+        active.id,
+        active.token,
+        question,
+      );
+      followSession.current = {
+        id: result.record.investigationId,
+        token: result.accessToken,
+      };
+      if (result.status === 'blocked') {
+        setFollowMessage(
+          `Country follow-up blocked: required analytics are unavailable or do not reconcile. Retained record: ${result.record.investigationId}. ${result.warnings.join(' ')}`,
+        );
+      } else {
+        setFollowAnswer(
+          await readCountryFollowUpAnswer(
+            result.record.investigationId,
+            result.accessToken,
+          ),
+        );
+        setFollowMessage('Country follow-up complete.');
+      }
+    } catch (error) {
+      setFollowMessage(
+        error instanceof Error ? error.message : 'Follow-up unavailable.',
+      );
+    } finally {
+      setBusy(false);
     }
   }
   function claim(item: Claim, index = 0) {
@@ -362,6 +411,168 @@ function App() {
             <p>{answer.recommendedNextStep.text}</p>
             <p>Owner: {answer.recommendedNextStep.owner}</p>
           </section>
+          <section
+            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
+            aria-labelledby="country-heading"
+          >
+            <h2 id="country-heading">Country comparison follow-up</h2>
+            <p>
+              Compare the same reporting months and customer scope as this
+              investigation.
+            </p>
+            <button
+              type="button"
+              disabled={busy || resolving}
+              onClick={() => void followUp()}
+            >
+              Break down by country
+            </button>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void followUp(followQuestion);
+              }}
+            >
+              <label className="flex flex-col gap-2 font-semibold">
+                Follow-up question
+                <input
+                  value={followQuestion}
+                  maxLength={1000}
+                  disabled={busy || resolving}
+                  placeholder="Break that down by country"
+                  onChange={(event) => setFollowQuestion(event.target.value)}
+                />
+              </label>
+              <button disabled={busy || resolving}>Run follow-up</button>
+            </form>
+            <p role="status" aria-live="polite">
+              {followMessage}
+            </p>
+            {followAnswer && (
+              <>
+                <p>
+                  Previous month:{' '}
+                  {followAnswer.comparison.previousMonth.slice(0, 7)} · Current
+                  month: {followAnswer.comparison.currentMonth.slice(0, 7)} ·
+                  Customers:{' '}
+                  {followAnswer.permittedCustomerIds.join(', ') ||
+                    'Full synthetic dataset'}
+                </p>
+                <p>Ranked by signed MRR change, largest loss first.</p>
+                <div aria-hidden="true" className="space-y-3">
+                  {followAnswer.comparison.rows.map((row) => (
+                    <div key={row.country ?? 'unassigned'}>
+                      <div className="flex justify-between gap-3">
+                        <span>{row.country ?? 'Unassigned country'}</span>
+                        <span>{eur(row.mrrChangeEurCents)}</span>
+                      </div>
+                      <div className="h-5 rounded bg-[#edf2ef]">
+                        <div
+                          className={`h-5 rounded ${row.mrrChangeEurCents < 0 ? 'bg-[#a33b32]' : 'bg-[#174b3a]'}`}
+                          style={{
+                            width: `${(Math.abs(row.mrrChangeEurCents) / Math.max(1, ...followAnswer.comparison.rows.map((item) => Math.abs(item.mrrChangeEurCents)))) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="my-4 w-full text-left">
+                    <caption className="text-left font-semibold">
+                      Country MRR comparison (EUR)
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Country</th>
+                        <th scope="col">Previous MRR</th>
+                        <th scope="col">Current MRR</th>
+                        <th scope="col">Change</th>
+                        <th scope="col">Evidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {followAnswer.comparison.rows.map((row) => (
+                        <tr key={row.country ?? 'unassigned'}>
+                          <th scope="row">
+                            {row.country ?? 'Unassigned country'}
+                          </th>
+                          <td>{eur(row.previousMrrEurCents)}</td>
+                          <td>{eur(row.currentMrrEurCents)}</td>
+                          <td>{eur(row.mrrChangeEurCents)}</td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void inspect(
+                                  followAnswer.sourceEvidenceIds[2]!,
+                                  followSession.current,
+                                )
+                              }
+                              aria-controls="evidence-detail"
+                            >
+                              Inspect country {row.country ?? 'unassigned'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <th scope="row">Total</th>
+                        <td>
+                          {eur(followAnswer.comparison.previousMrrEurCents)}
+                        </td>
+                        <td>
+                          {eur(followAnswer.comparison.currentMrrEurCents)}
+                        </td>
+                        <td>
+                          {eur(followAnswer.comparison.mrrChangeEurCents)}
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void inspect(
+                                followAnswer.sourceEvidenceIds[2]!,
+                                followSession.current,
+                              )
+                            }
+                            aria-controls="evidence-detail"
+                          >
+                            Inspect country total
+                          </button>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                <ul>
+                  {followAnswer.limitations.map((text) => (
+                    <li key={text}>{text}</li>
+                  ))}
+                </ul>
+                <p>
+                  Stored follow-up: {followAnswer.investigationId} · Parent:{' '}
+                  {followAnswer.parentInvestigationId}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {followAnswer.evidence.map((item) => (
+                    <button
+                      type="button"
+                      key={item.evidenceId}
+                      onClick={() =>
+                        void inspect(item.evidenceId, followSession.current)
+                      }
+                      aria-controls="evidence-detail"
+                    >
+                      Inspect country evidence {item.evidenceId}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
           {record && (
             <details className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6">
               <summary className="cursor-pointer font-semibold">
@@ -439,7 +650,7 @@ function App() {
   );
 }
 function eur(cents: number) {
-  const digits = cents.toString().padStart(3, '0');
-  return `EUR ${digits.slice(0, -2)}.${digits.slice(-2)}`;
+  const digits = Math.abs(cents).toString().padStart(3, '0');
+  return `EUR ${cents < 0 ? '-' : ''}${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
 createRoot(document.getElementById('root')!).render(<App />);

@@ -325,3 +325,63 @@ test('creates a chart specification from breakdown data and evidence only', asyn
     result.evidence[0]?.evidenceId,
   ]);
 });
+
+test('country comparison reconciles both months, includes entering/exiting countries and explicit missing dimensions', async () => {
+  const repository = fixtureRepository({
+    [JULY]: [
+      record('moving', JULY, 100, { country: 'DE' }),
+      record('missing', JULY, 50, { country: '' }),
+    ],
+    [AUGUST]: [
+      record('moving', AUGUST, 100, { country: 'GB' }),
+      record('missing', AUGUST, 30, { country: '' }),
+    ],
+  });
+  const result = await service(repository).compareCountryMrr({ month: AUGUST });
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.value.rows, [
+    {
+      country: 'DE',
+      previousMrrEurCents: 100,
+      currentMrrEurCents: 0,
+      mrrChangeEurCents: -100,
+    },
+    {
+      country: null,
+      previousMrrEurCents: 50,
+      currentMrrEurCents: 30,
+      mrrChangeEurCents: -20,
+    },
+    {
+      country: 'GB',
+      previousMrrEurCents: 0,
+      currentMrrEurCents: 100,
+      mrrChangeEurCents: 100,
+    },
+  ]);
+  assert.equal(result.value.mrrChangeEurCents, -20);
+  assert.equal(result.evidence[2].integrity, 'warning');
+  assert.deepEqual(
+    result.evidence[2].content.inputEvidenceIds,
+    result.evidence.slice(0, 2).map((item) => item.evidenceId),
+  );
+  const calls = repository.calls();
+  assert.equal(
+    (
+      await service(repository).compareCountryMrr({
+        month: AUGUST,
+        groupBy: 'plan',
+      })
+    ).status,
+    'invalid_request',
+  );
+  assert.equal(repository.calls(), calls);
+  assert.equal(
+    (
+      await service(
+        fixtureRepository({ [AUGUST]: [record('a', AUGUST, 100)] }),
+      ).compareCountryMrr({ month: AUGUST })
+    ).status,
+    'data_unavailable',
+  );
+});

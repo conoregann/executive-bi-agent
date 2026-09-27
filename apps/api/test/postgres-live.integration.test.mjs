@@ -148,3 +148,95 @@ test(
     }
   },
 );
+
+test(
+  'PostgreSQL retains linked country follow-ups and evidence across service restart',
+  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  async () => {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+    });
+    const analytics = new Pool({
+      connectionString: process.env.ANALYTICS_DATABASE_URL,
+      connectionTimeoutMillis: 5000,
+    });
+    const parentId = `synthetic_${randomUUID().replaceAll('-', '')}`;
+    const childId = `synthetic_${randomUUID().replaceAll('-', '')}`;
+    const request = (id, token, body) =>
+      new Request(`http://api.test/v1/investigations/${id}`, {
+        method: body ? 'POST' : 'GET',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    try {
+      const first = await createPostgresMrrDeclineApi(
+        analytics,
+        new PostgresInvestigationStore(pool),
+      );
+      const created = await first.fetch(
+        request('mrr-decline', undefined, {
+          investigationId: parentId,
+          month: '2026-08-01',
+          permittedCustomerIds: ['cust_acme'],
+        }),
+      );
+      assert.equal(created.status, 201);
+      const parent = await created.json();
+      const followResponse = await first.fetch(
+        request(`${parentId}/country-follow-ups`, parent.accessToken, {
+          investigationId: childId,
+          action: 'breakdown_mrr_by_country',
+        }),
+      );
+      assert.equal(followResponse.status, 201);
+      const follow = await followResponse.json();
+      const original = await (
+        await first.fetch(request(`${childId}/answer`, follow.accessToken))
+      ).json();
+      const second = await createPostgresMrrDeclineApi(
+        analytics,
+        new PostgresInvestigationStore(pool),
+      );
+      const retained = await second.fetch(
+        request(`${childId}/answer`, follow.accessToken),
+      );
+      assert.equal(retained.status, 200);
+      assert.deepEqual(await retained.json(), original);
+      assert.equal(original.answer.comparison.mrrChangeEurCents, -240000);
+      assert.deepEqual(original.answer.permittedCustomerIds, ['cust_acme']);
+      for (const id of original.answer.sourceEvidenceIds)
+        assert.equal(
+          (
+            await second.fetch(
+              request(`${childId}/evidence/${id}`, follow.accessToken),
+            )
+          ).status,
+          200,
+        );
+      assert.deepEqual(
+        (
+          await (
+            await second.fetch(request(parentId, parent.accessToken))
+          ).json()
+        ).record,
+        parent.record,
+      );
+      assert.equal(
+        (await second.fetch(request(`${childId}/answer`, parent.accessToken)))
+          .status,
+        404,
+      );
+    } finally {
+      await pool.query(
+        'DELETE FROM app.investigations WHERE investigation_id = ANY($1::text[])',
+        [[parentId, childId]],
+      );
+      await analytics.end();
+      await pool.end();
+    }
+  },
+);

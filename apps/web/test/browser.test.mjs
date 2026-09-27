@@ -341,3 +341,66 @@ test('natural-language review preserves selected customer scope and handles clar
   );
   assert.equal(starts, 1);
 });
+
+test('country follow-up action and bounded phrase show compared values and protected evidence on mobile', async (t) => {
+  const page = await pageForTest(t, { width: 390, height: 844 });
+  await complete(page);
+  await page
+    .getByRole('button', { name: 'Break down by country', exact: true })
+    .click();
+  await page
+    .getByRole('table', { name: 'Country MRR comparison (EUR)' })
+    .waitFor();
+  const table = page.getByRole('table', {
+    name: 'Country MRR comparison (EUR)',
+  });
+  assert.match(await table.textContent(), /Previous MRR.*Current MRR.*Change/);
+  assert.match(await table.textContent(), /EUR -1700.00/);
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+    true,
+  );
+  const requestPromise = page.waitForRequest((request) =>
+    request.url().includes('/evidence/'),
+  );
+  await page
+    .getByRole('button', { name: 'Inspect country total', exact: true })
+    .click();
+  const request = await requestPromise;
+  assert.match(request.headers().authorization, /^Bearer /);
+  await page
+    .getByRole('heading', { name: 'Supporting values or document excerpt' })
+    .waitFor();
+  assert.match(
+    await page.locator('#evidence-detail').textContent(),
+    /country_change/,
+  );
+  await page
+    .getByLabel('Follow-up question', { exact: true })
+    .fill('Break that down by country in September 2026');
+  await page
+    .getByRole('button', { name: 'Run follow-up', exact: true })
+    .click();
+  await page
+    .getByRole('status')
+    .filter({ hasText: 'Only “Break that down by country”' })
+    .waitFor();
+  assert.equal(await table.count(), 0);
+  await page
+    .getByLabel('Follow-up question', { exact: true })
+    .fill('Break that down by country');
+  await page
+    .getByRole('button', { name: 'Run follow-up', exact: true })
+    .click();
+  await table.waitFor();
+  assert.match(
+    await page.getByRole('article').textContent(),
+    /not churn or acquisition/,
+  );
+  await page.screenshot({
+    path: '/tmp/executive-bi-country-mobile.png',
+    fullPage: true,
+  });
+});

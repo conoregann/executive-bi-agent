@@ -1,10 +1,14 @@
 import {
   MrrDeclineInvestigationService,
   synthesizeMrrDeclineAnswer,
+  synthesizeCountryFollowUpAnswer,
   type InvestigationRecord,
 } from '@executive-bi/investigations';
 import {
   mrrDeclineRequestSchema,
+  countryFollowUpResponseSchema,
+  countryFollowUpFailureSchema,
+  storedInvestigationRecordSchema,
   followUpContextRequestSchema,
   investigationEvidenceSchema,
   mrrDeclineResponseSchema,
@@ -33,7 +37,7 @@ export class MrrDeclineApi {
       return Response.json(resolveQuestion(parsed.data.question));
     }
     const detail =
-      /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context|\/answer)?$/u.exec(
+      /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context|\/country-follow-ups|\/answer)?$/u.exec(
         pathname,
       );
     if (detail && pathname !== MRR_DECLINE_PATH)
@@ -83,8 +87,10 @@ export class MrrDeclineApi {
     evidenceId?: string,
   ): Promise<Response> {
     const pathname = new URL(request.url).pathname;
+    const countryFollowUp = pathname.endsWith('/country-follow-ups');
     const followUp = pathname.endsWith('/follow-up-context');
-    if (request.method !== (followUp ? 'POST' : 'GET')) return notFound();
+    if (request.method !== (followUp || countryFollowUp ? 'POST' : 'GET'))
+      return notFound();
     const authorization = request.headers.get('authorization');
     if (
       !authorization?.startsWith('Bearer ') ||
@@ -96,6 +102,30 @@ export class MrrDeclineApi {
       );
     }
     const token = authorization.slice(7);
+    if (countryFollowUp) {
+      if (!request.headers.get('content-type')?.includes('application/json'))
+        return invalidResponse('Content-Type must be application/json.');
+      const body = await parseJson(request);
+      if (!body.ok) return invalidResponse(body.error);
+      const result = await this.investigation.startCountryFollowUp(
+        investigationId,
+        token,
+        body.value,
+      );
+      if (result.status === 'not_found') return notFound();
+      if (result.status === 'completed' || result.status === 'blocked')
+        return Response.json(countryFollowUpResponseSchema.parse(result), {
+          status: result.status === 'completed' ? 201 : 422,
+        });
+      return Response.json(countryFollowUpFailureSchema.parse(result), {
+        status:
+          result.status === 'conflict'
+            ? 409
+            : result.status === 'invalid_request'
+              ? 400
+              : 422,
+      });
+    }
     if (followUp) {
       if (!request.headers.get('content-type')?.includes('application/json'))
         return invalidResponse('Content-Type must be application/json.');
@@ -129,7 +159,10 @@ export class MrrDeclineApi {
     );
     if (found.status !== 'ok') return notFound();
     if (pathname === `/v1/investigations/${investigationId}/answer`) {
-      const result = synthesizeMrrDeclineAnswer(found.record, found.evidence);
+      const result =
+        found.record.kind === 'mrr_decline'
+          ? synthesizeMrrDeclineAnswer(found.record, found.evidence)
+          : synthesizeCountryFollowUpAnswer(found.record, found.evidence);
       return Response.json(result, {
         status: result.status === 'ok' ? 200 : 422,
       });
@@ -144,7 +177,10 @@ export class MrrDeclineApi {
         evidence: investigationEvidenceSchema.parse(evidence),
       });
     }
-    return Response.json({ status: 'ok', record: toApiRecord(found.record) });
+    return Response.json({
+      status: 'ok',
+      record: storedInvestigationRecordSchema.parse(found.record),
+    });
   }
 }
 

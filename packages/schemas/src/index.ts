@@ -253,3 +253,158 @@ export const resolveQuestionResponseSchema = z.discriminatedUnion('status', [
     })
     .strict(),
 ]);
+
+export const countryFollowUpRequestSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    action: z.literal('breakdown_mrr_by_country').optional(),
+    question: z.string().trim().min(1).max(1000).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => (value.action !== undefined) !== (value.question !== undefined),
+    'Provide exactly one action or question.',
+  );
+
+export const countryMrrComparisonSchema = z
+  .object({
+    currentMonth: calendarMonth,
+    previousMonth: calendarMonth,
+    previousMrrEurCents: z.number().int().nonnegative().safe(),
+    currentMrrEurCents: z.number().int().nonnegative().safe(),
+    mrrChangeEurCents: z.number().int().safe(),
+    missingDimensions: z.boolean(),
+    rows: z.array(
+      z
+        .object({
+          country: z
+            .string()
+            .min(1)
+            .refine((value) => value.trim().length > 0)
+            .nullable(),
+          previousMrrEurCents: z.number().int().nonnegative().safe(),
+          currentMrrEurCents: z.number().int().nonnegative().safe(),
+          mrrChangeEurCents: z.number().int().safe(),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const date = new Date(`${value.currentMonth}T00:00:00Z`);
+    date.setUTCMonth(date.getUTCMonth() - 1);
+    if (
+      date.toISOString().slice(0, 10) !== value.previousMonth ||
+      new Set(value.rows.map((row) => row.country)).size !==
+        value.rows.length ||
+      value.missingDimensions !==
+        value.rows.some((row) => row.country === null) ||
+      value.rows.some(
+        (row, index) =>
+          index > 0 &&
+          (value.rows[index - 1]!.mrrChangeEurCents > row.mrrChangeEurCents ||
+            (value.rows[index - 1]!.mrrChangeEurCents ===
+              row.mrrChangeEurCents &&
+              (value.rows[index - 1]!.country ?? '').localeCompare(
+                row.country ?? '',
+              ) > 0)),
+      ) ||
+      value.rows.some(
+        (row) =>
+          row.currentMrrEurCents - row.previousMrrEurCents !==
+          row.mrrChangeEurCents,
+      ) ||
+      value.currentMrrEurCents - value.previousMrrEurCents !==
+        value.mrrChangeEurCents ||
+      (
+        [
+          'previousMrrEurCents',
+          'currentMrrEurCents',
+          'mrrChangeEurCents',
+        ] as const
+      ).some(
+        (key) =>
+          value.rows.reduce((total, row) => total + row[key], 0) !== value[key],
+      )
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Country comparison must reconcile with consecutive months and unique rows.',
+      });
+    }
+  });
+
+export const countryFollowUpPlanSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    steps: z.tuple([
+      z.literal('breakdown_mrr_by_country_previous'),
+      z.literal('breakdown_mrr_by_country_current'),
+    ]),
+    maximumToolCalls: z.literal(2),
+  })
+  .strict();
+export const countryFollowUpRecordSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    kind: z.literal('mrr_country_follow_up'),
+    month: calendarMonth,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    plan: countryFollowUpPlanSchema,
+    status: z.enum(['completed', 'blocked']),
+    evidenceIds: z.array(z.string().min(1)),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export const storedInvestigationRecordSchema = z.union([
+  mrrDeclineRecordSchema,
+  countryFollowUpRecordSchema,
+]);
+export const countryFollowUpAnswerSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    comparison: countryMrrComparisonSchema,
+    evidence: z.array(investigationEvidenceSchema).min(3),
+    sourceEvidenceIds: z.array(z.string().min(1)).length(3),
+    limitations: z.array(z.string().min(1)),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.sourceEvidenceIds.every((id, index) =>
+        value.evidence.some(
+          (item) =>
+            item.evidenceId === id &&
+            item.type === (index === 2 ? 'calculation' : 'metric_query') &&
+            item.integrity !== 'invalid',
+        ),
+      ) && new Set(value.sourceEvidenceIds).size === 3,
+    'Country values require inspectable query and calculation evidence.',
+  );
+export const countryFollowUpResponseSchema = z
+  .object({
+    status: z.enum(['completed', 'blocked']),
+    record: countryFollowUpRecordSchema,
+    accessToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export const countryFollowUpFailureSchema = z
+  .object({
+    status: z.enum([
+      'invalid_request',
+      'unsupported',
+      'invalid_parent',
+      'conflict',
+    ]),
+    error: z.string().min(1).optional(),
+  })
+  .strict();
+
+export type CountryFollowUpRecord = z.infer<typeof countryFollowUpRecordSchema>;
+export type CountryFollowUpAnswer = z.infer<typeof countryFollowUpAnswerSchema>;
+export type CountryFollowUpPlan = z.infer<typeof countryFollowUpPlanSchema>;

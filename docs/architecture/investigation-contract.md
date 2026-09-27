@@ -76,6 +76,29 @@ its SHA-256 hash is stored. The plan is reserved before tool execution;
 terminal records and evidence are retained in PostgreSQL. See the
 [API contract](api-mrr-decline-contract.md) for routes and responses.
 
+## Executable country follow-up
+
+A completed `mrr_decline` parent with usable retained comparison evidence may
+execute `mrr_country_follow_up`. Authentication uses the parent's token before
+any reservation or tools. The child inherits the exact month, previous-period
+comparison and permitted customer IDs, including the original full-dataset
+scope. Dates, filters and other metrics cannot be supplied as overrides.
+
+The child reserves its own ID and two-step plan before querying country MRR for
+the previous and current months. `packages/metrics` calculates signed country
+deltas, sorts the largest losses first and reconciles both totals. Both totals
+must also equal the parent's retained total queries. Unavailable analytics,
+invalid evidence, or changed totals produce a retained `blocked` child, without
+an answer. Missing dimension MRR remains an explicit unassigned row.
+
+The child retains its own query/calculation evidence plus copies of the parent's
+total queries under local evidence IDs. It has a separate bearer token and
+immutable linked record; the parent remains unchanged. Retained child answers
+and evidence are readable after restart without querying analytics or requiring
+the parent token. Child records cannot themselves be parents in this slice.
+Country movements mean changes in country totals, including country migration;
+they do not classify churn, acquisition or causes.
+
 ## Tool design and implementation status
 
 The table describes intended general tools. Current executable MRR operations
