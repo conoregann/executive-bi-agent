@@ -45,7 +45,10 @@ Strength is assessed per claim, not per answer. A metric result with incomplete 
 
 ## Citation display
 
-Each answer shows compact citations near the statement they support. A citation opens a detail view containing the source reference, resolved scope, freshness, and values or excerpt. Sensitive record fields must be redacted according to the active permission scope before display.
+The current API returns evidence IDs and an authenticated evidence-detail
+route with source reference, resolved scope, freshness, and values or excerpt.
+A future UI must show compact citations near the supported statement and open
+that evidence in a detail view. Sensitive record fields must be redacted according to the active permission scope before display.
 
 ## Invalid evidence
 

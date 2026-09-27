@@ -1,141 +1,91 @@
 # AGENTS.md — Executive BI Agent
 
-Behavioral guidelines, non-negotiable system invariants, and project execution standards.
+## Working rules
 
-**Tradeoff:** These guidelines bias toward caution and correctness over speed. For trivial tasks, use judgment.
+Proceed on clear user intent and carry authorized work through verified acceptance
+criteria. Choose ordinary reversible implementation details independently. Ask
+only when a material product, data-model, security, or architecture decision
+blocks progress; explain the decision and continue independent work. State useful
+assumptions and surface consequential alternatives before implementing them.
 
----
+- Read the affected code, tests, shared schemas, and governing contract before
+  editing. [Spec.md](Spec.md) separates current scope from intended architecture;
+  [docs](docs/README.md) indexes focused contracts. Root rules apply everywhere;
+  nested `AGENTS.md` files add local requirements.
+- Prefer the simplest design that satisfies the request. No speculative
+  abstractions, single-use frameworks, unrequested configurability, dependencies,
+  or infrastructure. Push back when a simpler approach meets the goal.
+- Make surgical changes, match existing style, and preserve user changes. Remove
+  only dead code caused by your edits; mention unrelated issues without fixing
+  them. Every changed line should support the requested capability.
+- Define observable acceptance criteria before implementation. For a bug,
+  reproduce the failure; for a public boundary, establish contract tests. Use a
+  brief plan for multi-step work, with each step tied to verification. Skip
+  ceremony for trivial changes.
+- Preserve readable design, typed boundaries, useful failure outcomes, and
+  accessible, understandable product behavior. Update durable contracts when
+  their behavior changes; do not document routine implementation details.
 
-## 1. Core Operating Rules
+## Capability delivery
 
-### 1. Think Before Coding
+Deliver small, complete, independently reviewable user-visible or operational
+capabilities. Split large goals into useful vertical slices with explicit
+acceptance criteria, contracts, behavior, failure handling, tests, and relevant
+evaluations. A slice may expose a narrower supported scope; label remaining work
+as planned and do not leave its promised path incomplete.
 
-**Don’t assume. Don’t hide confusion. Surface tradeoffs.**
+Use `feat/<capability>`, `fix/<issue>`, or `chore/<task>` branches from `main` for
+new work. Inspect the current branch and working tree first; reuse a suitable
+branch when continuing its capability. Keep a capability together across files
+and sessions. Avoid file-level micro-branches and oversized roadmap branches;
+separate independently reviewable slices when they can stand on their own.
 
-- Read the governing contracts (`packages/schemas`, `docs/SPEC.md`), affected code, and tests before editing.
-- State your assumptions explicitly. If an architectural or modeling choice is open, ask before building.
-- If multiple interpretations exist, present them—do not pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
+Use atomic Conventional Commits as meaningful review or recovery checkpoints,
+including before risky transitions. No commit quota: activity is not progress.
+Open a PR when the slice satisfies its acceptance criteria; describe behavior,
+validation, limitations, and deferred scope so it can be reviewed independently.
+Never force-push or rewrite shared history. Preserve unrelated changes in commits
+and PRs as well as in the working tree.
 
-### 2. Simplicity First
+Progress means completed capabilities and verified acceptance criteria, not LOC,
+commit counts, branch counts, or time spent.
 
-**Minimum code that solves the problem. Nothing speculative.**
-
-- Build only what was asked. No speculative abstractions or unrequested configurability.
-- Do not introduce new dependencies, vector stores, or infrastructure until an active feature strictly requires them.
-- _Senior engineer test:_ If you write 200 lines and it could be 50, rewrite it.
-
-### 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-- Do not "improve" adjacent code, comments, or formatting. Match existing style.
-- Do not refactor components that are not broken.
-- When your changes orphan imports, variables, or functions, remove them. Leave pre-existing dead code untouched (mention it instead).
-- Every changed line must trace directly to the requested feature.
-
-### 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-- Convert tasks into verifiable goals before modifying implementation:
-  - _"Fix metric query"_ $\to$ write a test reproducing the discrepancy, then make it pass.
-  - _"Add API endpoint"_ $\to$ write a contract/schema test first, then implement.
-- For multi-step tasks, state a brief plan:
-  ```
-  1. [Step] → verify: [check]
-  2. [Step] → verify: [check]
-  3. [Step] → verify: [check]
-  ```
-
----
-
-## 2. Project Overview & Layout Boundaries
-
-This repository is a production-style Executive BI Agent for a fictional B2B SaaS company ($28.9M ARR). It investigates business questions across structured metrics and unstructured knowledge using deterministic semantic metrics, knowledge RAG, and safe exploratory text-to-SQL.
-
-Canonical system specs and data schemas live in **`docs/SPEC.md`**.
-
-| Path                 | Responsibility                                | Invariant                                                               |
-| :------------------- | :-------------------------------------------- | :---------------------------------------------------------------------- |
-| `apps/web`           | Next.js 15 UI, Recharts rendering             | Consumes NestJS API only. No direct DB or model access.                 |
-| `apps/api`           | NestJS API, investigation orchestration       | Enforces auth, rate limits, and structured response validation.         |
-| `apps/worker`        | BullMQ async jobs                             | Ingestion, heavy queries, and long-running investigations.              |
-| `packages/metrics`   | Semantic metric catalog & query compiler      | **Deterministic pure logic only.** No LLM inference inside metric math. |
-| `packages/database`  | PostgreSQL client, migrations, seeds          | Strict separation of raw, staging, and analytics schemas.               |
-| `packages/retrieval` | Knowledge ingestion, pgvector search          | Hybrid search over internal documents with strict metadata filtering.   |
-| `packages/ai`        | Model adapters, prompts, tool contracts       | Provider-independent structured outputs using shared Zod schemas.       |
-| `packages/schemas`   | Shared typed contracts (Zod)                  | Single source of truth across web, API, worker, and packages.           |
-| `evals/`             | Automated benchmark suite (100 cases)         | Tests metric correctness, SQL safety, and groundedness.                 |
-| `data/`              | Synthetic data generators & seeds             | Strictly synthetic data. No real PII or customer data.                  |
-| `docs/`              | Canonical specifications (`SPEC.md`) and ADRs | Concise documentation only. No duplicated code walkthroughs.            |
-
----
-
-## 3. Non-Negotiable Domain & Security Invariants
+## Non-Negotiable Domain & Security Invariants
 
 These rules override speed and convenience. Never bypass them:
 
-1. **Deterministic Metrics Only:** Metrics (`mrr`, `arr`, `customer_churn_rate`, `mrr_churn_rate`, `nrr`, `cac`, `ltv`, `trial_conversion_rate`) are centrally defined in `packages/metrics`. **Never let an LLM infer or calculate metric values in prompt text.**
+1. **Deterministic Metrics Only:** Metrics (`mrr`, `arr`, `customer_churn_rate`, `mrr_churn_rate`, `nrr`, `cac`, `ltv`, `trial_conversion_rate`) must be centrally defined and implemented in `packages/metrics` before exposure; the current executable scope is MRR. **Never let an LLM infer or calculate metric values in prompt text.**
 2. **Treat Generated SQL as Hostile Input:**
    - Execute strictly via a dedicated PostgreSQL read-only database role.
    - Run an AST check (using `pgsql-ast-parser` or equivalent) to hard-reject `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `GRANT`, `REVOKE`, or multiple statements.
    - Restrict execution to `staging.*` and `analytics.*` tables. Reject queries targeting `raw.*` or system catalogs.
    - Force statement timeouts (max 5s) and row limits (max 500 rows).
 3. **Inspectable Citations:** Every material numerical claim must link to a structured `query_id`; every contextual claim must link to a retrieved `document_id`. Clearly distinguish observed facts, calculated deltas, hypotheses, and correlations.
-4. **Tool-First Execution:** Direct the model to typed tools (`getMetric`, `compareMetric`, `decomposeMetricMovement`, `searchCompanyKnowledge`) before allowing fallback to exploratory SQL generation.
-5. **Synthetic Data Labeling:** All fixtures, seeds, and test databases must be explicitly labeled `synthetic`.
+4. **Tool-First Execution:** Direct the model to typed tools (current MRR operations and scoped company-knowledge search) before allowing fallback to exploratory SQL generation.
+5. **Privacy and Scope:** Preserve explicit customer permissions, confidential-document boundaries, immutable provenance, and bounded follow-up scope. Never broaden scope to fill missing evidence or imply causality from correlation.
+6. **Synthetic Data Labeling:** All fixtures, seeds, and test databases must be explicitly labeled `synthetic`.
 
----
+## Verification and completion
 
-## 4. Build, Test & Verification Commands
+Right-size checks to the changed boundary and risk; never reduce safeguards to
+save time. Run focused tests while implementing, including relevant happy paths,
+edge cases, failures, evidence integrity, and permission isolation. Update
+appropriate evaluations for new durable behavior or safety rules.
 
-Always run targeted checks during implementation and full repository validation before completing work:
+- Runtime changes: run affected package checks/tests first, then `pnpm check`,
+  `pnpm test`, and `pnpm format:check` before marking the capability ready.
+  Public contracts, cross-package changes, metrics, and security boundaries need
+  coverage of affected consumers and integrations.
+- Schema or seed changes: also run `pnpm db:verify` per local guides. Live
+  PostgreSQL integration tests require `DATABASE_URL`; report skips explicitly.
+- Documentation-only changes: run Prettier on changed Markdown, check local links
+  and paths against the repository, and run `git diff --check`. Do not run
+  application tests unless executable behavior or fixtures changed.
+- Use existing package scripts for targeted checks, for example
+  `pnpm --filter @executive-bi/metrics test`; there is no `test:targeted` script.
+  Do not rerun passing checks without a new change or unresolved concern.
 
-```bash
-# Type checking
-pnpm check
-
-# Unit and integration testing
-pnpm test
-
-# Targeted test for active work
-pnpm test:targeted <path/to/test>
-
-# Linting and formatting
-pnpm format:check
-
-# Hygiene check
-git diff --check
-```
-
----
-
-## 5. Feature Delivery, Branches & Commits
-
-Work in complete feature scopes, using substantial branches and regular checkpoint commits for version control:
-
-- **Substantial Feature Branches:**
-  - Branch off `main` using `feat/<feature-name>`, `fix/<issue-name>`, or `chore/<task-name>`.
-  - Scope branches to an **entire substantial feature or capability** (e.g., `feat/mrr-decomposition-tool`, `feat/knowledge-retrieval-pipeline`, `feat/sql-safety-ast-layer`).
-  - Do not create micro-branches for individual files, prompts, or task list items. Keep the branch open across work sessions until the complete feature is fully implemented and tested.
-- **Regular Commits for Version Control:**
-  - Make frequent, atomic Conventional Commits within the branch (`feat: ...`, `test: ...`, `fix: ...`, `refactor: ...`).
-  - Use commits as safe recovery points, rollback markers, and clear changelog entries as you progress through the feature.
-- **Complete Features:**
-  - A feature is only complete when its contract, business logic, edge-case handling, and automated tests are fully in place.
-- **History Preservation:**
-  - Never force-push or rewrite git history on shared branches. Preserve unrelated working tree changes.
-
----
-
-## 6. Definition of Done
-
-A task or feature branch is ready for review and merge only when:
-
-- [ ] The feature is completely implemented according to `docs/SPEC.md`.
-- [ ] Metric calculations and SQL execution strictly follow security invariants.
-- [ ] Targeted tests pass and cover both happy paths and edge/failure cases.
-- [ ] Repository checks pass cleanly: `pnpm check`, `pnpm test`, `pnpm format:check`.
-- [ ] Diff is minimal, surgical, free of orphaned code, and verified with `git diff --check`.
-- [ ] The final response summarizes the changes made, tests verified, and any newly exposed endpoints or tools.
+Before completion, review the diff for scope, contradictions, orphaned code, and
+unsupported claims. Report what changed, acceptance criteria verified, exact
+checks and results, skips or blockers, and new endpoints/tools if any. Never
+claim an unrun check passed or treat a planned guarantee as implemented.

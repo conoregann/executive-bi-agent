@@ -1,6 +1,8 @@
 # Semantic-foundation investigation evaluations
 
-These cases are fixture-backed acceptance criteria for the first implementation. They are intentionally written before data and code exist.
+These cases are fixture-backed acceptance criteria for the first implementation. MRR and retained-scope behavior have executable tests. Natural-language
+clarification and conversion diagnosis remain planned acceptance criteria, not
+implemented capabilities.
 
 ## Case: MRR decline investigation
 

@@ -4,6 +4,13 @@
 
 Convert an executive’s natural-language question into a bounded, reviewable investigation request. The agent may infer a safe default only when the interpretation is unambiguous; otherwise it asks a focused clarifying question.
 
+## Implementation status
+
+Natural-language resolution and these general request fields are planned. The
+current [API](../architecture/api-mrr-decline-contract.md) accepts an explicit
+month and optional permitted customer IDs; it does not interpret question text.
+These clarification rules govern a future question-resolution capability.
+
 ## Required request fields
 
 | Field           | Description                          | Example                       |

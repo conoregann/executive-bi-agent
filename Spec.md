@@ -1,18 +1,60 @@
-Here is the complete, production-grade **`docs/SPEC.md`**.
-
-This document serves as the authoritative technical blueprint for the system: defining the business model, database schemas, metric definitions, agent tool contracts, SQL safety policies, and evaluation standards without fluff or speculative prose.
-
----
-
 # Executive BI Agent — System & Domain Specification
 
-**Status:** Canonical System Specification  
+**Status:** Intended system architecture; implementation status below
+
 **Domain:** Enterprise B2B SaaS Business Intelligence & Decision Support  
-**Target Organization:** ApexCloud Technologies (Fictional mid-market B2B SaaS: $28.9M ARR, 1,400+ enterprise/mid-market accounts)
+**Target Organization:** Northstar Workspace, the fictional B2B SaaS company in
+[company context](docs/discovery/company-context.md). $28.9M ARR and 1,400+
+accounts describe intended scenario scale, not the current small synthetic seed.
 
 ---
 
-## 1. System Topology & Data Flow
+## Implementation status and authority
+
+This specification describes product intent, not a claim that the full system is
+implemented. Focused contracts in [docs/architecture](docs/architecture/README.md),
+[docs/metrics](docs/metrics/README.md), and [docs/discovery](docs/discovery/)
+define durable behavior; shared runtime schemas live in `packages/schemas`.
+Use those contracts and their tests for executable shapes and metric semantics.
+The examples below are future design sketches, not current request schemas,
+migrations, formulas, or guarantees. If intended behavior conflicts with a
+focused contract, surface the conflict before changing that boundary.
+
+### Implemented today
+
+| Location                  | Current responsibility                                                                                                                                                                              |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context. Not NestJS or a production tenant/RBAC service. |
+| `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                     |
+| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                              |
+| `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                      |
+| `packages/investigations` | Five-step MRR-decline orchestration, blocked outcomes and retained scope.                                                                                                                           |
+| `packages/schemas`        | Zod API request, record and evidence contracts; other domain types remain in their owning packages.                                                                                                 |
+| `packages/database`       | Local database documentation only; no runtime package/client.                                                                                                                                       |
+| `infra/postgres`          | Local synthetic raw/staging/analytics layers and separate `app` persistence schema, initialization, migration, verification SQL.                                                                    |
+| `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                    |
+| `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                            |
+
+Current flow: structured month/customer request → synthetic metric fixture and
+scoped lexical knowledge → deterministic investigation → persisted evidence →
+authenticated record/evidence reads. PostgreSQL source parity is verified
+separately; the API currently uses the JSON analytics fixture.
+
+### Planned scope
+
+Deterministic cited answer presentation is implemented on
+`feat/evidence-backed-investigation-answers` but is not yet part of `main`.
+
+The topology, package responsibilities, broad data model, tool examples, output
+interface, state machine, benchmark targets, and milestones in sections 1–10
+are intended architecture. `apps/web`, `apps/worker`, `packages/ai`, and
+`packages/observability` do not exist. Natural-language resolution, NestJS/SSE,
+BullMQ/Redis, dbt, embeddings/pgvector retrieval, exploratory SQL, external
+connectors, production authorization/rate limits, and telemetry are not
+implemented. SQL safety requirements below are mandatory prerequisites before
+any generated-SQL capability can be exposed, not an existing execution path.
+
+## 1. Planned System Topology & Data Flow
 
 ```text
                        ┌─────────────────────────┐
@@ -50,7 +92,7 @@ This document serves as the authoritative technical blueprint for the system: de
 
 ---
 
-## 2. Monorepo Layout & Package Responsibilities
+## 2. Planned Monorepo Layout & Package Responsibilities
 
 | Path                     | Responsibility                                                              | Invariant                                                                   |
 | :----------------------- | :-------------------------------------------------------------------------- | :-------------------------------------------------------------------------- |
@@ -68,7 +110,13 @@ This document serves as the authoritative technical blueprint for the system: de
 
 ---
 
-## 3. Synthetic Domain Data Model
+## 3. Planned Synthetic Domain Data Model
+
+The SQL below sketches future source coverage, not migrations to apply. Current
+source grains, integer EUR-cent values, dimensions, IDs, and UTC periods are
+defined by the [analytics contract](docs/architecture/analytics-data-contract.md)
+and [metric catalog](docs/metrics/metric-catalog.md); preserve those conventions
+when extending source coverage.
 
 The data warehouse lives in PostgreSQL across three layers: `raw` (ingested JSON/records), `staging` (cleaned, normalized), and `analytics` (star schemas and dimensional marts).
 
@@ -221,7 +269,12 @@ CREATE INDEX idx_docs_embedding ON analytics.company_documents USING ivfflat (em
 
 ---
 
-## 4. Semantic Metrics Catalog
+## 4. Planned Metric Coverage
+
+The [metric catalog](docs/metrics/metric-catalog.md) owns executable metric
+semantics. The broad formula sketches below do not override its customer-level
+classification, period, precision, or reconciliation rules. New coverage requires
+a catalog definition and verified implementation before exposure.
 
 Metrics are statically defined in `packages/metrics`. **The LLM is forbidden from authoring SQL logic for these calculations.**
 
@@ -241,9 +294,11 @@ Metrics are statically defined in `packages/metrics`. **The LLM is forbidden fro
 
 ---
 
-## 5. Agent Tool Interfaces & Execution Contracts
+## 5. Planned Agent Tool Interfaces
 
-All tools consumed by the agent are strictly typed via Zod in `packages/schemas`.
+Planned agent tools will use shared typed schemas. The examples below are not
+exports from the current `packages/schemas`; current MRR operations are defined
+in the [trusted service contract](docs/architecture/trusted-mrr-service-contract.md).
 
 ### 5.1 Tool Registry
 
@@ -382,7 +437,7 @@ The execution engine immediately rejects queries containing any of:
 
 ---
 
-## 7. Evidence, Citations & Synthesis Contract
+## 7. Planned Evidence and Synthesis Interface
 
 The agent's output must adhere to a strict structured schema. Unverified freeform text is rejected.
 
@@ -429,7 +484,7 @@ export interface InvestigationResult {
 
 ---
 
-## 8. Investigation State Machine
+## 8. Planned General Investigation State Machine
 
 Every executive investigation runs through an inspectable state machine managed by the orchestrator:
 
@@ -460,9 +515,11 @@ Every executive investigation runs through an inspectable state machine managed 
 
 ---
 
-## 9. Evaluation Framework & Benchmark Targets
+## 9. Planned Evaluation Framework & Benchmark Targets
 
-The repository includes a dedicated benchmark suite under `evals/` containing 100 deterministic executive questions.
+The planned benchmark will contain 100 deterministic executive questions.
+Current `evals/` contains Markdown acceptance cases, not this benchmark or measured
+quality/latency results.
 
 ### Question Categories
 
@@ -489,9 +546,11 @@ The repository includes a dedicated benchmark suite under `evals/` containing 10
 
 ---
 
-## 10. Capability Delivery Roadmap (Bulk Milestones)
+## 10. Planned Capability Roadmap
 
-Execution proceeds in complete functional milestones. Each milestone delivers code, configurations, schemas, and passing tests together.
+Milestones group future product intent, not branch scope or completion claims.
+Deliver each through small independently reviewable vertical capabilities under
+[AGENTS.md](AGENTS.md), with contracts and verification for each supported slice.
 
 ```text
 Milestone 1: Data Foundations & Metrics Core

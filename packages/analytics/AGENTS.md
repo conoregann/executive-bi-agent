@@ -10,7 +10,8 @@ data. The contract is `docs/architecture/analytics-data-contract.md`.
   malformed values.
 - Return immutable data and do not calculate business metrics here. Metric
   classification belongs in `packages/metrics`.
-- Keep the adapter local and deterministic; no database client, model, or hidden
-  fallback data source belongs here.
+- Keep adapters deterministic: PostgreSQL access uses the injected query-client
+  interface and fixed approved analytics-view queries. No credentials, client
+  lifecycle ownership, model, or hidden fallback data source belongs here.
 
 Update the package test whenever a source-data invariant changes.

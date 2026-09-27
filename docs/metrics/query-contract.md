@@ -4,6 +4,13 @@
 
 The agent requests a typed metric operation; the analytics layer selects deterministic query templates. It must not compose raw SQL from model text for catalog metrics.
 
+## Scope and implementation status
+
+This is the general metric-query design contract. The generic shapes below are
+not current API requests. The executable MRR subset uses the operations and
+validation in the [trusted MRR service contract](../architecture/trusted-mrr-service-contract.md).
+Additional catalog metrics and generic query support remain planned.
+
 ## Request shape
 
 ```json

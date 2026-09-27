@@ -4,6 +4,13 @@
 
 Northstar Workspace is the fictional company used in all seeds, documents, dashboards, and evaluations. This contract makes example data internally consistent; it is not a claim about a real company.
 
+## Implementation status
+
+This context defines the intended synthetic company. The current fixture covers
+July and August 2026, not the full January 2025 onward horizon. Broader source
+domains, integrations, target tracking, and executive questions below are product
+intent; see [Spec.md](../../Spec.md) for implemented capabilities.
+
 ## Business model
 
 Northstar Workspace sells collaborative workflow software to mid-market and enterprise customers in Europe and North America.

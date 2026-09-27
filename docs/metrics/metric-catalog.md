@@ -1,5 +1,12 @@
 # Semantic metric catalog
 
+## Implementation status
+
+MRR values, comparisons, customer/aggregate movements, and breakdowns are
+executable through the [trusted service](../architecture/trusted-mrr-service-contract.md).
+Other catalog definitions are durable product contracts awaiting implementation,
+not currently callable metrics.
+
 ## Conventions
 
 - All monetary values are EUR, stored and calculated in minor units, then formatted for display.

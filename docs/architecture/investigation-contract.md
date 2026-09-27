@@ -4,6 +4,13 @@
 
 An investigation turns a bounded executive question into a sequence of controlled actions and an evidence-backed answer. It is not a single model completion and it does not grant unrestricted system access.
 
+## General design and executable scope
+
+The general lifecycle and normalized plan fields below describe intended
+question-driven orchestration. The current structured MRR API implements the
+five-step plan and `completed`/`blocked` terminal records described below and
+in the [API contract](api-mrr-decline-contract.md).
+
 ## State machine
 
 ```text
@@ -69,7 +76,14 @@ its SHA-256 hash is stored. The plan is reserved before tool execution;
 terminal records and evidence are retained in PostgreSQL. See the
 [API contract](api-mrr-decline-contract.md) for routes and responses.
 
-## Approved initial tools
+## Tool design and implementation status
+
+The table describes intended general tools. Current executable MRR operations
+are listed in the [trusted service contract](trusted-mrr-service-contract.md),
+and lexical retrieval in the [knowledge contract](company-knowledge-retrieval-contract.md).
+Support-ticket/CRM tools and generic metric/chart bindings are not implemented.
+
+## Intended general tools
 
 | Tool                        | Purpose                                            | Output requirement                         |
 | --------------------------- | -------------------------------------------------- | ------------------------------------------ |
@@ -86,9 +100,14 @@ Tools return typed data and evidence objects. They do not return prose intended 
 
 ## Budgets and stop conditions
 
-The initial default budget is at most 8 tool calls, 60 seconds wall time, and 100 retrieved knowledge chunks before reranking. The orchestrator stops early when the metric is measured, its movement reconciles, supporting context has been searched, and no unresolved high-severity warning remains.
+The general design budget is at most 8 tool calls, 60 seconds wall time, and
+100 retrieved knowledge chunks before reranking. The executable MRR plan is
+limited to five calls; the general wall-time/reranking budget is not an
+implemented runtime guarantee. The orchestrator stops early when the metric is measured, its movement reconciles, supporting context has been searched, and no unresolved high-severity warning remains.
 
-If evidence conflicts, is stale, or fails to reconcile, the investigation completes with that limitation; it must not make extra speculative calls just to find a convenient narrative.
+If required metric evidence is unavailable or fails to reconcile, the executable
+MRR investigation is `blocked`. Non-blocking contextual gaps retain limitations;
+no investigation may make extra speculative calls to find a convenient narrative.
 
 ## Synthesis rules
 
