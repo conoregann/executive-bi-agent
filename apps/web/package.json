@@ -1,0 +1,27 @@
+{
+  "name": "@executive-bi/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "pnpm run check && vite build",
+    "check": "pnpm --filter @executive-bi/schemas build && tsc --noEmit",
+    "test": "pnpm run check && pnpm --filter @executive-bi/api check && pnpm --filter @executive-bi/api build && node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@executive-bi/schemas": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@executive-bi/api": "workspace:*",
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^7.0.0"
+  }
+}

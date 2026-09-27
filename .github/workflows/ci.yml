@@ -18,6 +18,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Chromium and Linux browser dependencies
+        run: pnpm --filter @executive-bi/web exec playwright install --with-deps chromium
       - run: pnpm format:check
       - run: pnpm check
       - run: docker compose up --detach --wait db
