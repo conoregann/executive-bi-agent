@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "eval:cross-source": "pnpm --filter @executive-bi/api build && node evals/investigations/cross-source-benchmark.mjs"
+    "eval:cross-source": "pnpm --filter @executive-bi/api... build && node evals/investigations/cross-source-benchmark.mjs"
   },
   "devDependencies": {
     "prettier": "^3.5.3",
