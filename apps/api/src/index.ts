@@ -6,6 +6,7 @@ import {
 } from '@executive-bi/analytics';
 import {
   MrrDeclineInvestigationService,
+  synthesizeMrrDeclineAnswer,
   type InvestigationStore,
   type InvestigationRecord,
 } from '@executive-bi/investigations';
@@ -121,7 +122,7 @@ export class MrrDeclineApi {
   async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
     const detail =
-      /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context)?$/u.exec(
+      /^\/v1\/investigations\/([A-Za-z0-9_-]{1,100})(?:\/evidence\/([A-Za-z0-9_-]{1,100})|\/follow-up-context|\/answer)?$/u.exec(
         pathname,
       );
     if (detail && pathname !== MRR_DECLINE_PATH)
@@ -216,6 +217,12 @@ export class MrrDeclineApi {
       token,
     );
     if (found.status !== 'ok') return notFound();
+    if (pathname === `/v1/investigations/${investigationId}/answer`) {
+      const result = synthesizeMrrDeclineAnswer(found.record, found.evidence);
+      return Response.json(result, {
+        status: result.status === 'ok' ? 200 : 422,
+      });
+    }
     if (evidenceId !== undefined) {
       const evidence = found.evidence.find(
         (item) => item.evidenceId === evidenceId,

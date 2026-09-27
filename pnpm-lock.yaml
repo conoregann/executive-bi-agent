@@ -48,6 +48,10 @@ importers:
   packages/analytics: {}
 
   packages/investigations:
+    dependencies:
+      '@executive-bi/schemas':
+        specifier: workspace:*
+        version: link:../schemas
     devDependencies:
       '@types/node':
         specifier: ^22.20.4

@@ -40,6 +40,9 @@ evidence items. A reserved but non-terminal ID cannot be reused or read.
 Read routes require `Authorization: Bearer <accessToken>`:
 
 - `GET /v1/investigations/:investigationId` returns the terminal record.
+- `GET /v1/investigations/:investigationId/answer` returns the cited executive
+  answer for completed investigations, or `422` when required evidence is
+  insufficient. See the [answer contract](investigation-answer-contract.md).
 - `GET /v1/investigations/:investigationId/evidence/:evidenceId` returns one
   source-backed evidence item, including scope, freshness, integrity and
   supporting values or excerpt.

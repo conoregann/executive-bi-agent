@@ -19,3 +19,6 @@ The initial architecture deliberately excludes exploratory SQL and external inte
   decline plan and bounded follow-up context.
 - [MRR-decline API contract](api-mrr-decline-contract.md) — the narrow
   synthetic-data integration boundary.
+
+- [Evidence-backed answer contract](investigation-answer-contract.md) — deterministic
+  executive presentation of persisted investigations and inspectable citations.
