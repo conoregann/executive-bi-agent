@@ -59,3 +59,52 @@ test('accepts cited answers and rejects missing, mistyped or duplicate citations
     assert.equal(investigationAnswerSchema.safeParse(value).success, false);
   }
 });
+
+test('synthetic chart contract rejects malformed values, provenance and scope', () => {
+  const value = answer();
+  value.evidence.push({
+    ...value.evidence[0],
+    evidenceId: 'plan',
+    type: 'metric_query',
+  });
+  value.chart = {
+    chartType: 'bar',
+    month: '2026-08-01',
+    permittedCustomerIds: [],
+    sourceEvidenceId: 'plan',
+    reconciles: true,
+    unassignedMrrEurCents: 0,
+    data: [{ dimensionValue: 'growth', mrrEurCents: 30000 }],
+  };
+  assert.equal(investigationAnswerSchema.safeParse(value).success, true);
+  for (const mutate of [
+    (v) => {
+      v.chart.sourceEvidenceId = 'missing';
+    },
+    (v) => {
+      v.chart.sourceEvidenceId = 'change';
+    },
+    (v) => {
+      v.chart.month = '2026-07-01';
+    },
+    (v) => {
+      v.chart.permittedCustomerIds = ['outside_scope'];
+    },
+    (v) => {
+      v.chart.data[0].mrrEurCents = 1.5;
+    },
+    (v) => {
+      v.chart.data[0].mrrEurCents = Number.MAX_SAFE_INTEGER + 1;
+    },
+    (v) => {
+      v.chart.data.push(v.chart.data[0]);
+    },
+    (v) => {
+      v.chart.unassignedMrrEurCents = 10;
+    },
+  ]) {
+    const changed = structuredClone(value);
+    mutate(changed);
+    assert.equal(investigationAnswerSchema.safeParse(changed).success, false);
+  }
+});

@@ -90,7 +90,9 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173), or the URL Vite prints if
 that port is occupied. The web server proxies requests to the API on port 3001;
 keep the API on that port. Select **August 2026**, leave customer IDs empty for
 the full synthetic dataset, or enter `cust_acme` for a scoped investigation.
-Click **Investigate MRR**, then open any **Inspect** citation to view evidence.
+Click **Investigate MRR** to see the cited answer and MRR-by-plan chart. Open
+**How this answer was generated** for the retained plan, or any **Inspect**
+citation to view evidence.
 
 The frontend can render without the API, but investigations require the API and
 PostgreSQL. If the API reports `DATABASE_URL is required`, confirm that key

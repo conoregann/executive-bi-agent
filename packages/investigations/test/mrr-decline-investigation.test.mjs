@@ -398,6 +398,22 @@ test('composes trusted metric and knowledge capabilities without generated claim
     /EUR 3400.00.*EUR 1000.00.*EUR -2400.00/,
   );
   assert.equal(answer.answer.context.length, 1);
+  const breakdown = found.evidence.find(
+    (item) => item.scope.groupBy === 'plan',
+  );
+  assert.deepEqual(answer.answer.chart.data, breakdown.content.rows);
+  assert.equal(answer.answer.chart.sourceEvidenceId, breakdown.evidenceId);
+  assert.equal(answer.answer.chart.reconciles, true);
+  const invalid = structuredClone(found.evidence);
+  invalid.find((item) => item.scope.groupBy === 'plan').content.rows[0]
+    .mrrEurCents++;
+  const invalidChart = synthesizeMrrDeclineAnswer(found.record, invalid);
+  assert.equal(invalidChart.status, 'ok');
+  assert.equal(invalidChart.answer.chart, undefined);
+  assert.deepEqual(
+    synthesizeMrrDeclineAnswer(found.record, found.evidence),
+    answer,
+  );
   assert.deepEqual(answer.answer.recommendedNextStep.customerIds, [
     'cust_churn',
   ]);

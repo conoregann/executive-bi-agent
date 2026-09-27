@@ -228,3 +228,74 @@ test('malformed answers fail closed and document markup renders as text', async 
   assert.equal(await page.locator('#evidence-detail img').count(), 0);
   assert.equal(await page.evaluate(() => window.injected), undefined);
 });
+
+test('synthetic chart and retained trail support scoped values and keyboard inspection', async (t) => {
+  const page = await pageForTest(t, { width: 390, height: 844 });
+  await page.getByLabel('Customer IDs (optional)').fill('cust_riviera');
+  await complete(page);
+  const table = page.getByRole('table', { name: 'Plan MRR values (EUR)' });
+  assert.match(await table.textContent(), /EUR 300.00/);
+  assert.doesNotMatch(await table.textContent(), /2500.00/);
+  const inspect = page.getByRole('button', {
+    name: 'Inspect chart evidence',
+    exact: true,
+  });
+  await inspect.focus();
+  await page.keyboard.press('Enter');
+  await page
+    .getByRole('heading', { name: 'Supporting values or document excerpt' })
+    .waitFor();
+  assert.match(await page.locator('#evidence-detail').textContent(), /by:plan/);
+  const summary = page.locator('summary');
+  await summary.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('details').getAttribute('open'), '');
+  assert.equal(await page.locator('details ol li').count(), 5);
+  assert.match(await page.locator('details').textContent(), /completed/);
+  await page
+    .getByRole('button', { name: /^Inspect trail / })
+    .first()
+    .click();
+  await page
+    .getByRole('heading', { name: 'Supporting values or document excerpt' })
+    .waitFor();
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+    true,
+  );
+});
+
+test('synthetic incomplete and unavailable charts retain the executive answer', async (t) => {
+  const page = await pageForTest(t);
+  await page.route('**/answer', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.answer.chart.reconciles = false;
+    body.answer.chart.unassignedMrrEurCents = 100;
+    await route.fulfill({ response, json: body });
+  });
+  await complete(page);
+  assert.match(
+    await page.getByRole('table').textContent(),
+    /UnassignedEUR 1.00/,
+  );
+  assert.match(
+    await page.getByRole('article').textContent(),
+    /Incomplete breakdown/,
+  );
+  await page.unroute('**/answer');
+  await page.route('**/answer', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    delete body.answer.chart;
+    await route.fulfill({ response, json: body });
+  });
+  await complete(page);
+  assert.equal(await page.getByRole('table').count(), 0);
+  assert.match(
+    await page.getByRole('article').textContent(),
+    /chart unavailable/,
+  );
+});
