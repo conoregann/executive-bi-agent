@@ -75,3 +75,11 @@ BEGIN
 END $$;
 
 SELECT 'analytics verification passed' AS result;
+
+DO $$
+BEGIN
+ IF (SELECT count(*) FROM analytics.operational_records) <> (SELECT jsonb_array_length(pg_read_file('/fixtures/operations-2026.json')::jsonb->'rows')) THEN
+ RAISE EXCEPTION 'Synthetic operational fixture parity failed';
+ END IF;
+ IF EXISTS (SELECT 1 FROM raw.operational_records WHERE label <> 'synthetic') THEN RAISE EXCEPTION 'Missing synthetic label'; END IF;
+END $$;

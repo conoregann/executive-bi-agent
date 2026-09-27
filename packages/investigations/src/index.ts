@@ -1,4 +1,10 @@
 import {
+  runCrossSource,
+  type CrossSourceDependencies,
+} from './cross-source.js';
+export { readCrossSourceAnswer } from './cross-source.js';
+import type { CrossSourceRecord, CrossSourcePlan } from '@executive-bi/schemas';
+import {
   customerFollowUpRequestSchema,
   customerFollowUpRecordSchema,
   type CustomerFollowUpRecord,
@@ -129,9 +135,15 @@ export interface FollowUpContextResult {
 }
 
 export type StoredRecord =
-  InvestigationRecord | CountryFollowUpRecord | CustomerFollowUpRecord;
+  | CrossSourceRecord
+  | InvestigationRecord
+  | CountryFollowUpRecord
+  | CustomerFollowUpRecord;
 export type StoredPlan =
-  InvestigationPlan | CountryFollowUpPlan | CustomerFollowUpPlan;
+  | CrossSourcePlan
+  | InvestigationPlan
+  | CountryFollowUpPlan
+  | CustomerFollowUpPlan;
 
 export interface StoredInvestigation {
   plan: StoredPlan;
@@ -193,6 +205,7 @@ export class MrrDeclineInvestigationService {
   constructor(
     private readonly tools: MrrDeclineTools,
     private readonly store: InvestigationStore = new InMemoryInvestigationStore(),
+    private readonly crossSource?: CrossSourceDependencies,
   ) {}
 
   async start(input: unknown): Promise<MrrDeclineInvestigationResult> {
@@ -610,6 +623,22 @@ export class MrrDeclineInvestigationService {
       accessToken,
       warnings: record.warnings,
     };
+  }
+
+  async startCrossSourceFollowUp(
+    parentId: string,
+    token: string,
+    input: unknown,
+  ) {
+    const parent = await this.getInvestigation(parentId, token);
+    if (parent.status !== 'ok') return { status: 'not_found' as const };
+    return runCrossSource(
+      parent.record,
+      parent.evidence,
+      input,
+      this.store,
+      this.crossSource,
+    );
   }
 
   private async block(
