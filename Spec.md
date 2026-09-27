@@ -22,19 +22,19 @@ focused contract, surface the conflict before changing that boundary.
 
 ### Implemented today
 
-| Location                  | Current responsibility                                                                                                                                                                                                           |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web`                | React/Vite interface for structured synthetic MRR investigations, cited answers, evidence-backed MRR-by-plan charts, retained plans, and authenticated evidence inspection. No natural-language input or streaming.              |
-| `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context, deterministic cited answers. Not NestJS or a production tenant/RBAC service. |
-| `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                                                  |
-| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                                                           |
-| `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                                                   |
-| `packages/investigations` | Five-step MRR-decline orchestration, blocked outcomes, retained scope, and deterministic answer presentation.                                                                                                                    |
-| `packages/schemas`        | Zod API request, record, evidence, and answer contracts; other domain types remain in their owning packages.                                                                                                                     |
-| `packages/database`       | Local database documentation only; no runtime package/client.                                                                                                                                                                    |
-| `infra/postgres`          | Local synthetic raw/staging/analytics layers and separate `app` persistence schema, initialization, migration, verification SQL.                                                                                                 |
-| `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                                                 |
-| `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                                                         |
+| Location                  | Current responsibility                                                                                                                                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web`                | React/Vite interface for structured synthetic MRR investigations, cited answers, evidence-backed MRR-by-plan charts, retained plans, and authenticated evidence inspection. Bounded natural-language MRR-decline input; no streaming. |
+| `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context, deterministic cited answers. Not NestJS or a production tenant/RBAC service.      |
+| `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                                                       |
+| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                                                                |
+| `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                                                        |
+| `packages/investigations` | Five-step MRR-decline orchestration, blocked outcomes, retained scope, and deterministic answer presentation.                                                                                                                         |
+| `packages/schemas`        | Zod API request, record, evidence, and answer contracts; other domain types remain in their owning packages.                                                                                                                          |
+| `packages/database`       | Local database documentation only; no runtime package/client.                                                                                                                                                                         |
+| `infra/postgres`          | Local synthetic raw/staging/analytics layers and separate `app` persistence schema, initialization, migration, verification SQL.                                                                                                      |
+| `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                                                      |
+| `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                                                              |
 
 Current flow: structured month/customer request → synthetic PostgreSQL analytics and
 scoped lexical knowledge → deterministic investigation → persisted evidence →
@@ -46,8 +46,8 @@ connection; JSON analytics fixtures remain available for deterministic tests.
 The topology, package responsibilities, broad data model, tool examples, output
 interface, state machine, benchmark targets, and milestones in sections 1–10
 are intended architecture. `apps/worker`, `packages/ai`, and `packages/observability` do not exist.
-The React/Vite `apps/web` supports the existing structured MRR workflow; the
-SSE streaming remains future scope. Natural-language resolution, NestJS/SSE,
+The React/Vite `apps/web` supports structured MRR requests and bounded natural-language MRR-decline resolution; the
+SSE streaming remains future scope. General natural-language resolution, NestJS/SSE,
 BullMQ/Redis, dbt, embeddings/pgvector retrieval, exploratory SQL, external
 connectors, production authorization/rate limits, and telemetry are not
 implemented. SQL safety requirements below are mandatory prerequisites before

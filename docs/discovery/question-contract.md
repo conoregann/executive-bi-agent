@@ -6,10 +6,33 @@ Convert an executive’s natural-language question into a bounded, reviewable in
 
 ## Implementation status
 
-Natural-language resolution and these general request fields are planned. The
-current [API](../architecture/api-mrr-decline-contract.md) accepts an explicit
-month and optional permitted customer IDs; it does not interpret question text.
-These clarification rules govern a future question-resolution capability.
+The current resolver supports a bounded English MRR-decline grammar:
+“Why did MRR fall in August 2026?”, ISO months such as `2026-08`, and
+“Why did MRR drop last month?”. `monthly recurring revenue` is an alias;
+fall, drop, decline, decrease and their supported past forms are accepted.
+Matching is case-insensitive. It does not use an LLM, calculate metrics, run SQL,
+or execute investigation tools.
+
+`POST /v1/investigations/resolve-question` accepts only `{ "question": "..." }`
+with 1–1000 trimmed characters and the existing 16 KiB JSON limit. It returns
+`200` with a typed `resolved`, `clarification_required`, or `unsupported` result;
+malformed requests return `400`. A resolved result includes original trimmed
+wording, `metric: mrr`, a first-of-month `month`, `comparison: previous_period`,
+and `responseMode: investigation`. No record or access token is created.
+
+Named months require an explicit year. “Last month” uses the server request-time
+UTC calendar, including year rollover. No active-investigation year is inferred.
+The resolver does not check data availability; the existing investigation returns
+a retained blocked outcome when comparison evidence is missing.
+
+All unmatched wording is rejected without silently dropping constraints. Other
+metrics, dimensions, country/plan/customer filters in prose, custom comparisons,
+quarters, and conversational follow-ups remain unsupported. Customer scope stays
+in the separate explicit form field. The UI shows the resolution for review;
+the user submits the existing structured MRR request to run the investigation.
+Question text is not persisted as investigation evidence or used as authorization.
+
+The general fields and rules below remain planned beyond this bounded slice.
 
 ## Required request fields
 

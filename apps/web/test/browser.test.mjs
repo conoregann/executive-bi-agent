@@ -299,3 +299,45 @@ test('synthetic incomplete and unavailable charts retain the executive answer', 
     /chart unavailable/,
   );
 });
+
+test('natural-language review preserves selected customer scope and handles clarification', async (t) => {
+  const page = await pageForTest(t);
+  let starts = 0;
+  page.on('request', (request) => {
+    if (request.url().endsWith('/mrr-decline')) starts++;
+  });
+  await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
+  await page
+    .getByLabel('Ask an MRR question')
+    .fill('Why did MRR fall in August?');
+  await page.getByRole('button', { name: 'Resolve question' }).click();
+  await page.getByRole('status').filter({ hasText: 'Which year' }).waitFor();
+  assert.equal(starts, 0);
+  await page
+    .getByLabel('Ask an MRR question')
+    .fill('Why did MRR fall in August 2026 in Germany?');
+  await page.getByRole('button', { name: 'Resolve question' }).click();
+  await page.getByRole('status').filter({ hasText: 'not supported' }).waitFor();
+  assert.equal(starts, 0);
+  await page.getByLabel('Reporting month').fill('2026-07');
+  await page
+    .getByLabel('Ask an MRR question')
+    .fill('Why did MRR fall in August 2026?');
+  await page.getByRole('button', { name: 'Resolve question' }).click();
+  await page.getByRole('status').filter({ hasText: 'Resolved MRR' }).waitFor();
+  assert.equal(
+    await page.getByLabel('Reporting month').inputValue(),
+    '2026-08',
+  );
+  assert.equal(
+    await page.getByLabel('Customer IDs (optional)').inputValue(),
+    'cust_acme',
+  );
+  assert.equal(starts, 0);
+  await complete(page);
+  assert.match(
+    await page.locator('.scope').textContent(),
+    /Customers: cust_acme/,
+  );
+  assert.equal(starts, 1);
+});

@@ -228,3 +228,28 @@ export const investigationAnswerSchema = z
   });
 
 export type InvestigationAnswer = z.infer<typeof investigationAnswerSchema>;
+
+export const resolveQuestionRequestSchema = z
+  .object({
+    question: z.string().trim().min(1).max(1000),
+  })
+  .strict();
+
+export const resolveQuestionResponseSchema = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('resolved'),
+      question: z.string().min(1).max(1000),
+      metric: z.literal('mrr'),
+      month: calendarMonth,
+      comparison: z.literal('previous_period'),
+      responseMode: z.literal('investigation'),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.enum(['clarification_required', 'unsupported']),
+      message: z.string().min(1),
+    })
+    .strict(),
+]);
