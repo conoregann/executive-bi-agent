@@ -46,6 +46,17 @@ test(
       );
       assert.equal(detail.status, 200);
       assert.deepEqual((await detail.json()).record, created.record);
+      const answerRequest = new Request(
+        `http://api.test/v1/investigations/${investigationId}/answer`,
+        { headers },
+      );
+      const originalAnswer = await first.fetch(answerRequest.clone());
+      const retainedAnswer = await second.fetch(answerRequest);
+      assert.equal(retainedAnswer.status, 200);
+      assert.deepEqual(
+        await retainedAnswer.json(),
+        await originalAnswer.json(),
+      );
       const evidence = await second.fetch(
         new Request(
           `http://api.test/v1/investigations/${investigationId}/evidence/${created.record.evidenceIds[0]}`,

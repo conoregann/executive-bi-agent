@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   InMemoryInvestigationStore,
+  synthesizeMrrDeclineAnswer,
   MrrDeclineInvestigationService,
 } from '../dist/index.js';
 import { TrustedMrrService } from '../../metrics/dist/index.js';
@@ -386,6 +387,25 @@ test('composes trusted metric and knowledge capabilities without generated claim
   assert.deepEqual(result.record?.driverCustomerIds, ['cust_churn']);
   assert.equal(result.record?.evidenceIds.length, 9);
   assert.deepEqual(result.warnings, []);
+  const found = await service.getInvestigation(
+    'composed-services',
+    result.accessToken,
+  );
+  const answer = synthesizeMrrDeclineAnswer(found.record, found.evidence);
+  assert.equal(answer.status, 'ok');
+  assert.match(
+    answer.answer.answer.text,
+    /EUR 3400.00.*EUR 1000.00.*EUR -2400.00/,
+  );
+  assert.equal(answer.answer.context.length, 1);
+  assert.deepEqual(answer.answer.recommendedNextStep.customerIds, [
+    'cust_churn',
+  ]);
+  assert.deepEqual(
+    found.evidence,
+    (await service.getInvestigation('composed-services', result.accessToken))
+      .evidence,
+  );
 });
 
 function subscription(customerId, month, mrrEurCents) {

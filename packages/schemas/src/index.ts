@@ -101,3 +101,86 @@ export const mrrDeclineResponseSchema = z.union([
 
 export type MrrDeclineApiRequest = z.infer<typeof mrrDeclineRequestSchema>;
 export type MrrDeclineApiResponse = z.infer<typeof mrrDeclineResponseSchema>;
+
+const answerClaimSchema = z
+  .object({
+    classification: z.enum(['observed_fact', 'calculated_delta', 'context']),
+    text: z.string().min(1),
+    evidenceIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+
+export const investigationAnswerSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    scope: z
+      .object({
+        month: calendarMonth,
+        comparison: z.literal('previous_period'),
+        permittedCustomerIds: z.array(z.string().min(1)),
+      })
+      .strict(),
+    answer: answerClaimSchema.extend({
+      classification: z.literal('calculated_delta'),
+    }),
+    drivers: z.array(
+      answerClaimSchema.extend({ classification: z.literal('observed_fact') }),
+    ),
+    context: z.array(
+      answerClaimSchema.extend({ classification: z.literal('context') }),
+    ),
+    limitations: z.array(z.string().min(1)),
+    evidence: z
+      .array(
+        z
+          .object({
+            evidenceId: z.string().min(1),
+            sourceRef: z.string().min(1),
+            type: z.enum(['metric_query', 'calculation', 'document_chunk']),
+            freshness: z.string().datetime(),
+          })
+          .strict(),
+      )
+      .min(1),
+    recommendedNextStep: z
+      .object({
+        owner: z.literal('Revenue operations'),
+        text: z.string().min(1),
+        customerIds: z.array(z.string().min(1)).max(5),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((answer, ctx) => {
+    const evidence = new Map(
+      answer.evidence.map((item) => [item.evidenceId, item]),
+    );
+    if (evidence.size !== answer.evidence.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Duplicate evidence IDs.',
+      });
+    }
+    for (const claim of [answer.answer, ...answer.drivers, ...answer.context]) {
+      const citations = claim.evidenceIds.map((id) => evidence.get(id));
+      if (
+        citations.some((citation) => citation === undefined) ||
+        !citations.some(
+          (citation) =>
+            citation?.type ===
+            (claim.classification === 'context'
+              ? 'document_chunk'
+              : claim.classification === 'calculated_delta'
+                ? 'calculation'
+                : 'metric_query'),
+        )
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Claim requires matching inspectable evidence.',
+        });
+      }
+    }
+  });
+
+export type InvestigationAnswer = z.infer<typeof investigationAnswerSchema>;

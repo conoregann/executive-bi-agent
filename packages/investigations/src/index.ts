@@ -1,3 +1,7 @@
+export {
+  synthesizeMrrDeclineAnswer,
+  type InvestigationAnswerResult,
+} from './answer.js';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export const INVESTIGATION_DEFINITION_VERSION = '1.1.0';
