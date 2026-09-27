@@ -83,3 +83,15 @@ BEGIN
  END IF;
  IF EXISTS (SELECT 1 FROM raw.operational_records WHERE label <> 'synthetic') THEN RAISE EXCEPTION 'Missing synthetic label'; END IF;
 END $$;
+
+DO $$
+BEGIN
+ IF EXISTS (
+  SELECT 1 FROM jsonb_array_elements(pg_read_file('/fixtures/operations-2026.json')::jsonb->'rows') item
+  LEFT JOIN analytics.operational_records actual ON actual.record_id = item->>'recordId'
+  WHERE actual.record IS DISTINCT FROM item
+ ) THEN RAISE EXCEPTION 'Synthetic operational record parity failed'; END IF;
+ IF NOT has_table_privilege('executive_bi_analytics','analytics.operational_records','SELECT')
+ OR has_table_privilege('executive_bi_analytics','raw.operational_records','SELECT') THEN
+ RAISE EXCEPTION 'Operational reader permission boundary failed'; END IF;
+END $$;

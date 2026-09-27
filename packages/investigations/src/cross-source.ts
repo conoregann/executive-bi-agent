@@ -1,4 +1,5 @@
 import {
+  investigationEvidenceSchema,
   crossSourceRequestSchema,
   crossSourceRecordSchema,
   modelPlanSchema,
@@ -10,7 +11,10 @@ import {
   type CrossSourcePlan,
   type OperationalSource,
 } from '@executive-bi/schemas';
-import type { OperationalRepository } from '@executive-bi/operations';
+import {
+  compareCustomerUsage,
+  type OperationalRepository,
+} from '@executive-bi/operations';
 import type { InvestigationModel } from '@executive-bi/ai';
 import type {
   InvestigationEvidence,
@@ -24,11 +28,9 @@ import { createHash, randomBytes } from 'node:crypto';
 export interface CrossSourceDependencies {
   repository: OperationalRepository;
   model?: InvestigationModel;
-  searchKnowledge?: (
-    input: unknown,
-  ) => Promise<{
+  searchKnowledge?: (input: unknown) => Promise<{
     status: string;
-    hits: readonly { evidence: InvestigationEvidence }[];
+    hits: readonly { evidence: InvestigationEvidence; documentId?: string }[];
     warnings: readonly string[];
   }>;
 }
@@ -53,6 +55,7 @@ async function bounded<T>(
   call: (signal: AbortSignal) => Promise<T>,
   deadline: number,
 ): Promise<T> {
+  if (Date.now() >= deadline) throw new Error('Deadline');
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -126,6 +129,8 @@ export async function runCrossSource(
       warnings.push('model_plan_unavailable');
     }
   }
+  for (const source of ['crm', 'support', 'usage'] as const)
+    if (!sources.includes(source)) warnings.push(`${source}_not_requested`);
   const plan: CrossSourcePlan = {
     investigationId: request.data.investigationId,
     steps: sources,
@@ -223,7 +228,18 @@ export async function runCrossSource(
         freshness: rows.map((row) => row.freshness).sort()[0] ?? now,
         integrity: stale.length ? 'warning' : 'valid',
         scope: { month: parent.month, previousMonth, customerIds: ids, source },
-        content: { rows, missingCustomerIds: missing, staleCustomerIds: stale },
+        content: {
+          rows,
+          missingCustomerIds: missing,
+          staleCustomerIds: stale,
+          ...(source === 'usage'
+            ? {
+                usageComparisons: compareCustomerUsage(rows, ids, parent.month),
+                formula:
+                  'activeUserChange = currentActiveUsers - previousActiveUsers; null when either observation is missing',
+              }
+            : {}),
+        },
       });
     } catch {
       warnings.push(`${source}_unavailable`);
@@ -241,13 +257,28 @@ export async function runCrossSource(
         deadline,
       );
       if (result.status !== 'ok') throw new Error('Knowledge unavailable');
+      const previous = new Date(`${parent.month}T00:00:00Z`);
+      previous.setUTCMonth(previous.getUTCMonth() - 1);
+      const next = new Date(`${parent.month}T00:00:00Z`);
+      next.setUTCMonth(next.getUTCMonth() + 1);
+      const hits = result.hits.filter(
+        (hit) =>
+          hit.documentId &&
+          hit.evidence.type === 'document_chunk' &&
+          hit.evidence.integrity === 'valid' &&
+          hit.evidence.observedAt >= previous.toISOString() &&
+          hit.evidence.observedAt < next.toISOString() &&
+          JSON.stringify(hit.evidence.scope.customerIds) ===
+            JSON.stringify(ids),
+      );
       evidence.push(
-        ...result.hits.map((hit, index) => ({
+        ...hits.map((hit, index) => ({
           ...hit.evidence,
           evidenceId: `cross_doc_${index}`,
+          content: { ...hit.evidence.content, documentId: hit.documentId },
         })),
       );
-      if (!result.hits.length) warnings.push('document_context_missing');
+      if (!hits.length) warnings.push('document_context_missing');
     } catch {
       warnings.push('document_context_unavailable');
     }
@@ -372,6 +403,7 @@ export function readCrossSourceAnswer(
   };
   if (
     !crossSourceRecordSchema.safeParse(record).success ||
+    !investigationEvidenceSchema.array().safeParse(evidence).success ||
     record.status !== 'completed' ||
     evidence.length !== record.evidenceIds.length ||
     new Set(record.evidenceIds).size !== evidence.length ||
@@ -409,20 +441,67 @@ export function readCrossSourceAnswer(
   const operational = evidence.filter(
     (item) => item.source === 'synthetic_operational_records',
   );
-  if (
-    operational.some(
-      (item) =>
-        item.scope.month !== record.month ||
-        JSON.stringify(item.scope.customerIds) !==
-          JSON.stringify(record.customerIds) ||
-        !operationalSnapshotSchema.safeParse({
-          label: 'synthetic',
-          rows: item.content.rows,
-        }).success ||
-        (item.content.rows as { customerId: string }[]).some(
-          (row) => !record.customerIds.includes(row.customerId),
-        ),
+  const previous = new Date(`${record.month}T00:00:00Z`);
+  previous.setUTCMonth(previous.getUTCMonth() - 1);
+  const previousMonth = previous.toISOString().slice(0, 10);
+  for (const item of operational) {
+    const rows = operationalSnapshotSchema.safeParse({
+      label: 'synthetic',
+      rows: item.content.rows,
+    });
+    if (
+      !rows.success ||
+      item.type !== 'metric_query' ||
+      item.integrity === 'invalid' ||
+      !record.plan.steps.includes(item.scope.source as OperationalSource) ||
+      item.evidenceId !== `ops_${item.scope.source}` ||
+      item.scope.month !== record.month ||
+      item.scope.previousMonth !== previousMonth ||
+      JSON.stringify(item.scope.customerIds) !==
+        JSON.stringify(record.customerIds) ||
+      rows.data.rows.some(
+        (row) =>
+          !record.customerIds.includes(row.customerId) ||
+          row.source !== item.scope.source ||
+          row.month < previousMonth ||
+          row.month > record.month,
+      )
     )
+      return unavailable;
+    if (item.scope.source === 'usage') {
+      const expected = compareCustomerUsage(
+        rows.data.rows,
+        record.customerIds,
+        record.month,
+      );
+      const actual = item.content.usageComparisons;
+      if (
+        !Array.isArray(actual) ||
+        actual.length !== expected.length ||
+        expected.some((value, index) => {
+          const row = actual[index];
+          return (
+            !row ||
+            typeof row !== 'object' ||
+            Object.keys(row).length !== Object.keys(value).length ||
+            Object.entries(value).some(([key, field]) => row[key] !== field)
+          );
+        })
+      )
+        return unavailable;
+    }
+  }
+  if (
+    evidence
+      .filter((item) => item.type === 'document_chunk')
+      .some(
+        (item) =>
+          JSON.stringify(item.scope.customerIds) !==
+            JSON.stringify(record.customerIds) ||
+          item.integrity !== 'valid' ||
+          typeof item.content.excerpt !== 'string' ||
+          typeof item.content.documentId !== 'string',
+      )
   )
     return unavailable;
   return {

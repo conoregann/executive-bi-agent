@@ -37,10 +37,10 @@ for (const [i, customerId] of ids.entries()) {
         source: 'crm',
         month,
         observedAt,
-        freshness,
+        freshness: '2026-09-01T08:00:00Z',
         activeUsers: null,
         category:
-          customerId === 'cust_berlin'
+          customerId === 'cust_riviera'
             ? 'pricing_objection'
             : customerId === 'cust_acme'
               ? 'budget_frozen'

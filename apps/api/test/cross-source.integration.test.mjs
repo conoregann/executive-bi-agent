@@ -1,57 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { createMrrDeclineApi } from '../dist/features/mrr/composition.js';
-import { loadSyntheticMrrDeclineDependencies } from '../dist/features/mrr/synthetic-source.js';
-import { createOperationalRepository } from '@executive-bi/operations';
-import { InMemoryInvestigationStore } from '@executive-bi/investigations';
-const snapshot = JSON.parse(
-  readFileSync(
-    new URL('../../../data/synthetic/operations-2026.json', import.meta.url),
-  ),
-);
-async function send(api, path, body, token) {
-  return api.fetch(
-    new Request(`http://test/v1/investigations/${path}`, {
-      method: body ? 'POST' : 'GET',
-      headers: {
-        'content-type': 'application/json',
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    }),
-  );
-}
-export async function scenario(
-  model,
-  scope,
-  question = 'Investigate revenue losses across sources',
-) {
-  const store = new InMemoryInvestigationStore();
-  const dependencies = await loadSyntheticMrrDeclineDependencies();
-  const api = createMrrDeclineApi(
-    dependencies,
-    store,
-    createOperationalRepository(snapshot),
-    model,
-  );
-  const parent = await (
-    await send(api, 'mrr-decline', {
-      investigationId: 'parent',
-      month: '2026-08-01',
-      ...(scope ? { permittedCustomerIds: scope } : {}),
-    })
-  ).json();
-  const child = await (
-    await send(
-      api,
-      'parent/cross-source-follow-ups',
-      { investigationId: 'cross', question },
-      parent.accessToken,
-    )
-  ).json();
-  return { api, parent, child, store, dependencies };
-}
+import { scenario, send } from './helpers/cross-source.mjs';
 test('retained scoped operational evidence, contradictions, authentication and restart', async () => {
   const { api, parent, child, store, dependencies } = await scenario();
   assert.equal(child.status, 'completed');
@@ -124,4 +74,58 @@ test('model plan and citation failures are safe', async () => {
   assert.equal(good.child.record.modelStatus, 'completed');
   const scoped = await scenario(undefined, ['cust_acme']);
   assert.deepEqual(scoped.child.record.customerIds, ['cust_acme']);
+});
+
+test('Germany and UK comparison continues through reconciled country accounts to bounded context', async () => {
+  const { api, parent } = await scenario();
+  const countries = await (
+    await send(
+      api,
+      'parent/country-follow-ups',
+      { investigationId: 'countries', question: 'Compare Germany with the UK' },
+      parent.accessToken,
+    )
+  ).json();
+  assert.equal(countries.status, 'completed');
+  const comparison = await (
+    await send(api, 'countries/answer', undefined, countries.accessToken)
+  ).json();
+  assert.ok(
+    comparison.answer.comparison.rows.some((row) => row.country === 'DE'),
+  );
+  assert.ok(
+    comparison.answer.comparison.rows.some((row) => row.country === 'GB'),
+  );
+  const customers = await (
+    await send(
+      api,
+      'countries/customer-follow-ups',
+      { investigationId: 'customers', country: 'DE' },
+      countries.accessToken,
+    )
+  ).json();
+  assert.equal(customers.status, 'completed');
+  const context = await (
+    await send(
+      api,
+      'customers/cross-source-follow-ups',
+      {
+        investigationId: 'country_context',
+        question:
+          'Did those accounts have support escalations or declining usage?',
+      },
+      customers.accessToken,
+    )
+  ).json();
+  assert.equal(context.status, 'completed');
+  assert.deepEqual(context.record.customerIds, ['cust_acme']);
+  const answer = await (
+    await send(api, 'country_context/answer', undefined, context.accessToken)
+  ).json();
+  assert.equal(answer.status, 'ok');
+  assert.ok(
+    answer.answer.evidence
+      .find((item) => item.evidenceId === 'ops_usage')
+      .content.usageComparisons.some((row) => row.activeUserChange === -40),
+  );
 });

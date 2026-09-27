@@ -136,6 +136,24 @@ export const mrrPlanChartSchema = z
     'Chart rows must be unique and reconciliation must match unassigned MRR.',
   );
 
+export const mrrWaterfallSchema = z
+  .object({
+    sourceEvidenceId: z.string().min(1),
+    data: z
+      .array(
+        z
+          .object({
+            label: z.string(),
+            startEurCents: z.number().int().safe(),
+            endEurCents: z.number().int().safe(),
+            valueEurCents: z.number().int().safe(),
+          })
+          .strict(),
+      )
+      .length(6),
+  })
+  .strict();
+
 export const investigationAnswerSchema = z
   .object({
     investigationId: opaqueIdentifier,
@@ -169,6 +187,7 @@ export const investigationAnswerSchema = z
       )
       .min(1),
     chart: mrrPlanChartSchema.optional(),
+    waterfall: mrrWaterfallSchema.optional(),
     recommendedNextStep: z
       .object({
         owner: z.literal('Revenue operations'),
@@ -204,6 +223,15 @@ export const investigationAnswerSchema = z
         code: z.ZodIssueCode.custom,
         message:
           'Chart requires matching scope and inspectable metric evidence.',
+      });
+    if (
+      answer.waterfall &&
+      evidence.get(answer.waterfall.sourceEvidenceId)?.type !== 'calculation'
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Waterfall requires inspectable movement calculation evidence.',
       });
     for (const claim of [answer.answer, ...answer.drivers, ...answer.context]) {
       const citations = claim.evidenceIds.map((id) => evidence.get(id));
@@ -591,7 +619,14 @@ export const operationalSnapshotSchema = z
     (value) =>
       new Set(value.rows.map((row) => row.recordId)).size === value.rows.length,
     'Record IDs must be unique.',
-  );
+  )
+  .refine((value) => {
+    const usage = value.rows.filter((row) => row.source === 'usage');
+    return (
+      new Set(usage.map((row) => `${row.customerId}:${row.month}`)).size ===
+      usage.length
+    );
+  }, 'Monthly usage observations must be unique per customer.');
 export const operationalRequestSchema = z
   .object({
     month: calendarMonth,
@@ -678,3 +713,13 @@ export const storedInvestigationRecordSchema = z.union([
   customerFollowUpRecordSchema,
   crossSourceRecordSchema,
 ]);
+
+export const crossSourceAnswerSchema = z
+  .object({
+    record: crossSourceRecordSchema,
+    evidence: investigationEvidenceSchema.array(),
+    operationalEvidenceIds: z.array(z.string()),
+    parentEvidence: investigationEvidenceSchema.array(),
+  })
+  .strict();
+export type CrossSourceAnswer = z.infer<typeof crossSourceAnswerSchema>;

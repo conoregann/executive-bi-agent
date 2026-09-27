@@ -97,7 +97,7 @@
       "observedAt": "2026-08-01T00:00:00Z",
       "freshness": "2026-09-01T08:00:00Z",
       "activeUsers": null,
-      "category": "pricing_objection",
+      "category": "renewal",
       "note": "Synthetic account event; reported reason is not causal proof."
     },
     {
@@ -216,9 +216,9 @@
       "source": "crm",
       "month": "2026-08-01",
       "observedAt": "2026-08-01T00:00:00Z",
-      "freshness": "2026-07-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
       "activeUsers": null,
-      "category": "renewal",
+      "category": "pricing_objection",
       "note": "Synthetic account event; reported reason is not causal proof."
     }
   ]

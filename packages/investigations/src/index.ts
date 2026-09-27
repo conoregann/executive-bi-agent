@@ -403,12 +403,14 @@ export class MrrDeclineInvestigationService {
       };
     if (
       parsed.data.question !== undefined &&
-      !/^break that down by country[.!?]?$/iu.test(parsed.data.question)
+      !/^(?:break that down by country|compare germany with (?:the )?(?:uk|united kingdom))[.!?]?$/iu.test(
+        parsed.data.question,
+      )
     )
       return {
         status: 'unsupported' as const,
         error:
-          'Only “Break that down by country” is supported. Use a new investigation for other periods, metrics or filters.',
+          'Only “Break that down by country” or “Compare Germany with the UK” is supported. Use a new investigation for other periods, metrics or filters.',
       };
     const parentAnswer = synthesizeMrrDeclineAnswer(
       parent.record,

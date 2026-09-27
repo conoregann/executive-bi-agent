@@ -108,3 +108,19 @@ test('synthetic chart contract rejects malformed values, provenance and scope', 
     assert.equal(investigationAnswerSchema.safeParse(changed).success, false);
   }
 });
+
+test('waterfall requires an inspectable calculation reference', () => {
+  const value = answer();
+  value.waterfall = {
+    sourceEvidenceId: 'change',
+    data: Array.from({ length: 6 }, (_, index) => ({
+      label: `synthetic-${index}`,
+      startEurCents: 0,
+      endEurCents: 0,
+      valueEurCents: 0,
+    })),
+  };
+  assert.equal(investigationAnswerSchema.safeParse(value).success, true);
+  value.waterfall.sourceEvidenceId = 'unknown';
+  assert.equal(investigationAnswerSchema.safeParse(value).success, false);
+});

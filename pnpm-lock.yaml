@@ -101,6 +101,9 @@ importers:
       '@executive-bi/ai':
         specifier: workspace:*
         version: link:../ai
+      '@executive-bi/metrics':
+        specifier: workspace:*
+        version: link:../metrics
       '@executive-bi/operations':
         specifier: workspace:*
         version: link:../operations

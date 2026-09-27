@@ -106,3 +106,9 @@ links, invalid integrity, wrong months, changed parent totals, incorrect ranking
 or unreconciled offsets/remainder. The copied country provenance is validated as
 well. Only trusted retained values are presented; no tools run. Transfers mean
 country contributions, without churn/acquisition labels or business causes.
+
+The optional `waterfall` accompanies the existing plan chart. It contains six
+integer-cent rows derived centrally from retained reconciled MRR movement, with a
+required inspectable calculation-evidence reference. It adds no model-generated
+numerical series and is omitted when retained movement cannot produce valid
+geometry. Both charts appear before the recommended next step in the answer.

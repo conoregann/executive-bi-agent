@@ -22,7 +22,6 @@ function previousMonth(month: string): string {
   date.setUTCMonth(date.getUTCMonth() - 1);
   return date.toISOString().slice(0, 10);
 }
-let sequence = 0;
 export function createOperationalRepository(
   snapshot: unknown,
 ): OperationalRepository {
@@ -58,7 +57,7 @@ function createRepository(
 ): OperationalRepository {
   return {
     async read(input) {
-      const queryId = `synthetic_ops_query_${++sequence}`;
+      const queryId = `synthetic_ops_query_${crypto.randomUUID().replaceAll('-', '')}`;
       const request = operationalRequestSchema.safeParse(input);
       if (!request.success)
         return {
@@ -120,4 +119,50 @@ function createRepository(
       }
     },
   };
+}
+
+export function getCustomerCrmContext(
+  repository: OperationalRepository,
+  input: { month: string; customerIds: readonly string[] },
+) {
+  return repository.read({ ...input, source: 'crm' });
+}
+export function getCustomerSupportHistory(
+  repository: OperationalRepository,
+  input: { month: string; customerIds: readonly string[] },
+) {
+  return repository.read({ ...input, source: 'support' });
+}
+/** Deterministic monthly active-user delta; missing observations remain null. */
+export function compareCustomerUsage(
+  rows: readonly OperationalRecord[],
+  customerIds: readonly string[],
+  month: string,
+) {
+  const previous = previousMonth(month);
+  return customerIds.map((customerId) => {
+    const prior =
+      rows.find(
+        (row) =>
+          row.source === 'usage' &&
+          row.customerId === customerId &&
+          row.month === previous,
+      )?.activeUsers ?? null;
+    const current =
+      rows.find(
+        (row) =>
+          row.source === 'usage' &&
+          row.customerId === customerId &&
+          row.month === month,
+      )?.activeUsers ?? null;
+    return {
+      customerId,
+      previousMonth: previous,
+      currentMonth: month,
+      previousActiveUsers: prior,
+      currentActiveUsers: current,
+      activeUserChange:
+        prior === null || current === null ? null : current - prior,
+    };
+  });
 }

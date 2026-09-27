@@ -67,3 +67,14 @@ test('PostgreSQL parameters and returned scope are enforced without fixture fall
     'data_unavailable',
   );
 });
+
+test('monthly usage comparisons preserve missing observations and counterexamples', async () => {
+  const { compareCustomerUsage } = await import('../dist/index.js');
+  const result = compareCustomerUsage(
+    snapshot.rows,
+    ['cust_london', 'missing'],
+    '2026-08-01',
+  );
+  assert.equal(result[0].activeUserChange, -40);
+  assert.equal(result[1].activeUserChange, null);
+});

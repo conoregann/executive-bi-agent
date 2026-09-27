@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS raw.operational_records (
 INSERT INTO raw.operational_records (record_id, record)
 SELECT item->>'recordId', item
 FROM jsonb_array_elements((pg_read_file('/fixtures/operations-2026.json')::jsonb)->'rows') item
-ON CONFLICT (record_id) DO NOTHING;
+ON CONFLICT (record_id) DO UPDATE SET record = EXCLUDED.record;
 CREATE OR REPLACE VIEW staging.operational_records AS
 SELECT record_id, record->>'customerId' AS customer_id, record->>'source' AS source,
  (record->>'month')::date AS month, record
