@@ -17,3 +17,11 @@ For an existing local synthetic volume, run `pnpm db:migrate` and then
 investigation table. Set `DATABASE_URL` from `.env.example` before starting
 the API. The [API contract](../../docs/architecture/api-mrr-decline-contract.md)
 defines the token-protected persistence boundary.
+
+The running API requires `ANALYTICS_DATABASE_URL` using the dedicated
+`executive_bi_analytics` role, separate from writable `DATABASE_URL` persistence.
+This local synthetic role can select only the two approved analytics views,
+defaults to read-only transactions, and has a five-second statement timeout.
+Run `pnpm db:migrate` for an existing volume. Analytics tool failures produce a retained blocked investigation (`422`);
+persistence failures return a sanitized `503`. There is no JSON metric fallback. Retained evidence
+remains readable independently of the analytics connection.

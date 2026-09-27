@@ -59,16 +59,17 @@ pnpm build
 ```
 
 If you already had a `.env` from an earlier version, copying the example is
-skipped. Ensure it also contains `DATABASE_URL`. With the default local
+skipped. Ensure it contains both `DATABASE_URL` and `ANALYTICS_DATABASE_URL`. With the default local
 PostgreSQL credentials and port 5433, add:
 
 ```dotenv
 DATABASE_URL=postgres://executive_bi:executive_bi_local_only@127.0.0.1:5433/executive_bi
+ANALYTICS_DATABASE_URL=postgres://executive_bi_analytics:synthetic_analytics_local_only@127.0.0.1:5433/executive_bi
 ```
 
 If you changed the database user, password, name, or port, use matching values
 in that connection URL. `POSTGRES_PORT` alone configures Docker; the API requires
-`DATABASE_URL`.
+both database URLs.
 
 Keep these processes running in separate terminals from the repository root.
 Terminal 1 starts the separate backend and loads the local database configuration:
@@ -115,3 +116,11 @@ pnpm --filter @executive-bi/web exec playwright install chromium
 Build web assets with `pnpm --filter @executive-bi/web build`.
 Production hosting needs a same-origin reverse proxy; see the
 [web contract](docs/architecture/executive-web-contract.md).
+
+The running API requires `ANALYTICS_DATABASE_URL` using the dedicated
+`executive_bi_analytics` role, separate from writable `DATABASE_URL` persistence.
+This local synthetic role can select only the two approved analytics views,
+defaults to read-only transactions, and has a five-second statement timeout.
+Run `pnpm db:migrate` for an existing volume. Analytics tool failures produce a retained blocked investigation (`422`);
+persistence failures return a sanitized `503`. There is no JSON metric fallback. Retained evidence
+remains readable independently of the analytics connection.

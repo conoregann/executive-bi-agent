@@ -36,10 +36,10 @@ focused contract, surface the conflict before changing that boundary.
 | `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                                                 |
 | `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                                                         |
 
-Current flow: structured month/customer request → synthetic metric fixture and
+Current flow: structured month/customer request → synthetic PostgreSQL analytics and
 scoped lexical knowledge → deterministic investigation → persisted evidence →
-authenticated record/answer/evidence reads. PostgreSQL source parity is verified
-separately; the API currently uses the JSON analytics fixture.
+authenticated record/answer/evidence reads. The running API reads PostgreSQL analytics views through a dedicated read-only
+connection; JSON analytics fixtures remain available for deterministic tests.
 
 ### Planned scope
 
