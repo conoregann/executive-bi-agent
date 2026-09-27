@@ -3,9 +3,8 @@
 ## Scope
 
 The development API exposes one integration boundary over the deterministic
-MRR, company-knowledge, and MRR-decline investigation services. It loads only
-the explicitly labeled synthetic fixtures in `data/synthetic`; it is not a
-production data-source adapter.
+MRR, company-knowledge, and MRR-decline investigation services. It reads the local synthetic PostgreSQL analytics views and labeled knowledge
+fixtures in `data/synthetic`; it is not a production data-source adapter.
 
 ## Endpoint
 
@@ -58,3 +57,11 @@ after valid token authentication. JSON request bodies are limited to 16 KiB.
 The boundary preserves the investigation contract: it never calculates metrics
 outside `packages/metrics`, broadens document scope, exposes raw synthetic
 records, or turns contextual documents into causal claims.
+
+The running API requires `ANALYTICS_DATABASE_URL` using the dedicated
+`executive_bi_analytics` role, separate from writable `DATABASE_URL` persistence.
+This local synthetic role can select only the two approved analytics views,
+defaults to read-only transactions, and has a five-second statement timeout.
+Run `pnpm db:migrate` for an existing volume. Analytics tool failures produce a retained blocked investigation (`422`);
+persistence failures return a sanitized `503`. There is no JSON metric fallback. Retained evidence
+remains readable independently of the analytics connection.

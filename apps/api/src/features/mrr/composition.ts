@@ -1,4 +1,10 @@
-import { createSubscriptionMonthRepository } from '@executive-bi/analytics';
+import {
+  createSubscriptionMonthRepository,
+  createPostgresSubscriptionMonthRepository,
+  type SubscriptionMonthRepository,
+  type PostgresQueryClient,
+} from '@executive-bi/analytics';
+import type { KnowledgeDocument } from '@executive-bi/retrieval';
 import {
   MrrDeclineInvestigationService,
   type InvestigationStore,
@@ -9,16 +15,27 @@ import { MrrDeclineApi } from './routes.js';
 import {
   loadSyntheticMrrDeclineDependencies,
   type SyntheticMrrDeclineDependencies,
+  loadSyntheticKnowledgeDocuments,
 } from './synthetic-source.js';
 
 export function createMrrDeclineApi(
   dependencies: SyntheticMrrDeclineDependencies,
   store?: InvestigationStore,
 ): MrrDeclineApi {
-  const metrics = new TrustedMrrService(
+  return composeMrrDeclineApi(
     createSubscriptionMonthRepository(dependencies.snapshot),
+    dependencies.documents,
+    store,
   );
-  const knowledge = createCompanyKnowledgeSearch(dependencies.documents);
+}
+
+function composeMrrDeclineApi(
+  repository: SubscriptionMonthRepository,
+  documents: readonly KnowledgeDocument[],
+  store?: InvestigationStore,
+): MrrDeclineApi {
+  const metrics = new TrustedMrrService(repository);
+  const knowledge = createCompanyKnowledgeSearch(documents);
   const investigation = new MrrDeclineInvestigationService(
     {
       compareMrr: metrics.compareMrr.bind(metrics),
@@ -37,6 +54,17 @@ export async function createSyntheticMrrDeclineApi(
 ): Promise<MrrDeclineApi> {
   return createMrrDeclineApi(
     await loadSyntheticMrrDeclineDependencies(),
+    store,
+  );
+}
+
+export async function createPostgresMrrDeclineApi(
+  client: PostgresQueryClient,
+  store: InvestigationStore,
+): Promise<MrrDeclineApi> {
+  return composeMrrDeclineApi(
+    createPostgresSubscriptionMonthRepository(client),
+    await loadSyntheticKnowledgeDocuments(),
     store,
   );
 }

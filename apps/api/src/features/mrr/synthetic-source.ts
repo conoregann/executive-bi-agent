@@ -12,14 +12,23 @@ export interface SyntheticMrrDeclineDependencies {
  * boundary. Production data sources are intentionally outside this adapter.
  */
 export async function loadSyntheticMrrDeclineDependencies(): Promise<SyntheticMrrDeclineDependencies> {
-  const [snapshotFile, paymentIncident, salesReview] = await Promise.all([
-    readFile(
-      new URL(
-        '../../../../../data/synthetic/subscription-month-2026.json',
-        import.meta.url,
-      ),
-      'utf8',
+  const snapshotFile = await readFile(
+    new URL(
+      '../../../../../data/synthetic/subscription-month-2026.json',
+      import.meta.url,
     ),
+    'utf8',
+  );
+  return {
+    snapshot: parseSyntheticSnapshot(JSON.parse(snapshotFile) as unknown),
+    documents: await loadSyntheticKnowledgeDocuments(),
+  };
+}
+
+export async function loadSyntheticKnowledgeDocuments(): Promise<
+  readonly KnowledgeDocument[]
+> {
+  const [paymentIncident, salesReview] = await Promise.all([
     readFile(
       new URL(
         '../../../../../data/synthetic/knowledge/2026-08-payment-incident-281.md',
@@ -35,30 +44,25 @@ export async function loadSyntheticMrrDeclineDependencies(): Promise<SyntheticMr
       'utf8',
     ),
   ]);
-  const snapshot = parseSyntheticSnapshot(JSON.parse(snapshotFile) as unknown);
-
-  return {
-    snapshot,
-    documents: [
-      {
-        documentId: 'payment-incident-281',
-        title: 'Payment provider incident #281',
-        source: 'synthetic_knowledge',
-        observedAt: '2026-08-16T17:30:00Z',
-        freshness: snapshot.freshness,
-        content: paymentIncident,
-      },
-      {
-        documentId: 'august-sales-review',
-        title: 'August sales review',
-        source: 'synthetic_knowledge',
-        observedAt: '2026-08-31T17:00:00Z',
-        freshness: snapshot.freshness,
-        content: salesReview,
-        customerIds: ['cust_acme'],
-      },
-    ],
-  };
+  return [
+    {
+      documentId: 'payment-incident-281',
+      title: 'Payment provider incident #281',
+      source: 'synthetic_knowledge',
+      observedAt: '2026-08-16T17:30:00Z',
+      freshness: '2026-09-01T08:00:00Z',
+      content: paymentIncident,
+    },
+    {
+      documentId: 'august-sales-review',
+      title: 'August sales review',
+      source: 'synthetic_knowledge',
+      observedAt: '2026-08-31T17:00:00Z',
+      freshness: '2026-09-01T08:00:00Z',
+      content: salesReview,
+      customerIds: ['cust_acme'],
+    },
+  ];
 }
 
 function parseSyntheticSnapshot(value: unknown): SubscriptionMonthSnapshot {
