@@ -8,9 +8,7 @@ knowledge retrieval, and evidence-backed investigations.
 
 The implemented path is a Node.js HTTP API for structured synthetic MRR-decline
 requests, deterministic metrics and scoped lexical knowledge retrieval,
-PostgreSQL investigation/evidence persistence, and token-protected record and
-evidence reads. Deterministic cited answer presentation remains on the
-`feat/evidence-backed-investigation-answers` branch.
+PostgreSQL investigation/evidence persistence, and token-protected cited answers.
 There is no web app, worker, model integration, or exploratory SQL execution yet.
 
 - `apps/api` — the current deployable API.

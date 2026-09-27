@@ -45,7 +45,7 @@ Strength is assessed per claim, not per answer. A metric result with incomplete 
 
 ## Citation display
 
-The current API returns evidence IDs and an authenticated evidence-detail
+The current answer API returns citation IDs and an authenticated evidence-detail
 route with source reference, resolved scope, freshness, and values or excerpt.
 A future UI must show compact citations near the supported statement and open
 that evidence in a detail view. Sensitive record fields must be redacted according to the active permission scope before display.

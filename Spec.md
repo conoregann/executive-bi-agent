@@ -22,28 +22,25 @@ focused contract, surface the conflict before changing that boundary.
 
 ### Implemented today
 
-| Location                  | Current responsibility                                                                                                                                                                              |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context. Not NestJS or a production tenant/RBAC service. |
-| `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                     |
-| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                              |
-| `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                      |
-| `packages/investigations` | Five-step MRR-decline orchestration, blocked outcomes and retained scope.                                                                                                                           |
-| `packages/schemas`        | Zod API request, record and evidence contracts; other domain types remain in their owning packages.                                                                                                 |
-| `packages/database`       | Local database documentation only; no runtime package/client.                                                                                                                                       |
-| `infra/postgres`          | Local synthetic raw/staging/analytics layers and separate `app` persistence schema, initialization, migration, verification SQL.                                                                    |
-| `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                    |
-| `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                            |
+| Location                  | Current responsibility                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context, deterministic cited answers. Not NestJS or a production tenant/RBAC service. |
+| `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                                                  |
+| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Other catalog metrics are not yet executable.                                                           |
+| `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                                                   |
+| `packages/investigations` | Five-step MRR-decline orchestration, blocked outcomes, retained scope, and deterministic answer presentation.                                                                                                                    |
+| `packages/schemas`        | Zod API request, record, evidence, and answer contracts; other domain types remain in their owning packages.                                                                                                                     |
+| `packages/database`       | Local database documentation only; no runtime package/client.                                                                                                                                                                    |
+| `infra/postgres`          | Local synthetic raw/staging/analytics layers and separate `app` persistence schema, initialization, migration, verification SQL.                                                                                                 |
+| `data/synthetic`          | Small July/August 2026 subscription fixture and two knowledge documents; not the full fictional company dataset.                                                                                                                 |
+| `evals`                   | Markdown acceptance cases backed where implemented by package/API tests; not an automated 100-question benchmark runner.                                                                                                         |
 
 Current flow: structured month/customer request → synthetic metric fixture and
 scoped lexical knowledge → deterministic investigation → persisted evidence →
-authenticated record/evidence reads. PostgreSQL source parity is verified
+authenticated record/answer/evidence reads. PostgreSQL source parity is verified
 separately; the API currently uses the JSON analytics fixture.
 
 ### Planned scope
-
-Deterministic cited answer presentation is implemented on
-`feat/evidence-backed-investigation-answers` but is not yet part of `main`.
 
 The topology, package responsibilities, broad data model, tool examples, output
 interface, state machine, benchmark targets, and milestones in sections 1–10
