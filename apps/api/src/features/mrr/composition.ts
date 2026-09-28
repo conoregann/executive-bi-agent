@@ -1,3 +1,14 @@
+import { readFile } from 'node:fs/promises';
+import {
+  createOperationalRepository,
+  createPostgresOperationalRepository,
+  type OperationalRepository,
+} from '@executive-bi/operations';
+import {
+  createGeminiModel,
+  createOpenAIModel,
+  type InvestigationModel,
+} from '@executive-bi/ai';
 import {
   createSubscriptionMonthRepository,
   createPostgresSubscriptionMonthRepository,
@@ -21,11 +32,15 @@ import {
 export function createMrrDeclineApi(
   dependencies: SyntheticMrrDeclineDependencies,
   store?: InvestigationStore,
+  operations?: OperationalRepository,
+  model?: InvestigationModel,
 ): MrrDeclineApi {
   return composeMrrDeclineApi(
     createSubscriptionMonthRepository(dependencies.snapshot),
     dependencies.documents,
     store,
+    operations,
+    model,
   );
 }
 
@@ -33,6 +48,8 @@ function composeMrrDeclineApi(
   repository: SubscriptionMonthRepository,
   documents: readonly KnowledgeDocument[],
   store?: InvestigationStore,
+  operations?: OperationalRepository,
+  model?: InvestigationModel,
 ): MrrDeclineApi {
   const metrics = new TrustedMrrService(repository);
   const knowledge = createCompanyKnowledgeSearch(documents);
@@ -48,6 +65,13 @@ function composeMrrDeclineApi(
       searchCompanyKnowledge: knowledge.search.bind(knowledge),
     },
     store,
+    operations
+      ? {
+          repository: operations,
+          ...(model ? { model } : {}),
+          searchKnowledge: knowledge.search.bind(knowledge),
+        }
+      : undefined,
   );
   return new MrrDeclineApi(investigation);
 }
@@ -58,6 +82,18 @@ export async function createSyntheticMrrDeclineApi(
   return createMrrDeclineApi(
     await loadSyntheticMrrDeclineDependencies(),
     store,
+    createOperationalRepository(
+      JSON.parse(
+        await readFile(
+          new URL(
+            '../../../../../data/synthetic/operations-2026.json',
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+      ),
+    ),
+    configuredModel(),
   );
 }
 
@@ -69,5 +105,27 @@ export async function createPostgresMrrDeclineApi(
     createPostgresSubscriptionMonthRepository(client),
     await loadSyntheticKnowledgeDocuments(),
     store,
+    createPostgresOperationalRepository(client),
+    configuredModel(),
   );
+}
+
+export function configuredModel(
+  environment: Record<string, string | undefined> = process.env,
+): InvestigationModel | undefined {
+  const provider =
+    environment.INVESTIGATION_MODEL_PROVIDER ??
+    (environment.GEMINI_API_KEY ? 'gemini' : 'openai');
+  if (provider === 'gemini')
+    return environment.GEMINI_API_KEY
+      ? createGeminiModel({
+          apiKey: environment.GEMINI_API_KEY,
+          model: environment.GEMINI_INVESTIGATION_MODEL ?? 'gemini-3.8-flash',
+        })
+      : undefined;
+  if (provider !== 'openai')
+    throw new Error('Unsupported investigation model provider.');
+  const key = environment.OPENAI_API_KEY;
+  const model = environment.OPENAI_INVESTIGATION_MODEL;
+  return key && model ? createOpenAIModel({ apiKey: key, model }) : undefined;
 }

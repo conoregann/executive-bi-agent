@@ -7,10 +7,10 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc --project tsconfig.json",
-    "check": "pnpm --filter @executive-bi/analytics build && pnpm --filter @executive-bi/investigations build && pnpm --filter @executive-bi/metrics build && pnpm --filter @executive-bi/retrieval build && pnpm --filter @executive-bi/schemas build && tsc --project tsconfig.json --noEmit",
+    "build": "pnpm --filter @executive-bi/operations build && pnpm --filter @executive-bi/ai build && tsc --project tsconfig.json",
+    "check": "pnpm --filter @executive-bi/operations build && pnpm --filter @executive-bi/ai build && pnpm --filter @executive-bi/analytics build && pnpm --filter @executive-bi/investigations build && pnpm --filter @executive-bi/metrics build && pnpm --filter @executive-bi/retrieval build && pnpm --filter @executive-bi/schemas build && tsc --project tsconfig.json --noEmit",
     "start": "node dist/main.js",
-    "test": "pnpm run check && tsc --project tsconfig.json && node --test test/*.test.mjs"
+    "test": "pnpm --filter @executive-bi/operations build && pnpm --filter @executive-bi/ai build && pnpm run check && tsc --project tsconfig.json && node --test test/*.test.mjs"
   },
   "dependencies": {
     "@executive-bi/analytics": "workspace:*",
@@ -18,7 +18,9 @@
     "@executive-bi/metrics": "workspace:*",
     "@executive-bi/retrieval": "workspace:*",
     "@executive-bi/schemas": "workspace:*",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "@executive-bi/operations": "workspace:*",
+    "@executive-bi/ai": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.15.3",

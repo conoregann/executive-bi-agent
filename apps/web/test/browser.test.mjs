@@ -298,7 +298,9 @@ test('synthetic incomplete and unavailable charts retain the executive answer', 
   });
   await complete(page);
   assert.match(
-    await page.getByRole('table').textContent(),
+    await page
+      .getByRole('table', { name: 'Plan MRR values (EUR)' })
+      .textContent(),
     /UnassignedEUR 1.00/,
   );
   assert.match(
@@ -313,7 +315,10 @@ test('synthetic incomplete and unavailable charts retain the executive answer', 
     await route.fulfill({ response, json: body });
   });
   await complete(page);
-  assert.equal(await page.getByRole('table').count(), 0);
+  assert.equal(
+    await page.getByRole('table', { name: 'Plan MRR values (EUR)' }).count(),
+    0,
+  );
   assert.match(
     await page.getByRole('article').textContent(),
     /chart unavailable/,
@@ -526,5 +531,58 @@ test('synthetic account drill-down announces empty losses and retained blocked r
   assert.equal(
     await page.getByRole('article', { name: 'Executive answer' }).count(),
     1,
+  );
+});
+
+test('cross-source journey retains country scope and cites operational records on mobile', async (t) => {
+  const page = await pageForTest(t, { width: 390, height: 844 });
+  await complete(page);
+  await page
+    .getByRole('heading', { name: 'Revenue movement waterfall', exact: true })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Break down by country', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Show accounts for DE', exact: true })
+    .click();
+  await page
+    .locator('#customer-drilldown')
+    .getByText('cust_acme', { exact: true })
+    .waitFor();
+  await page
+    .getByRole('button', {
+      name: 'Investigate revenue losses across sources',
+      exact: true,
+    })
+    .click();
+  const section = page.getByRole('region', {
+    name: 'Cross-source revenue investigation',
+  });
+  await section
+    .getByRole('heading', { name: 'crm evidence', exact: true })
+    .waitFor();
+  assert.match(await section.textContent(), /Accounts: cust_acme/);
+  assert.match(await section.textContent(), /budget_frozen/);
+  assert.match(await section.textContent(), /conflict/);
+  await section
+    .getByRole('button', {
+      name: 'Inspect support query evidence',
+      exact: true,
+    })
+    .click();
+  await page
+    .locator('#evidence-detail')
+    .getByText(/synthetic_ops_query/)
+    .waitFor();
+  await page.screenshot({
+    path: '/tmp/executive-bi-cross-source-mobile.png',
+    fullPage: true,
+  });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+    true,
   );
 });

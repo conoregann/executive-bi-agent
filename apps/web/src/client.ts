@@ -214,3 +214,46 @@ export async function readCustomerFollowUpAnswer(id: string, token: string) {
     );
   return parsed.data;
 }
+
+export async function investigateCrossSource(
+  id: string,
+  token: string,
+  question: string,
+) {
+  const {
+    crossSourceRequestSchema,
+    crossSourceResponseSchema,
+    crossSourceAnswerSchema,
+  } = await import('@executive-bi/schemas');
+  const request = crossSourceRequestSchema.parse({
+    investigationId: crypto.randomUUID(),
+    question,
+  });
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/cross-source-follow-ups`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+      cache: 'no-store',
+    },
+  );
+  const child = crossSourceResponseSchema.parse(await readJson(response));
+  if (child.status === 'blocked')
+    throw new Error(`Investigation blocked: ${child.warnings.join(' ')}`);
+  const answerResponse = await fetch(
+    `/v1/investigations/${encodeURIComponent(child.record.investigationId)}/answer`,
+    {
+      headers: { authorization: `Bearer ${child.accessToken}` },
+      cache: 'no-store',
+    },
+  );
+  const body = (await readJson(answerResponse)) as { answer: unknown };
+  return {
+    answer: crossSourceAnswerSchema.parse(body.answer),
+    session: { id: child.record.investigationId, token: child.accessToken },
+  };
+}

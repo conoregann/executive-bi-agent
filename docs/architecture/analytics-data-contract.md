@@ -67,3 +67,15 @@ To deliberately reseed local data, stop the service and remove the named Docker 
 - Preserve stable IDs across fixtures and knowledge metadata.
 - Add a verification assertion whenever a metric-changing transformation is added.
 - Data in this repository remains synthetic; no real credentials or company records belong here.
+
+## Synthetic operational history
+
+`data/synthetic/generate-operations.mjs` reproducibly generates CRM account events,
+support events and monthly active-user summaries for June–August 2026. The fixture
+is `operations-2026.json`, explicitly labelled synthetic. The additive migration
+loads stable record IDs into `raw.operational_records`, conforms source/customer/
+month fields in staging, and exposes `analytics.operational_records` to the
+existing read-only role. Migration updates only these synthetic fixture records.
+Verification checks complete JSON parity and reader permissions. Operational
+usage deltas are current minus previous observed active-user counts; either
+missing observation produces null, never zero. No account-health score is inferred.
