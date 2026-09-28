@@ -1,5 +1,8 @@
 import {
   customerFollowUpRequestSchema,
+  churnFollowUpRequestSchema,
+  churnFollowUpResponseSchema,
+  churnFollowUpAnswerSchema,
   customerFollowUpResponseSchema,
   customerFollowUpAnswerSchema,
   countryFollowUpRequestSchema,
@@ -148,6 +151,50 @@ export async function startCountryFollowUp(
   if (!parsed.success)
     throw new Error(
       'The service returned an invalid follow-up. Please try again.',
+    );
+  return parsed.data;
+}
+export async function startChurnFollowUp(id: string, token: string) {
+  const body = churnFollowUpRequestSchema.parse({
+    investigationId: crypto.randomUUID(),
+    action: 'get_customer_churn_rate',
+  });
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/customer-churn-follow-ups`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    },
+  );
+  const parsed = churnFollowUpResponseSchema.safeParse(
+    await readJson(response),
+  );
+  if (!parsed.success)
+    throw new Error('The service returned an invalid churn follow-up.');
+  return parsed.data;
+}
+export async function readChurnFollowUpAnswer(id: string, token: string) {
+  const response = await fetch(
+    `/v1/investigations/${encodeURIComponent(id)}/answer`,
+    {
+      headers: { authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    },
+  );
+  const body = await readJson(response);
+  const parsed = churnFollowUpAnswerSchema.safeParse(
+    body && typeof body === 'object' && 'answer' in body
+      ? body.answer
+      : undefined,
+  );
+  if (!parsed.success)
+    throw new Error(
+      'Retained customer churn evidence is insufficient for an answer.',
     );
   return parsed.data;
 }

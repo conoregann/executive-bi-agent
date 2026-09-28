@@ -5,6 +5,7 @@ import type {
   InvestigationAnswer,
   CountryFollowUpAnswer,
   CustomerFollowUpAnswer,
+  ChurnFollowUpAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 import {
@@ -13,6 +14,8 @@ import {
   readCustomerFollowUpAnswer,
   readAnswer,
   startCountryFollowUp,
+  startChurnFollowUp,
+  readChurnFollowUpAnswer,
   readCountryFollowUpAnswer,
   readEvidence,
   startInvestigation,
@@ -26,6 +29,11 @@ type Claim =
   | InvestigationAnswer['context'][number];
 function App() {
   const [requestOpen, setRequestOpen] = useState(true);
+  const [churnAnswer, setChurnAnswer] = useState<ChurnFollowUpAnswer>();
+  const [churnMessage, setChurnMessage] = useState('');
+  const churnSession = useRef<{ id: string; token: string } | undefined>(
+    undefined,
+  );
   const [crossAnswer, setCrossAnswer] = useState<CrossSourceAnswer>();
   const [crossMessage, setCrossMessage] = useState('');
   const crossSession = useRef<{ id: string; token: string } | undefined>(
@@ -94,6 +102,9 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setChurnAnswer(undefined);
+    setChurnMessage('');
+    churnSession.current = undefined;
     setCrossAnswer(undefined);
     setCrossMessage('');
     crossSession.current = undefined;
@@ -193,6 +204,39 @@ function App() {
     } catch (error) {
       setFollowMessage(
         error instanceof Error ? error.message : 'Follow-up unavailable.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function churnFollowUp() {
+    const active = session.current;
+    if (!active) return;
+    setBusy(true);
+    setChurnAnswer(undefined);
+    setChurnMessage('Calculating customer churn from both monthly snapshots…');
+    try {
+      const result = await startChurnFollowUp(active.id, active.token);
+      churnSession.current = {
+        id: result.record.investigationId,
+        token: result.accessToken,
+      };
+      if (result.status === 'blocked') {
+        setChurnMessage(
+          `Customer churn unavailable. Retained record: ${result.record.investigationId}. ${result.warnings.join(' ')}`,
+        );
+      } else {
+        setChurnAnswer(
+          await readChurnFollowUpAnswer(
+            result.record.investigationId,
+            result.accessToken,
+          ),
+        );
+        setChurnMessage('Customer churn follow-up complete.');
+      }
+    } catch (error) {
+      setChurnMessage(
+        error instanceof Error ? error.message : 'Customer churn unavailable.',
       );
     } finally {
       setBusy(false);
@@ -609,6 +653,65 @@ function App() {
               </ul>
             </section>
           </details>
+          <section
+            className="result-section follow-section"
+            aria-labelledby="churn-heading"
+            aria-busy={busy}
+          >
+            <h2 id="churn-heading">Customer churn rate</h2>
+            <button
+              type="button"
+              disabled={busy || resolving}
+              onClick={() => void churnFollowUp()}
+            >
+              Calculate customer churn
+            </button>
+            {churnMessage && (
+              <p className="inline-status" role="status" aria-live="polite">
+                {churnMessage}
+              </p>
+            )}
+            {churnAnswer && (
+              <>
+                <p className="meta-line">
+                  {churnAnswer.value.previousMonth.slice(0, 7)} to{' '}
+                  {churnAnswer.value.currentMonth.slice(0, 7)} · Customers:{' '}
+                  {churnAnswer.permittedCustomerIds.join(', ') ||
+                    'All customers'}
+                </p>
+                <p>
+                  {churnAnswer.value.churnedCustomers}{' '}
+                  {churnAnswer.value.churnedCustomers === 1
+                    ? 'customer'
+                    : 'customers'}{' '}
+                  churned / {churnAnswer.value.startingCustomers} starting
+                  customers
+                </p>
+                <p>
+                  {churnAnswer.value.rate === null
+                    ? 'Rate unavailable: no starting customers.'
+                    : `${(churnAnswer.value.rate * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}
+                </p>
+                <div className="source-actions">
+                  {churnAnswer.sourceEvidenceIds.map((id) => (
+                    <button
+                      type="button"
+                      key={id}
+                      aria-controls="evidence-detail"
+                      onClick={() => void inspect(id, churnSession.current)}
+                    >
+                      Inspect churn evidence {id}
+                    </button>
+                  ))}
+                </div>
+                {churnAnswer.warnings.map((warning) => (
+                  <p className="data-note" key={warning}>
+                    {warning}
+                  </p>
+                ))}
+              </>
+            )}
+          </section>
           <section
             className="result-section follow-section"
             aria-labelledby="country-heading"

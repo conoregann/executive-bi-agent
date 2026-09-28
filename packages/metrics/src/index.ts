@@ -83,6 +83,14 @@ export interface MrrMovement {
   reconciles: boolean;
 }
 
+export interface CustomerChurnRate {
+  currentMonth: string;
+  previousMonth: string;
+  churnedCustomers: number;
+  startingCustomers: number;
+  rate: number | null;
+}
+
 export interface CustomerMrrMovementRow {
   customerId: string;
   previousMrrEurCents: number;
@@ -255,6 +263,80 @@ export class TrustedMrrService {
       },
       evidence: [currentEvidence, previousEvidence, calculation],
       warnings,
+    };
+  }
+
+  async getCustomerChurnRate(
+    input: unknown,
+  ): Promise<MetricResult<CustomerChurnRate>> {
+    const parsed = parseRequest(input);
+    if (!parsed.ok) return invalidRequest(parsed.error);
+    const currentMonth = parsed.value.month;
+    const previousMonth = priorMonth(currentMonth);
+    const [previous, current] = await Promise.all([
+      this.loadMonth({ month: previousMonth, filters: parsed.value.filters }),
+      this.loadMonth(parsed.value),
+    ]);
+    if (!previous.ok) return previous.result;
+    if (!current.ok) return current.result;
+    const previousIds = [...customerMrr(previous.rows)]
+      .filter(([, amount]) => amount > 0)
+      .map(([id]) => id)
+      .sort();
+    const currentIds = [...customerMrr(current.rows)]
+      .filter(([, amount]) => amount > 0)
+      .map(([id]) => id)
+      .sort();
+    const currentSet = new Set(currentIds);
+    const churnedCustomers = previousIds.filter(
+      (id) => !currentSet.has(id),
+    ).length;
+    const startingCustomers = previousIds.length;
+    const rate =
+      startingCustomers === 0 ? null : churnedCustomers / startingCustomers;
+    const value = {
+      currentMonth,
+      previousMonth,
+      churnedCustomers,
+      startingCustomers,
+      rate,
+    };
+    const freshness = await this.repository.freshness();
+    const query = (month: string, activeCustomerIds: string[]): Evidence => ({
+      evidenceId: this.nextEvidenceId('metric'),
+      type: 'metric_query',
+      source: 'analytics.subscription_month',
+      sourceRef: `customer_churn_cohort:${month}`,
+      observedAt: month,
+      retrievedAt: this.now(),
+      scope: {
+        month,
+        filters: parsed.value.filters,
+        metric: 'customer_churn_cohort',
+        definitionVersion: METRIC_DEFINITION_VERSION,
+      },
+      content: {
+        month,
+        activeCustomerIds,
+        activeCustomers: activeCustomerIds.length,
+      },
+      freshness,
+      integrity: 'valid',
+    });
+    const priorEvidence = query(previousMonth, previousIds);
+    const currentEvidence = query(currentMonth, currentIds);
+    const calculation = this.calculationEvidence(
+      'customer_churn_rate = churned_customers / starting_customers',
+      [priorEvidence.evidenceId, currentEvidence.evidenceId],
+      value,
+      freshness,
+      rate === null ? 'warning' : 'valid',
+    );
+    return {
+      status: 'ok',
+      value,
+      evidence: [priorEvidence, currentEvidence, calculation],
+      warnings: rate === null ? ['zero_customer_churn_denominator'] : [],
     };
   }
 

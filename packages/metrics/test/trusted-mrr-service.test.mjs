@@ -61,6 +61,68 @@ function service(repository) {
   });
 }
 
+test('synthetic customer churn counts customers across subscriptions and missing current rows', async () => {
+  const result = await service(
+    fixtureRepository({
+      [JULY]: [
+        record('split', JULY, 100, { suffix: 'one' }),
+        record('split', JULY, 100, { suffix: 'two' }),
+        record('gone', JULY, 100),
+        record('steady', JULY, 100),
+      ],
+      [AUGUST]: [
+        record('split', AUGUST, 100, { suffix: 'two' }),
+        record('steady', AUGUST, 100),
+      ],
+    }),
+  ).getCustomerChurnRate({ month: AUGUST });
+  assert.equal(result.status, 'ok');
+  assert.deepEqual(result.value, {
+    currentMonth: AUGUST,
+    previousMonth: JULY,
+    churnedCustomers: 1,
+    startingCustomers: 3,
+    rate: 1 / 3,
+  });
+  assert.deepEqual(
+    result.evidence.map((item) => item.type),
+    ['metric_query', 'metric_query', 'calculation'],
+  );
+  assert.deepEqual(
+    result.evidence[2].content.inputEvidenceIds,
+    result.evidence.slice(0, 2).map((item) => item.evidenceId),
+  );
+});
+
+test('synthetic customer churn handles zero denominator, missing months and invalid requests', async () => {
+  const zero = await service(
+    fixtureRepository({
+      [JULY]: [record('inactive', JULY, 0)],
+      [AUGUST]: [record('new', AUGUST, 100)],
+    }),
+  ).getCustomerChurnRate({ month: AUGUST });
+  assert.equal(zero.value.rate, null);
+  assert.deepEqual(zero.warnings, ['zero_customer_churn_denominator']);
+  assert.equal(zero.evidence[2].integrity, 'warning');
+  const repo = fixtureRepository({ [JULY]: [record('gone', JULY, 100)] });
+  assert.equal(
+    (await service(repo).getCustomerChurnRate({ month: AUGUST })).status,
+    'data_unavailable',
+  );
+  const calls = repo.calls();
+  assert.equal(
+    (
+      await service(repo).getCustomerChurnRate({
+        month: AUGUST,
+        filters: { customerIds: ['gone'] },
+        limit: 5,
+      })
+    ).status,
+    'invalid_request',
+  );
+  assert.equal(repo.calls(), calls);
+});
+
 test('returns August MRR with metric-query evidence', async () => {
   const result = await service(fixture()).getMrr({ month: AUGUST });
 
