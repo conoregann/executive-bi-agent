@@ -26,9 +26,11 @@ The interface validates responses with shared schemas and presents the answer,
 drivers, plan breakdown, context, and recommended next step in a clear reading
 order. Limitations, source inventory, and the retained plan use keyboard-operable
 disclosures so they remain inspectable without crowding the result. The header
-uses plain MRR language without company branding or a dataset badge. A wider
-request panel sits to the right of a continuous result surface on desktop; on
-narrow screens the request comes first. Thin rules separate result sections.
+uses plain MRR language without company branding or a dataset badge. The request
+panel sits to the left of a continuous result surface on desktop. A keyboard
+operable rail slides the panel fully away and restores it without clearing form
+state; collapsed inputs are not focusable. On narrow screens the request comes
+first. Thin rules separate result sections.
 Fixture and source provenance remain in their records.
 It shows the resolved month, previous-month comparison, and customer scope.
 Every supplied claim citation opens the authenticated evidence route. Evidence

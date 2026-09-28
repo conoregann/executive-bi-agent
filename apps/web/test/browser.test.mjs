@@ -39,7 +39,10 @@ after(async () => {
   if (api) await new Promise((resolve) => api.close(resolve));
 });
 async function pageForTest(t, viewport = { width: 1200, height: 900 }) {
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({
+    viewport,
+    reducedMotion: 'reduce',
+  });
   t.after(() => context.close());
   const page = await context.newPage();
   page.setDefaultTimeout(10_000);
@@ -83,7 +86,7 @@ test('synthetic investigation renders all answer sections and protected citation
   assert.equal(await page.getByText('Completed', { exact: true }).count(), 0);
   const requestBox = await page.locator('.request-panel').boundingBox();
   const resultBox = await page.locator('.results').boundingBox();
-  assert.ok(requestBox.x > resultBox.x);
+  assert.ok(requestBox.x < resultBox.x);
   assert.ok(requestBox.width >= 320);
   await page.getByText('Sources & limitations').click();
   for (const name of [
@@ -129,6 +132,34 @@ test('synthetic investigation renders all answer sections and protected citation
   });
   await page.reload();
   assert.equal(await page.getByRole('article').count(), 0);
+});
+test('request rail slides the left panel fully away and restores its form state', async (t) => {
+  const page = await pageForTest(t);
+  await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
+  const expandedResult = await page.locator('.empty-state').boundingBox();
+  await page.getByRole('button', { name: 'Hide request panel' }).click();
+  assert.equal(await page.locator('.request-panel').isVisible(), false);
+  assert.equal(
+    await page
+      .getByRole('textbox', { name: 'Customer IDs (optional)' })
+      .count(),
+    0,
+  );
+  const collapsedResult = await page.locator('.empty-state').boundingBox();
+  assert.ok(collapsedResult.width > expandedResult.width);
+  await page.screenshot({ path: '/tmp/executive-bi-panel-collapsed.png' });
+  await page.getByRole('button', { name: 'Show request panel' }).click();
+  assert.equal(
+    await page.getByLabel('Customer IDs (optional)').inputValue(),
+    'cust_acme',
+  );
+  await assertNoHorizontalOverflow(page);
+  const mobile = await pageForTest(t, { width: 390, height: 844 });
+  await mobile.getByRole('button', { name: 'Hide request panel' }).click();
+  assert.equal(await mobile.locator('.request-panel').isVisible(), false);
+  await assertNoHorizontalOverflow(mobile);
+  await mobile.getByRole('button', { name: 'Show request panel' }).click();
+  assert.equal(await mobile.getByLabel('Reporting month').isVisible(), true);
 });
 test('invalid scope and missing comparison data show recoverable outcomes', async (t) => {
   const page = await pageForTest(t);

@@ -25,6 +25,7 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [requestOpen, setRequestOpen] = useState(true);
   const [crossAnswer, setCrossAnswer] = useState<CrossSourceAnswer>();
   const [crossMessage, setCrossMessage] = useState('');
   const crossSession = useRef<{ id: string; token: string } | undefined>(
@@ -263,13 +264,19 @@ function App() {
     );
   }
   return (
-    <main className="workspace">
+    <main className="workspace" data-panel-open={requestOpen}>
       <header className="topbar">
         <div className="topbar-title">
           <h1>MRR analysis</h1>
         </div>
       </header>
-      <section className="request-panel" aria-labelledby="request-heading">
+      <section
+        className="request-panel"
+        id="request-panel"
+        aria-labelledby="request-heading"
+        aria-hidden={!requestOpen}
+        inert={!requestOpen}
+      >
         <div className="panel-heading">
           <h2 id="request-heading">New investigation</h2>
         </div>
@@ -356,6 +363,18 @@ function App() {
           Available: July–August 2026. Access clears on reload.
         </p>
       </section>
+      <div className="panel-rail">
+        <button
+          className="panel-toggle"
+          type="button"
+          aria-label={requestOpen ? 'Hide request panel' : 'Show request panel'}
+          aria-controls="request-panel"
+          aria-expanded={requestOpen}
+          onClick={() => setRequestOpen((open) => !open)}
+        >
+          <span aria-hidden="true">{requestOpen ? '‹' : '›'}</span>
+        </button>
+      </div>
       {!answer && !busy && !message && (
         <section className="empty-state" aria-label="Getting started">
           <h2>Start with a reporting month.</h2>
@@ -406,7 +425,7 @@ function App() {
                           1,
                           Math.abs(row.endEurCents - row.startEurCents) * scale,
                         )}
-                        fill={row.valueEurCents < 0 ? '#a64f27' : '#777770'}
+                        fill={row.valueEurCents < 0 ? '#ff6b2b' : '#777770'}
                       />
                       <text
                         x={index * 120 + 55}
