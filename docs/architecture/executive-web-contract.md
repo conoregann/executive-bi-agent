@@ -23,7 +23,10 @@ The structured form remains available independently.
 ## Answers and evidence
 
 The interface validates responses with shared schemas and presents the answer,
-drivers, context, limitations, evidence, and recommended next step in order.
+drivers, plan breakdown, context, and recommended next step in a clear reading
+order. Limitations, source inventory, and the retained plan use keyboard-operable
+disclosures so they remain inspectable without crowding the result. The header
+uses plain MRR language without company branding; synthetic labeling stays visible.
 It shows the resolved month, previous-month comparison, and customer scope.
 Every supplied claim citation opens the authenticated evidence route. Evidence
 shows source references, scope, freshness, integrity, and supporting content.
@@ -58,9 +61,9 @@ form. Loading, unsupported wording, blocked results and service failures are
 announced and permit retry. A blocked child shows its retained identifier and
 warnings; it does not display invented values.
 
-The child displays previous/current month labels, exact customer scope, a chart
-of signed country-total changes (largest loss first), and an accessible table of
-previous MRR, current MRR and change. Missing dimensions show an explicit
+The child displays previous/current month labels, exact customer scope, and a
+scrollable table of signed country-total changes (largest loss first), previous
+MRR, and current MRR. Missing dimensions show an explicit
 unassigned-country row and limitation. Row and total citations open the child's
 retained calculation; its input queries and parent total snapshots are also
 inspectable. Separate page-memory tokens protect parent and child citations.

@@ -52,11 +52,31 @@ async function complete(page) {
     .click();
   await page.getByRole('article', { name: 'Executive answer' }).waitFor();
 }
+async function assertNoHorizontalOverflow(page) {
+  const layout = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    width: document.documentElement.scrollWidth,
+    offenders: [...document.querySelectorAll('body *')]
+      .filter(
+        (element) =>
+          element.getBoundingClientRect().right > window.innerWidth + 1,
+      )
+      .slice(0, 8)
+      .map((element) => `${element.tagName}.${element.className}`),
+  }));
+  assert.ok(layout.width <= layout.viewport, JSON.stringify(layout));
+}
 test('synthetic investigation renders all answer sections and protected citations', async (t) => {
   const page = await pageForTest(t);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
+  assert.equal(await page.title(), 'MRR analysis');
+  assert.equal(
+    await page.getByText(/Northstar|Understand your MRR movement/i).count(),
+    0,
+  );
   await complete(page);
+  await page.getByText('Sources & limitations').click();
   for (const name of [
     'Answer',
     'Drivers',
@@ -131,12 +151,7 @@ test('scoped answer preserves scope, mobile width and keyboard access', async (t
     await page.locator('.scope').textContent(),
     /Customers: cust_acme/,
   );
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-  );
+  await assertNoHorizontalOverflow(page);
   await page.screenshot({
     path: '/tmp/executive-bi-web-mobile.png',
     fullPage: true,
@@ -246,12 +261,13 @@ test('synthetic chart and retained trail support scoped values and keyboard insp
     .getByRole('heading', { name: 'Supporting values or document excerpt' })
     .waitFor();
   assert.match(await page.locator('#evidence-detail').textContent(), /by:plan/);
-  const summary = page.locator('summary');
+  const summary = page.getByText('How this answer was generated');
   await summary.focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.locator('details').getAttribute('open'), '');
-  assert.equal(await page.locator('details ol li').count(), 5);
-  assert.match(await page.locator('details').textContent(), /completed/);
+  const trail = page.locator('.trail-details');
+  assert.equal(await trail.getAttribute('open'), '');
+  assert.equal(await trail.locator('ol li').count(), 5);
+  assert.match(await trail.textContent(), /completed/);
   await page
     .getByRole('button', { name: /^Inspect trail / })
     .first()
@@ -259,12 +275,7 @@ test('synthetic chart and retained trail support scoped values and keyboard insp
   await page
     .getByRole('heading', { name: 'Supporting values or document excerpt' })
     .waitFor();
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-  );
+  await assertNoHorizontalOverflow(page);
 });
 
 test('synthetic incomplete and unavailable charts retain the executive answer', async (t) => {
@@ -308,20 +319,20 @@ test('natural-language review preserves selected customer scope and handles clar
   });
   await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
   await page
-    .getByLabel('Ask an MRR question')
+    .getByLabel('Question optional')
     .fill('Why did MRR fall in August?');
   await page.getByRole('button', { name: 'Resolve question' }).click();
   await page.getByRole('status').filter({ hasText: 'Which year' }).waitFor();
   assert.equal(starts, 0);
   await page
-    .getByLabel('Ask an MRR question')
+    .getByLabel('Question optional')
     .fill('Why did MRR fall in August 2026 in Germany?');
   await page.getByRole('button', { name: 'Resolve question' }).click();
   await page.getByRole('status').filter({ hasText: 'not supported' }).waitFor();
   assert.equal(starts, 0);
   await page.getByLabel('Reporting month').fill('2026-07');
   await page
-    .getByLabel('Ask an MRR question')
+    .getByLabel('Question optional')
     .fill('Why did MRR fall in August 2026?');
   await page.getByRole('button', { name: 'Resolve question' }).click();
   await page.getByRole('status').filter({ hasText: 'Resolved MRR' }).waitFor();
@@ -356,12 +367,7 @@ test('country follow-up action and bounded phrase show compared values and prote
   });
   assert.match(await table.textContent(), /Previous MRR.*Current MRR.*Change/);
   assert.match(await table.textContent(), /EUR -1700.00/);
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-  );
+  await assertNoHorizontalOverflow(page);
   const requestPromise = page.waitForRequest((request) =>
     request.url().includes('/evidence/'),
   );
@@ -377,6 +383,7 @@ test('country follow-up action and bounded phrase show compared values and prote
     await page.locator('#evidence-detail').textContent(),
     /country_change/,
   );
+  await page.getByText('Use a follow-up question').click();
   await page
     .getByLabel('Follow-up question', { exact: true })
     .fill('Break that down by country in September 2026');
@@ -457,12 +464,7 @@ test('synthetic country account drill-down shows cited contributions and uses a 
     await page.evaluate(() => localStorage.length + sessionStorage.length),
     0,
   );
-  assert.equal(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    ),
-    true,
-  );
+  await assertNoHorizontalOverflow(page);
   await page.screenshot({
     path: '/tmp/executive-bi-customer-mobile.png',
     fullPage: true,

@@ -202,7 +202,7 @@ function App() {
   }
   function claim(item: Claim, index = 0) {
     return (
-      <div className="border-t border-[#e3eae6] py-3.5" key={index}>
+      <div className="claim" key={index}>
         <small>{item.classification.replaceAll('_', ' ')}</small>
         <p>{item.text}</p>
         <div className="flex flex-wrap gap-2">
@@ -221,34 +221,25 @@ function App() {
     );
   }
   return (
-    <main className="mx-auto max-w-[1040px] px-3.5 py-6 min-[601px]:px-6 min-[601px]:py-12">
-      <header className="pt-5 pb-9">
-        <span className="text-[0.8rem] font-bold tracking-[0.15em]">
-          NORTHSTAR / EXECUTIVE BI
-        </span>
-        <span className="mt-3 block w-fit rounded-full border border-[#657d75] px-3 py-[3px] text-[0.8rem] min-[601px]:ml-4 min-[601px]:mt-0 min-[601px]:inline-block">
-          Synthetic data
-        </span>
-        <h1 className="mt-7 mb-[18px] max-w-[720px] text-[clamp(2rem,5vw,3.4rem)] leading-[1.15] font-bold">
-          Understand your MRR movement.
-        </h1>
-        <p>
-          Investigate a reporting month with trusted metrics and inspectable
-          company evidence.
-        </p>
+    <main className="workspace">
+      <header className="topbar">
+        <div className="topbar-title">
+          <h1>MRR analysis</h1>
+        </div>
+        <span className="dataset-badge">Synthetic data</span>
       </header>
-      <section
-        className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
-        aria-labelledby="request-heading"
-      >
-        <h2 id="request-heading">MRR investigation</h2>
-        <label className="flex flex-col gap-2 font-semibold">
-          Ask an MRR question
+      <section className="request-panel" aria-labelledby="request-heading">
+        <div className="panel-heading">
+          <span className="eyebrow">01 / REQUEST</span>
+          <h2 id="request-heading">New investigation</h2>
+        </div>
+        <label className="field-label">
+          Question <span className="optional">optional</span>
           <input
             value={question}
             maxLength={1000}
             disabled={busy || resolving}
-            placeholder="Why did MRR fall in August 2026?"
+            placeholder="Why did MRR fall?"
             onChange={(event) => {
               setQuestion(event.target.value);
               setResolution('');
@@ -256,6 +247,7 @@ function App() {
           />
         </label>
         <button
+          className="text-button resolve-button"
           type="button"
           disabled={busy || resolving}
           onClick={async () => {
@@ -282,14 +274,13 @@ function App() {
         >
           Resolve question
         </button>
-        <p role="status" aria-live="polite">
-          {resolution}
-        </p>
-        <form
-          className="grid grid-cols-1 gap-4 min-[601px]:grid-cols-[1fr_2fr] [&>p]:col-span-full [&>p]:m-0 [&>p]:text-[0.9rem]"
-          onSubmit={(event) => void submit(event)}
-        >
-          <label className="flex flex-col gap-2 font-semibold">
+        {resolution && (
+          <p className="inline-status" role="status" aria-live="polite">
+            {resolution}
+          </p>
+        )}
+        <form className="request-form" onSubmit={(event) => void submit(event)}>
+          <label className="field-label">
             Reporting month
             <input
               required
@@ -299,7 +290,7 @@ function App() {
               disabled={busy || resolving}
             />
           </label>
-          <label className="flex flex-col gap-2 font-semibold">
+          <label className="field-label">
             Customer IDs (optional)
             <input
               value={customers}
@@ -309,31 +300,38 @@ function App() {
               disabled={busy || resolving}
             />
           </label>
-          <p id="scope-help">
-            Use comma-separated IDs to restrict this investigation. Leave blank
-            for the full synthetic dataset. July and August 2026 are available;
-            August supports comparison with July.
+          <p id="scope-help" className="field-help">
+            Comma-separated IDs. Blank includes all synthetic customers.
           </p>
-          <button
-            className="w-fit bg-[#174b3a] px-5 py-2.5 text-white"
-            disabled={busy || resolving}
-          >
+          <button className="primary-button" disabled={busy || resolving}>
             {busy ? 'Investigating…' : 'Investigate MRR'}
           </button>
         </form>
-        <p role="status" aria-live="polite">
-          {message}
-        </p>
-        <p className="text-[0.9rem] text-[#50645c]">
-          Access is held only for this page session. Reloading clears the
-          investigation token.
+        {message && (
+          <p className="inline-status" role="status" aria-live="polite">
+            {message}
+          </p>
+        )}
+        <p className="panel-footnote">
+          Available: July–August 2026. Access clears on reload.
         </p>
       </section>
+      {!answer && !busy && !message && (
+        <section className="empty-state" aria-label="Getting started">
+          <span className="eyebrow">ANALYSIS / MRR</span>
+          <h2>Start with a reporting month.</h2>
+          <p>Results and supporting evidence will appear here.</p>
+        </section>
+      )}
       {answer && (
-        <article aria-label="Executive answer">
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
+        <article className="results" aria-label="Executive answer">
+          <section className="result-hero">
+            <div className="result-topline">
+              <span className="eyebrow">02 / RESULT</span>
+              <span className="result-state">Completed</span>
+            </div>
             <h2>Answer</h2>
-            <p className="scope text-[0.9rem] text-[#50645c]">
+            <p className="scope">
               Reporting month: {answer.scope.month.slice(0, 7)} · Comparison:
               previous month · Customers:{' '}
               {answer.scope.permittedCustomerIds.join(', ') ||
@@ -341,93 +339,91 @@ function App() {
             </p>
             {claim(answer.answer)}
           </section>
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
-            <h2>Drivers</h2>
-            {answer.drivers.length ? (
-              answer.drivers.map(claim)
-            ) : (
-              <p>No negative customer movements were found.</p>
-            )}
-          </section>
-          <section
-            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
-            aria-labelledby="chart-heading"
-          >
-            <h2 id="chart-heading">MRR by plan</h2>
-            {answer.chart ? (
-              <>
-                <p>
-                  Month: {answer.chart.month.slice(0, 7)} · Customers:{' '}
-                  {answer.chart.permittedCustomerIds.join(', ') ||
-                    'Full synthetic dataset'}
-                </p>
-                <p>
-                  {answer.chart.reconciles
-                    ? 'Complete plan breakdown.'
-                    : 'Incomplete breakdown: some MRR has no assigned plan.'}
-                </p>
-                <div aria-hidden="true" className="space-y-3">
-                  {answer.chart.data.map((row) => (
-                    <div key={row.dimensionValue}>
-                      <div className="flex justify-between gap-3">
-                        <span>{row.dimensionValue}</span>
-                        <span>{eur(row.mrrEurCents)}</span>
-                      </div>
-                      <div className="h-5 rounded bg-[#edf2ef]">
-                        <div
-                          className="h-5 rounded bg-[#174b3a]"
-                          style={{
-                            width: `${(row.mrrEurCents / Math.max(1, ...answer.chart!.data.map((item) => item.mrrEurCents))) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <table className="my-4 w-full text-left">
-                  <caption className="text-left font-semibold">
-                    Plan MRR values (EUR)
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Plan</th>
-                      <th scope="col">MRR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+          <div className="analysis-grid">
+            <section className="result-section drivers-section">
+              <h2>Drivers</h2>
+              {answer.drivers.length ? (
+                answer.drivers.map(claim)
+              ) : (
+                <p>No negative customer movements were found.</p>
+              )}
+            </section>
+            <section
+              className="result-section plan-section"
+              aria-labelledby="chart-heading"
+            >
+              <h2 id="chart-heading">MRR by plan</h2>
+              {answer.chart ? (
+                <>
+                  {!answer.chart.reconciles && (
+                    <p className="data-note">
+                      Incomplete breakdown · unassigned MRR shown below.
+                    </p>
+                  )}
+                  <div aria-hidden="true" className="bar-list">
                     {answer.chart.data.map((row) => (
-                      <tr key={row.dimensionValue}>
-                        <th scope="row">{row.dimensionValue}</th>
-                        <td>{eur(row.mrrEurCents)}</td>
-                      </tr>
+                      <div key={row.dimensionValue}>
+                        <div className="flex justify-between gap-3">
+                          <span>{row.dimensionValue}</span>
+                          <span>{eur(row.mrrEurCents)}</span>
+                        </div>
+                        <div className="bar-track">
+                          <div
+                            className="bar-fill"
+                            style={{
+                              width: `${(row.mrrEurCents / Math.max(1, ...answer.chart!.data.map((item) => item.mrrEurCents))) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
                     ))}
-                    {!answer.chart.reconciles && (
+                  </div>
+                  <table className="sr-only">
+                    <caption className="text-left font-semibold">
+                      Plan MRR values (EUR)
+                    </caption>
+                    <thead>
                       <tr>
-                        <th scope="row">Unassigned</th>
-                        <td>{eur(answer.chart.unassignedMrrEurCents)}</td>
+                        <th scope="col">Plan</th>
+                        <th scope="col">MRR</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-                {!answer.chart.data.length && (
-                  <p>No named plan MRR is available.</p>
-                )}
-                <button
-                  type="button"
-                  aria-controls="evidence-detail"
-                  onClick={() => void inspect(answer.chart!.sourceEvidenceId)}
-                >
-                  Inspect chart evidence
-                </button>
-              </>
-            ) : (
-              <p>
-                MRR by plan chart unavailable. Usable breakdown evidence is
-                missing.
-              </p>
-            )}
-          </section>
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
+                    </thead>
+                    <tbody>
+                      {answer.chart.data.map((row) => (
+                        <tr key={row.dimensionValue}>
+                          <th scope="row">{row.dimensionValue}</th>
+                          <td>{eur(row.mrrEurCents)}</td>
+                        </tr>
+                      ))}
+                      {!answer.chart.reconciles && (
+                        <tr>
+                          <th scope="row">Unassigned</th>
+                          <td>{eur(answer.chart.unassignedMrrEurCents)}</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                  {!answer.chart.data.length && (
+                    <p>No named plan MRR is available.</p>
+                  )}
+                  <button
+                    className="text-button"
+                    type="button"
+                    aria-controls="evidence-detail"
+                    onClick={() => void inspect(answer.chart!.sourceEvidenceId)}
+                  >
+                    Inspect chart evidence
+                  </button>
+                </>
+              ) : (
+                <p>
+                  MRR by plan chart unavailable. Usable breakdown evidence is
+                  missing.
+                </p>
+              )}
+            </section>
+          </div>
+          <section className="result-section context-section">
             <h2>Context</h2>
             {answer.context.length ? (
               answer.context.map(claim)
@@ -435,48 +431,52 @@ function App() {
               <p>No scoped company context was retrieved.</p>
             )}
           </section>
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
-            <h2>Limitations</h2>
-            <ul>
-              {answer.limitations.map((text, index) => (
-                <li key={index}>{text}</li>
-              ))}
-            </ul>
-          </section>
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
-            <h2>Evidence</h2>
-            <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
-              {answer.evidence.map((item) => (
-                <li key={item.evidenceId}>
-                  <button
-                    type="button"
-                    onClick={() => void inspect(item.evidenceId)}
-                    aria-controls="evidence-detail"
-                  >
-                    Inspect {item.evidenceId}
-                  </button>
-                  <span>
-                    {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
-                    Freshness: {item.freshness}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6">
+          <section className="result-section next-section">
             <h2>Recommended next step</h2>
             <p>{answer.recommendedNextStep.text}</p>
-            <p>Owner: {answer.recommendedNextStep.owner}</p>
+            <p className="meta-line">
+              Owner: {answer.recommendedNextStep.owner}
+            </p>
           </section>
+          <details className="supporting-details">
+            <summary>
+              Sources & limitations{' '}
+              <span>{answer.evidence.length} sources</span>
+            </summary>
+            <section className="supporting-section">
+              <h2>Limitations</h2>
+              <ul>
+                {answer.limitations.map((text, index) => (
+                  <li key={index}>{text}</li>
+                ))}
+              </ul>
+            </section>
+            <section className="supporting-section">
+              <h2>Evidence</h2>
+              <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
+                {answer.evidence.map((item) => (
+                  <li key={item.evidenceId}>
+                    <button
+                      type="button"
+                      onClick={() => void inspect(item.evidenceId)}
+                      aria-controls="evidence-detail"
+                    >
+                      Inspect {item.evidenceId}
+                    </button>
+                    <span>
+                      {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
+                      Freshness: {item.freshness}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </details>
           <section
-            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
+            className="result-section follow-section"
             aria-labelledby="country-heading"
           >
-            <h2 id="country-heading">Country comparison follow-up</h2>
-            <p>
-              Compare the same reporting months and customer scope as this
-              investigation.
-            </p>
+            <h2 id="country-heading">Country comparison</h2>
             <button
               type="button"
               disabled={busy || resolving}
@@ -484,30 +484,35 @@ function App() {
             >
               Break down by country
             </button>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void followUp(followQuestion);
-              }}
-            >
-              <label className="flex flex-col gap-2 font-semibold">
-                Follow-up question
-                <input
-                  value={followQuestion}
-                  maxLength={1000}
-                  disabled={busy || resolving}
-                  placeholder="Break that down by country"
-                  onChange={(event) => setFollowQuestion(event.target.value)}
-                />
-              </label>
-              <button disabled={busy || resolving}>Run follow-up</button>
-            </form>
-            <p role="status" aria-live="polite">
-              {followMessage}
-            </p>
+            <details className="phrase-details">
+              <summary>Use a follow-up question</summary>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void followUp(followQuestion);
+                }}
+              >
+                <label className="flex flex-col gap-2 font-semibold">
+                  Follow-up question
+                  <input
+                    value={followQuestion}
+                    maxLength={1000}
+                    disabled={busy || resolving}
+                    placeholder="Break that down by country"
+                    onChange={(event) => setFollowQuestion(event.target.value)}
+                  />
+                </label>
+                <button disabled={busy || resolving}>Run follow-up</button>
+              </form>
+            </details>
+            {followMessage && (
+              <p className="inline-status" role="status" aria-live="polite">
+                {followMessage}
+              </p>
+            )}
             {followAnswer && (
               <>
-                <p>
+                <p className="meta-line">
                   Previous month:{' '}
                   {followAnswer.comparison.previousMonth.slice(0, 7)} · Current
                   month: {followAnswer.comparison.currentMonth.slice(0, 7)} ·
@@ -515,26 +520,12 @@ function App() {
                   {followAnswer.permittedCustomerIds.join(', ') ||
                     'Full synthetic dataset'}
                 </p>
-                <p>Ranked by signed MRR change, largest loss first.</p>
-                <div aria-hidden="true" className="space-y-3">
-                  {followAnswer.comparison.rows.map((row) => (
-                    <div key={row.country ?? 'unassigned'}>
-                      <div className="flex justify-between gap-3">
-                        <span>{row.country ?? 'Unassigned country'}</span>
-                        <span>{eur(row.mrrChangeEurCents)}</span>
-                      </div>
-                      <div className="h-5 rounded bg-[#edf2ef]">
-                        <div
-                          className={`h-5 rounded ${row.mrrChangeEurCents < 0 ? 'bg-[#a33b32]' : 'bg-[#174b3a]'}`}
-                          style={{
-                            width: `${(Math.abs(row.mrrChangeEurCents) / Math.max(1, ...followAnswer.comparison.rows.map((item) => Math.abs(item.mrrChangeEurCents)))) * 100}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="overflow-x-auto">
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Country comparison table"
+                >
                   <table className="my-4 w-full text-left">
                     <caption className="text-left font-semibold">
                       Country MRR comparison (EUR)
@@ -618,149 +609,159 @@ function App() {
                     <li key={text}>{text}</li>
                   ))}
                 </ul>
-                <p>
-                  Stored follow-up: {followAnswer.investigationId} · Parent:{' '}
-                  {followAnswer.parentInvestigationId}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {followAnswer.evidence.map((item) => (
-                    <button
-                      type="button"
-                      key={item.evidenceId}
-                      onClick={() =>
-                        void inspect(item.evidenceId, followSession.current)
-                      }
-                      aria-controls="evidence-detail"
-                    >
-                      Inspect country evidence {item.evidenceId}
-                    </button>
-                  ))}
-                </div>
+                <details className="supporting-details nested-details">
+                  <summary>Country sources</summary>
+                  <div className="source-actions">
+                    {followAnswer.evidence.map((item) => (
+                      <button
+                        type="button"
+                        key={item.evidenceId}
+                        onClick={() =>
+                          void inspect(item.evidenceId, followSession.current)
+                        }
+                        aria-controls="evidence-detail"
+                      >
+                        Inspect country evidence {item.evidenceId}
+                      </button>
+                    ))}
+                  </div>
+                </details>
               </>
             )}
           </section>
-          <section
-            id="customer-drilldown"
-            aria-labelledby="customer-heading"
-            aria-busy={busy}
-            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6"
-          >
-            <h2 id="customer-heading">Customer contributions</h2>
-            <p role="status" aria-live="polite">
-              {customerMessage}
-            </p>
-            {customerAnswer && (
-              <>
-                <h3>
-                  {customerAnswer.contributions.country ?? 'Unassigned country'}{' '}
-                  · {customerAnswer.contributions.previousMonth.slice(0, 7)} →{' '}
-                  {customerAnswer.contributions.currentMonth.slice(0, 7)}
-                </h3>
-                <div
-                  className="overflow-x-auto"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Customer contributions table"
-                >
-                  <table className="my-4 w-full min-w-[620px] text-left">
-                    <caption className="text-left font-semibold">
-                      Five largest negative customer contributions (EUR)
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Customer</th>
-                        <th scope="col">Previous MRR</th>
-                        <th scope="col">Current MRR</th>
-                        <th scope="col">Contribution</th>
-                        <th scope="col">Evidence</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customerAnswer.contributions.largestLosses.map((row) => (
-                        <tr key={row.customerId}>
-                          <th scope="row">{row.customerId}</th>
-                          <td>{eur(row.previousMrrEurCents)}</td>
-                          <td>{eur(row.currentMrrEurCents)}</td>
-                          <td>{eur(row.mrrChangeEurCents)}</td>
-                          <td>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void inspect(
-                                  customerAnswer.sourceEvidenceIds[2]!,
-                                  customerSession.current,
-                                )
-                              }
-                              aria-controls="evidence-detail"
-                            >
-                              Inspect contribution {row.customerId}
-                            </button>
-                          </td>
+          {(followAnswer || customerMessage || customerAnswer) && (
+            <section
+              id="customer-drilldown"
+              aria-labelledby="customer-heading"
+              aria-busy={busy}
+              className="result-section customer-section"
+            >
+              <h2 id="customer-heading">Customer contributions</h2>
+              <p role="status" aria-live="polite">
+                {customerMessage}
+              </p>
+              {customerAnswer && (
+                <>
+                  <h3>
+                    {customerAnswer.contributions.country ??
+                      'Unassigned country'}{' '}
+                    · {customerAnswer.contributions.previousMonth.slice(0, 7)} →{' '}
+                    {customerAnswer.contributions.currentMonth.slice(0, 7)}
+                  </h3>
+                  <div
+                    className="overflow-x-auto"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Customer contributions table"
+                  >
+                    <table className="my-4 w-full min-w-[620px] text-left">
+                      <caption className="text-left font-semibold">
+                        Five largest negative customer contributions (EUR)
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Customer</th>
+                          <th scope="col">Previous MRR</th>
+                          <th scope="col">Current MRR</th>
+                          <th scope="col">Contribution</th>
+                          <th scope="col">Evidence</th>
                         </tr>
+                      </thead>
+                      <tbody>
+                        {customerAnswer.contributions.largestLosses.map(
+                          (row) => (
+                            <tr key={row.customerId}>
+                              <th scope="row">{row.customerId}</th>
+                              <td>{eur(row.previousMrrEurCents)}</td>
+                              <td>{eur(row.currentMrrEurCents)}</td>
+                              <td>{eur(row.mrrChangeEurCents)}</td>
+                              <td>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void inspect(
+                                      customerAnswer.sourceEvidenceIds[2]!,
+                                      customerSession.current,
+                                    )
+                                  }
+                                  aria-controls="evidence-detail"
+                                >
+                                  Inspect contribution {row.customerId}
+                                </button>
+                              </td>
+                            </tr>
+                          ),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                  {customerAnswer.contributions.largestLosses.length === 0 && (
+                    <p>No negative customer contributions in this country.</p>
+                  )}
+                  <dl>
+                    <dt>Positive offsets</dt>
+                    <dd>
+                      {eur(
+                        customerAnswer.contributions.positiveOffsetsEurCents,
+                      )}
+                    </dd>
+                    <dt>Remaining net movement</dt>
+                    <dd>
+                      {eur(
+                        customerAnswer.contributions
+                          .remainingNetMovementEurCents,
+                      )}
+                    </dd>
+                    <dt>Country MRR: previous → current</dt>
+                    <dd>
+                      {eur(customerAnswer.contributions.previousMrrEurCents)} →{' '}
+                      {eur(customerAnswer.contributions.currentMrrEurCents)}
+                    </dd>
+                    <dt>Country net movement</dt>
+                    <dd>
+                      {eur(customerAnswer.contributions.mrrChangeEurCents)}
+                    </dd>
+                  </dl>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void inspect(
+                        customerAnswer.sourceEvidenceIds[2]!,
+                        customerSession.current,
+                      )
+                    }
+                    aria-controls="evidence-detail"
+                  >
+                    Inspect offsets, remainder and country totals
+                  </button>
+                  <ul>
+                    {customerAnswer.limitations.map((text) => (
+                      <li key={text}>{text}</li>
+                    ))}
+                  </ul>
+                  <details className="supporting-details nested-details">
+                    <summary>Customer sources</summary>
+                    <div className="source-actions">
+                      {customerAnswer.sourceEvidenceIds.map((id) => (
+                        <button
+                          type="button"
+                          key={id}
+                          onClick={() =>
+                            void inspect(id, customerSession.current)
+                          }
+                          aria-controls="evidence-detail"
+                        >
+                          Inspect customer evidence {id}
+                        </button>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-                {customerAnswer.contributions.largestLosses.length === 0 && (
-                  <p>No negative customer contributions in this country.</p>
-                )}
-                <dl>
-                  <dt>Positive offsets</dt>
-                  <dd>
-                    {eur(customerAnswer.contributions.positiveOffsetsEurCents)}
-                  </dd>
-                  <dt>Remaining net movement</dt>
-                  <dd>
-                    {eur(
-                      customerAnswer.contributions.remainingNetMovementEurCents,
-                    )}
-                  </dd>
-                  <dt>Country MRR: previous → current</dt>
-                  <dd>
-                    {eur(customerAnswer.contributions.previousMrrEurCents)} →{' '}
-                    {eur(customerAnswer.contributions.currentMrrEurCents)}
-                  </dd>
-                  <dt>Country net movement</dt>
-                  <dd>{eur(customerAnswer.contributions.mrrChangeEurCents)}</dd>
-                </dl>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void inspect(
-                      customerAnswer.sourceEvidenceIds[2]!,
-                      customerSession.current,
-                    )
-                  }
-                  aria-controls="evidence-detail"
-                >
-                  Inspect offsets, remainder and country totals
-                </button>
-                <ul>
-                  {customerAnswer.limitations.map((text) => (
-                    <li key={text}>{text}</li>
-                  ))}
-                </ul>
-                <p>
-                  Stored drill-down: {customerAnswer.investigationId} · Parent:{' '}
-                  {customerAnswer.parentInvestigationId}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {customerAnswer.sourceEvidenceIds.map((id) => (
-                    <button
-                      type="button"
-                      key={id}
-                      onClick={() => void inspect(id, customerSession.current)}
-                      aria-controls="evidence-detail"
-                    >
-                      Inspect customer evidence {id}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
+                    </div>
+                  </details>
+                </>
+              )}
+            </section>
+          )}
           {record && (
-            <details className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6">
+            <details className="supporting-details trail-details">
               <summary className="cursor-pointer font-semibold">
                 How this answer was generated
               </summary>
@@ -795,43 +796,45 @@ function App() {
           )}
         </article>
       )}
-      <section
-        className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
-        id="evidence-detail"
-        aria-labelledby="evidence-heading"
-        aria-busy={evidenceBusy}
-      >
-        <h2 id="evidence-heading" ref={evidenceHeading} tabIndex={-1}>
-          Evidence detail
-        </h2>
-        <p role="status">
-          {evidenceBusy ? 'Loading protected evidence…' : evidenceError}
-        </p>
-        {evidence ? (
-          <>
-            <h3>{evidence.sourceRef}</h3>
-            <dl>
-              <dt>Evidence ID</dt>
-              <dd>{evidence.evidenceId}</dd>
-              <dt>Source</dt>
-              <dd>{evidence.source}</dd>
-              <dt>Freshness</dt>
-              <dd>{evidence.freshness}</dd>
-              <dt>Integrity</dt>
-              <dd>{evidence.integrity}</dd>
-            </dl>
-            <h3>Scope</h3>
-            <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
-            <h3>Supporting values or document excerpt</h3>
-            <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
-          </>
-        ) : (
-          !evidenceBusy &&
-          !evidenceError && (
-            <p>Open a citation to inspect its supporting evidence.</p>
-          )
-        )}
-      </section>
+      {(evidence || evidenceBusy || evidenceError) && (
+        <section
+          className="evidence-panel"
+          id="evidence-detail"
+          aria-labelledby="evidence-heading"
+          aria-busy={evidenceBusy}
+        >
+          <h2 id="evidence-heading" ref={evidenceHeading} tabIndex={-1}>
+            Evidence detail
+          </h2>
+          <p role="status">
+            {evidenceBusy ? 'Loading protected evidence…' : evidenceError}
+          </p>
+          {evidence ? (
+            <>
+              <h3>{evidence.sourceRef}</h3>
+              <dl>
+                <dt>Evidence ID</dt>
+                <dd>{evidence.evidenceId}</dd>
+                <dt>Source</dt>
+                <dd>{evidence.source}</dd>
+                <dt>Freshness</dt>
+                <dd>{evidence.freshness}</dd>
+                <dt>Integrity</dt>
+                <dd>{evidence.integrity}</dd>
+              </dl>
+              <h3>Scope</h3>
+              <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
+              <h3>Supporting values or document excerpt</h3>
+              <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
+            </>
+          ) : (
+            !evidenceBusy &&
+            !evidenceError && (
+              <p>Open a citation to inspect its supporting evidence.</p>
+            )
+          )}
+        </section>
+      )}
     </main>
   );
 }
