@@ -26,7 +26,10 @@ The interface validates responses with shared schemas and presents the answer,
 drivers, plan breakdown, context, and recommended next step in a clear reading
 order. Limitations, source inventory, and the retained plan use keyboard-operable
 disclosures so they remain inspectable without crowding the result. The header
-uses plain MRR language without company branding; synthetic labeling stays visible.
+uses plain MRR language without company branding or a dataset badge. A wider
+request panel sits to the right of a continuous result surface on desktop; on
+narrow screens the request comes first. Thin rules separate result sections.
+Fixture and source provenance remain in their records.
 It shows the resolved month, previous-month comparison, and customer scope.
 Every supplied claim citation opens the authenticated evidence route. Evidence
 shows source references, scope, freshness, integrity, and supporting content.
@@ -81,7 +84,8 @@ backend. No upstream destination is accepted from browser input.
 Submission and evidence loading states are announced. Invalid form scope,
 blocked evidence, unavailable services, and failed evidence reads have visible
 outcomes that allow retry. Inputs and citations support keyboard use and narrow
-screens. Synthetic data labeling remains visible.
+screens. The interface does not expose a synthetic-data badge; the data and
+evidence records retain their synthetic provenance.
 
 General natural-language resolution, new metrics, additional chart types, SSE streaming, production
 identity/tenant authorization, and NestJS migration remain planned scope.

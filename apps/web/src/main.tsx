@@ -88,7 +88,7 @@ function App() {
       setAnswer(
         await readAnswer(result.record.investigationId, result.accessToken),
       );
-      setMessage('Investigation complete.');
+      setMessage('');
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -226,11 +226,9 @@ function App() {
         <div className="topbar-title">
           <h1>MRR analysis</h1>
         </div>
-        <span className="dataset-badge">Synthetic data</span>
       </header>
       <section className="request-panel" aria-labelledby="request-heading">
         <div className="panel-heading">
-          <span className="eyebrow">01 / REQUEST</span>
           <h2 id="request-heading">New investigation</h2>
         </div>
         <label className="field-label">
@@ -301,7 +299,7 @@ function App() {
             />
           </label>
           <p id="scope-help" className="field-help">
-            Comma-separated IDs. Blank includes all synthetic customers.
+            Comma-separated IDs. Leave blank for all customers.
           </p>
           <button className="primary-button" disabled={busy || resolving}>
             {busy ? 'Investigating…' : 'Investigate MRR'}
@@ -318,7 +316,6 @@ function App() {
       </section>
       {!answer && !busy && !message && (
         <section className="empty-state" aria-label="Getting started">
-          <span className="eyebrow">ANALYSIS / MRR</span>
           <h2>Start with a reporting month.</h2>
           <p>Results and supporting evidence will appear here.</p>
         </section>
@@ -326,16 +323,11 @@ function App() {
       {answer && (
         <article className="results" aria-label="Executive answer">
           <section className="result-hero">
-            <div className="result-topline">
-              <span className="eyebrow">02 / RESULT</span>
-              <span className="result-state">Completed</span>
-            </div>
             <h2>Answer</h2>
             <p className="scope">
               Reporting month: {answer.scope.month.slice(0, 7)} · Comparison:
               previous month · Customers:{' '}
-              {answer.scope.permittedCustomerIds.join(', ') ||
-                'Full synthetic dataset'}
+              {answer.scope.permittedCustomerIds.join(', ') || 'All customers'}
             </p>
             {claim(answer.answer)}
           </section>
@@ -518,7 +510,7 @@ function App() {
                   month: {followAnswer.comparison.currentMonth.slice(0, 7)} ·
                   Customers:{' '}
                   {followAnswer.permittedCustomerIds.join(', ') ||
-                    'Full synthetic dataset'}
+                    'All customers'}
                 </p>
                 <div
                   className="table-scroll"

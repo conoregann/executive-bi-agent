@@ -72,10 +72,19 @@ test('synthetic investigation renders all answer sections and protected citation
   page.on('pageerror', (error) => errors.push(error.message));
   assert.equal(await page.title(), 'MRR analysis');
   assert.equal(
-    await page.getByText(/Northstar|Understand your MRR movement/i).count(),
+    await page
+      .getByText(
+        /Northstar|Understand your MRR movement|Synthetic data|01 \/ REQUEST|02 \/ RESULT/i,
+      )
+      .count(),
     0,
   );
   await complete(page);
+  assert.equal(await page.getByText('Completed', { exact: true }).count(), 0);
+  const requestBox = await page.locator('.request-panel').boundingBox();
+  const resultBox = await page.locator('.results').boundingBox();
+  assert.ok(requestBox.x > resultBox.x);
+  assert.ok(requestBox.width >= 320);
   await page.getByText('Sources & limitations').click();
   for (const name of [
     'Answer',
