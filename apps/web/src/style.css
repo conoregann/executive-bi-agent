@@ -337,8 +337,55 @@ td button,
 .context-section,
 .next-section,
 .follow-section,
-.customer-section {
+.customer-section,
+.waterfall-section,
+.cross-section {
   grid-column: 1 / -1;
+}
+.waterfall-section svg {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  margin: 4px 0 14px;
+  overflow: visible;
+}
+.waterfall-section svg text {
+  fill: #5e5e58;
+  font-family: var(--font-sans);
+}
+.cross-section .source-actions {
+  border-top: 0;
+  padding: 0 0 14px;
+}
+.cross-section .source-actions button {
+  border: 1px solid #aaa9a1;
+  padding: 8px 12px;
+}
+.cross-source {
+  border-top: 1px solid #d5d5cf;
+  padding: 18px 0 22px;
+}
+.cross-source blockquote {
+  max-width: 760px;
+  margin: 10px 0;
+  color: #474741;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.cross-source .table-scroll {
+  width: 100%;
+}
+.cross-source table {
+  min-width: 650px;
+}
+.cross-source td:last-child {
+  max-width: 280px;
+  white-space: normal;
+}
+.cross-source button {
+  display: inline-block;
+  margin-right: 12px;
 }
 .context-section .claim {
   max-width: 760px;

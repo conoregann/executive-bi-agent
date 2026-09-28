@@ -112,7 +112,7 @@ Completed MRR answers show a reconciled revenue-movement waterfall with a value
 table and evidence inspection. Cross-source actions use the selected customer
 drill-down when present, otherwise the initial MRR investigation. Busy status
 and the retained approved plan identify the contextual investigation; execution
-remains synchronous without streaming. CRM, support and usage cards show source
+remains synchronous without streaming. CRM, support and usage sections show source
 records, deterministic active-user deltas, coverage and freshness, document
 excerpts, tentative model hypotheses and explicit limitations. Each contextual
 child has a separate evidence token. Parent answers remain visible. See the

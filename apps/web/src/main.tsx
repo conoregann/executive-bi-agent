@@ -373,6 +373,85 @@ function App() {
             </p>
             {claim(answer.answer)}
           </section>
+          {answer.waterfall && (
+            <section
+              className="result-section waterfall-section"
+              aria-labelledby="waterfall-heading"
+            >
+              <h2 id="waterfall-heading">Revenue movement waterfall</h2>
+              <svg
+                viewBox="0 0 720 300"
+                role="img"
+                aria-label="Reconciled MRR movement from previous to current month"
+              >
+                {answer.waterfall.data.map((row, index) => {
+                  const max = Math.max(
+                    1,
+                    ...answer.waterfall!.data.flatMap((item) => [
+                      item.startEurCents,
+                      item.endEurCents,
+                    ]),
+                  );
+                  const scale = 220 / max;
+                  return (
+                    <g key={row.label}>
+                      <rect
+                        x={index * 120 + 20}
+                        y={
+                          250 -
+                          Math.max(row.startEurCents, row.endEurCents) * scale
+                        }
+                        width="70"
+                        height={Math.max(
+                          1,
+                          Math.abs(row.endEurCents - row.startEurCents) * scale,
+                        )}
+                        fill={row.valueEurCents < 0 ? '#a64f27' : '#777770'}
+                      />
+                      <text
+                        x={index * 120 + 55}
+                        y="280"
+                        textAnchor="middle"
+                        fontSize="12"
+                      >
+                        {row.label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+              <div
+                className="table-scroll"
+                tabIndex={0}
+                role="region"
+                aria-label="Revenue movement values"
+              >
+                <table>
+                  <caption>Deterministic revenue movement in EUR</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Movement</th>
+                      <th scope="col">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {answer.waterfall.data.map((row) => (
+                      <tr key={row.label}>
+                        <th scope="row">{row.label}</th>
+                        <td>{eur(row.valueEurCents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <button
+                type="button"
+                onClick={() => void inspect(answer.waterfall!.sourceEvidenceId)}
+              >
+                Inspect waterfall evidence
+              </button>
+            </section>
+          )}
           <div className="analysis-grid">
             <section className="result-section drivers-section">
               <h2>Drivers</h2>
@@ -794,6 +873,189 @@ function App() {
               )}
             </section>
           )}
+          <section
+            className="result-section cross-section"
+            aria-label="Cross-source revenue investigation"
+            aria-busy={busy}
+          >
+            <h2>Cross-source revenue investigation</h2>
+            <div className="source-actions">
+              {[
+                'Investigate revenue losses across sources',
+                'Did those accounts have support escalations or declining usage?',
+                'What evidence supports a pricing-related explanation?',
+              ].map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void crossSource(text)}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            {crossMessage && (
+              <p className="inline-status" role="status" aria-live="polite">
+                {crossMessage}
+              </p>
+            )}
+            {crossAnswer && (
+              <div className="cross-results">
+                <p className="meta-line">
+                  Accounts:{' '}
+                  {crossAnswer.record.customerIds.join(', ') ||
+                    'No retained losses'}
+                </p>
+                <p className="meta-line">
+                  Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
+                  Planner: {crossAnswer.record.plan.planner} · Model synthesis:{' '}
+                  {crossAnswer.record.modelStatus}
+                </p>
+                {crossAnswer.evidence
+                  .filter(
+                    (item) => item.source === 'synthetic_operational_records',
+                  )
+                  .map((item) => (
+                    <div className="cross-source" key={item.evidenceId}>
+                      <h3>{String(item.scope.source)} evidence</h3>
+                      <p className="meta-line">
+                        Freshness: {item.freshness} · Missing coverage:{' '}
+                        {Array.isArray(item.content.missingCustomerIds)
+                          ? item.content.missingCustomerIds.join(', ') || 'None'
+                          : 'Unavailable'}{' '}
+                        · Stale coverage:{' '}
+                        {Array.isArray(item.content.staleCustomerIds)
+                          ? item.content.staleCustomerIds.join(', ') || 'None'
+                          : 'Unavailable'}
+                      </p>
+                      <div
+                        className="table-scroll"
+                        tabIndex={0}
+                        role="region"
+                        aria-label={`${String(item.scope.source)} records`}
+                      >
+                        <table>
+                          <caption>Observed operational records</caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Account</th>
+                              <th scope="col">Month</th>
+                              <th scope="col">Category</th>
+                              <th scope="col">Active users</th>
+                              <th scope="col">Source excerpt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Array.isArray(item.content.rows) &&
+                              item.content.rows.map((row) => (
+                                <tr key={row.recordId}>
+                                  <td>{row.customerId}</td>
+                                  <td>{row.month}</td>
+                                  <td>{row.category}</td>
+                                  <td>{row.activeUsers ?? 'Not applicable'}</td>
+                                  <td>{row.note}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {Array.isArray(item.content.usageComparisons) && (
+                        <ul>
+                          {item.content.usageComparisons.map((row) => (
+                            <li key={row.customerId}>
+                              {row.customerId}: active users{' '}
+                              {row.previousActiveUsers ?? 'Missing'} →{' '}
+                              {row.currentActiveUsers ?? 'Missing'}, change{' '}
+                              {row.activeUserChange ?? 'Unavailable'}.
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void inspect(item.evidenceId, crossSession.current)
+                        }
+                      >
+                        Inspect {String(item.scope.source)} query evidence
+                      </button>
+                    </div>
+                  ))}
+                {crossAnswer.evidence
+                  .filter((item) => item.type === 'document_chunk')
+                  .map((item) => (
+                    <div className="cross-source" key={item.evidenceId}>
+                      <h3>Document context</h3>
+                      <blockquote>
+                        {String(item.content.excerpt ?? '')}
+                      </blockquote>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void inspect(item.evidenceId, crossSession.current)
+                        }
+                      >
+                        Inspect document {item.sourceRef}
+                      </button>
+                    </div>
+                  ))}
+                <div className="cross-source">
+                  <h3>Tentative hypotheses</h3>
+                  {crossAnswer.record.hypotheses.length === 0 && (
+                    <p>
+                      No validated model explanation is available. Review the
+                      observed records and document excerpts.
+                    </p>
+                  )}
+                  {crossAnswer.record.hypotheses.map((hypothesis, index) => (
+                    <div key={index}>
+                      <p>
+                        {hypothesis.kind} may be relevant to the retained
+                        losses; causality is unconfirmed.
+                      </p>
+                      <p>Supporting references:</p>
+                      {hypothesis.supportingEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                      <p>Contradictory references:</p>
+                      {hypothesis.contradictoryEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div className="cross-source">
+                  <h3>Coverage and limitations</h3>
+                  <ul>
+                    {crossAnswer.record.warnings.map((text, index) => (
+                      <li key={index}>{text}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void inspect('cross_parent', crossSession.current)
+                    }
+                  >
+                    Inspect retained revenue and parent provenance
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
           {record && (
             <details className="supporting-details trail-details">
               <summary className="cursor-pointer font-semibold">
