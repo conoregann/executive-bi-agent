@@ -30,7 +30,7 @@ export async function startInvestigation(month: string, customers: string) {
     .filter(Boolean);
   if (customers.trim() && !ids.length)
     throw new Error(
-      'Enter customer IDs or clear the scope field for the full synthetic dataset.',
+      'Enter customer IDs or clear the scope field for all customers.',
     );
   const request = mrrDeclineRequestSchema.safeParse({
     investigationId: crypto.randomUUID(),

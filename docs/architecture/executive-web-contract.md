@@ -23,7 +23,15 @@ The structured form remains available independently.
 ## Answers and evidence
 
 The interface validates responses with shared schemas and presents the answer,
-drivers, context, limitations, evidence, and recommended next step in order.
+drivers, plan breakdown, context, and recommended next step in a clear reading
+order. Limitations, source inventory, and the retained plan use keyboard-operable
+disclosures so they remain inspectable without crowding the result. The header
+uses plain MRR language without company branding or a dataset badge. The request
+panel sits to the left of a continuous result surface on desktop. A keyboard
+operable control in the header hides the panel fully and restores it without clearing form
+state; collapsed inputs are not focusable. On narrow screens the request comes
+first. Thin rules separate result sections.
+Fixture and source provenance remain in their records.
 It shows the resolved month, previous-month comparison, and customer scope.
 Every supplied claim citation opens the authenticated evidence route. Evidence
 shows source references, scope, freshness, integrity, and supporting content.
@@ -58,9 +66,9 @@ form. Loading, unsupported wording, blocked results and service failures are
 announced and permit retry. A blocked child shows its retained identifier and
 warnings; it does not display invented values.
 
-The child displays previous/current month labels, exact customer scope, a chart
-of signed country-total changes (largest loss first), and an accessible table of
-previous MRR, current MRR and change. Missing dimensions show an explicit
+The child displays previous/current month labels, exact customer scope, and a
+scrollable table of signed country-total changes (largest loss first), previous
+MRR, and current MRR. Missing dimensions show an explicit
 unassigned-country row and limitation. Row and total citations open the child's
 retained calculation; its input queries and parent total snapshots are also
 inspectable. Separate page-memory tokens protect parent and child citations.
@@ -78,7 +86,8 @@ backend. No upstream destination is accepted from browser input.
 Submission and evidence loading states are announced. Invalid form scope,
 blocked evidence, unavailable services, and failed evidence reads have visible
 outcomes that allow retry. Inputs and citations support keyboard use and narrow
-screens. Synthetic data labeling remains visible.
+screens. The interface does not expose a synthetic-data badge; the data and
+evidence records retain their synthetic provenance.
 
 General natural-language resolution, new metrics, additional chart types, SSE streaming, production
 identity/tenant authorization, and NestJS migration remain planned scope.
@@ -105,7 +114,7 @@ Completed MRR answers show a reconciled revenue-movement waterfall with a value
 table and evidence inspection. Cross-source actions use the selected customer
 drill-down when present, otherwise the initial MRR investigation. Busy status
 and the retained approved plan identify the contextual investigation; execution
-remains synchronous without streaming. CRM, support and usage cards show source
+remains synchronous without streaming. CRM, support and usage sections show source
 records, deterministic active-user deltas, coverage and freshness, document
 excerpts, tentative model hypotheses and explicit limitations. Each contextual
 child has a separate evidence token. Parent answers remain visible. See the
