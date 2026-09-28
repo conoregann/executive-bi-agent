@@ -146,6 +146,19 @@ test('synthetic churn follow-up inherits exact customer scope and rejects overri
       'cust_acme',
       'cust_london',
     ]);
+  const original = store.get.bind(store);
+  store.get = async (id) => {
+    const stored = await original(id);
+    if (id === 'scoped-churn') {
+      stored.evidence[1].content.activeCustomerIds.push('outside_scope');
+      stored.evidence[1].content.activeCustomers += 1;
+    }
+    return stored;
+  };
+  assert.equal(
+    (await api.fetch(request('scoped-churn/answer', child.accessToken))).status,
+    422,
+  );
 });
 
 test('synthetic retained churn evidence tampering blocks answers', async () => {

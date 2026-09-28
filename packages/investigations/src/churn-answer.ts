@@ -96,7 +96,11 @@ export function synthesizeChurnFollowUpAnswer(
       (item) =>
         Array.isArray(ids(item)) &&
         (ids(item) as unknown[]).every(
-          (id) => typeof id === 'string' && id.length > 0,
+          (id) =>
+            typeof id === 'string' &&
+            id.length > 0 &&
+            (record.permittedCustomerIds.length === 0 ||
+              record.permittedCustomerIds.includes(id)),
         ) &&
         new Set(ids(item) as string[]).size ===
           (ids(item) as string[]).length &&
