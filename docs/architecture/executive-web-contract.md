@@ -28,7 +28,7 @@ order. Limitations, source inventory, and the retained plan use keyboard-operabl
 disclosures so they remain inspectable without crowding the result. The header
 uses plain MRR language without company branding or a dataset badge. The request
 panel sits to the left of a continuous result surface on desktop. A keyboard
-operable rail slides the panel fully away and restores it without clearing form
+operable control in the header hides the panel fully and restores it without clearing form
 state; collapsed inputs are not focusable. On narrow screens the request comes
 first. Thin rules separate result sections.
 Fixture and source provenance remain in their records.

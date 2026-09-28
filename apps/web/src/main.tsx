@@ -266,6 +266,23 @@ function App() {
   return (
     <main className="workspace" data-panel-open={requestOpen}>
       <header className="topbar">
+        <button
+          className="panel-toggle"
+          type="button"
+          aria-label={requestOpen ? 'Hide request panel' : 'Show request panel'}
+          aria-controls="request-panel"
+          aria-expanded={requestOpen}
+          title={requestOpen ? 'Hide request panel' : 'Show request panel'}
+          onClick={() => setRequestOpen((open) => !open)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M9 4v16" />
+            {requestOpen && (
+              <path className="panel-toggle-fill" d="M4 5h4v14H4z" />
+            )}
+          </svg>
+        </button>
         <div className="topbar-title">
           <h1>MRR analysis</h1>
         </div>
@@ -363,18 +380,6 @@ function App() {
           Available: July–August 2026. Access clears on reload.
         </p>
       </section>
-      <div className="panel-rail">
-        <button
-          className="panel-toggle"
-          type="button"
-          aria-label={requestOpen ? 'Hide request panel' : 'Show request panel'}
-          aria-controls="request-panel"
-          aria-expanded={requestOpen}
-          onClick={() => setRequestOpen((open) => !open)}
-        >
-          <span aria-hidden="true">{requestOpen ? '‹' : '›'}</span>
-        </button>
-      </div>
       {!answer && !busy && !message && (
         <section className="empty-state" aria-label="Getting started">
           <h2>Start with a reporting month.</h2>
@@ -425,13 +430,13 @@ function App() {
                           1,
                           Math.abs(row.endEurCents - row.startEurCents) * scale,
                         )}
-                        fill={row.valueEurCents < 0 ? '#ff6b2b' : '#777770'}
+                        fill={row.valueEurCents < 0 ? '#607751' : '#8a9e7c'}
                       />
                       <text
                         x={index * 120 + 55}
                         y="280"
                         textAnchor="middle"
-                        fontSize="12"
+                        fontSize="13"
                       >
                         {row.label}
                       </text>

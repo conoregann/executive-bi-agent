@@ -133,8 +133,22 @@ test('synthetic investigation renders all answer sections and protected citation
   await page.reload();
   assert.equal(await page.getByRole('article').count(), 0);
 });
-test('request rail slides the left panel fully away and restores its form state', async (t) => {
+test('header control hides the left panel fully and restores its form state', async (t) => {
   const page = await pageForTest(t);
+  assert.equal(
+    await page
+      .locator('.topbar')
+      .getByRole('button', { name: 'Hide request panel' })
+      .count(),
+    1,
+  );
+  assert.equal(await page.locator('.panel-rail').count(), 0);
+  assert.equal(
+    await page
+      .locator('.primary-button')
+      .evaluate((button) => getComputedStyle(button).backgroundColor),
+    'rgb(200, 213, 187)',
+  );
   await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
   const expandedResult = await page.locator('.empty-state').boundingBox();
   await page.getByRole('button', { name: 'Hide request panel' }).click();
