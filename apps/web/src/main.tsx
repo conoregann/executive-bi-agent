@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
+  CrossSourceAnswer,
   InvestigationAnswer,
   CountryFollowUpAnswer,
   CustomerFollowUpAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 import {
+  investigateCrossSource,
   startCustomerFollowUp,
   readCustomerFollowUpAnswer,
   readAnswer,
@@ -23,6 +25,37 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [crossAnswer, setCrossAnswer] = useState<CrossSourceAnswer>();
+  const [crossMessage, setCrossMessage] = useState('');
+  const crossSession = useRef<{ id: string; token: string } | undefined>(
+    undefined,
+  );
+  async function crossSource(question: string) {
+    const active = customerSession.current ?? session.current;
+    if (!active) return;
+    setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage(
+      'Validating retained revenue evidence, planning approved sources, then gathering scoped context…',
+    );
+    try {
+      const result = await investigateCrossSource(
+        active.id,
+        active.token,
+        question,
+      );
+      setCrossAnswer(result.answer);
+      crossSession.current = result.session;
+      setCrossMessage('Context investigation complete.');
+    } catch (error) {
+      setCrossMessage(
+        error instanceof Error ? error.message : 'Context unavailable.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const [customerAnswer, setCustomerAnswer] =
     useState<CustomerFollowUpAnswer>();
   const [customerMessage, setCustomerMessage] = useState('');
@@ -60,6 +93,9 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     setCustomerMessage('');
     customerSession.current = undefined;
@@ -121,6 +157,9 @@ function App() {
     const active = session.current;
     if (!active) return;
     setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     setCustomerMessage('');
     customerSession.current = undefined;
@@ -162,6 +201,9 @@ function App() {
     const active = followSession.current;
     if (!active) return;
     setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     customerSession.current = undefined;
     setCustomerMessage(
@@ -349,6 +391,78 @@ function App() {
               <p>No negative customer movements were found.</p>
             )}
           </section>
+          {answer.waterfall && (
+            <section
+              aria-labelledby="waterfall-heading"
+              className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6"
+            >
+              <h2 id="waterfall-heading">Revenue movement waterfall</h2>
+              <svg
+                viewBox="0 0 720 300"
+                role="img"
+                aria-label="Reconciled MRR movement from previous to current month"
+              >
+                {answer.waterfall.data.map((row, index) => {
+                  const max = Math.max(
+                    1,
+                    ...answer.waterfall!.data.flatMap((item) => [
+                      item.startEurCents,
+                      item.endEurCents,
+                    ]),
+                  );
+                  const scale = 220 / max;
+                  return (
+                    <g key={row.label}>
+                      <rect
+                        x={index * 120 + 20}
+                        y={
+                          250 -
+                          Math.max(row.startEurCents, row.endEurCents) * scale
+                        }
+                        width="70"
+                        height={Math.max(
+                          1,
+                          Math.abs(row.endEurCents - row.startEurCents) * scale,
+                        )}
+                        fill={row.valueEurCents < 0 ? '#9c3434' : '#245e49'}
+                      />
+                      <text
+                        x={index * 120 + 55}
+                        y="280"
+                        textAnchor="middle"
+                        fontSize="12"
+                      >
+                        {row.label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+              <table>
+                <caption>Deterministic revenue movement in EUR</caption>
+                <thead>
+                  <tr>
+                    <th>Movement</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {answer.waterfall.data.map((row) => (
+                    <tr key={row.label}>
+                      <td>{row.label}</td>
+                      <td>{eur(row.valueEurCents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button
+                type="button"
+                onClick={() => void inspect(answer.waterfall!.sourceEvidenceId)}
+              >
+                Inspect waterfall evidence
+              </button>
+            </section>
+          )}
           <section
             className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-[18px] min-[601px]:p-6"
             aria-labelledby="chart-heading"
@@ -640,6 +754,187 @@ function App() {
             )}
           </section>
           <section
+            aria-labelledby="cross-source-heading"
+            aria-busy={busy}
+            className="mb-5 rounded-xl border border-[#d2ddd7] bg-white p-6"
+          >
+            <h2 id="cross-source-heading">
+              Cross-source revenue investigation
+            </h2>
+            <p>
+              Investigate the retained largest account losses
+              {customerAnswer ? ' in the selected country' : ''}. Dates and
+              customer permissions stay within the parent investigation.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                'Investigate revenue losses across sources',
+                'Did those accounts have support escalations or declining usage?',
+                'What evidence supports a pricing-related explanation?',
+              ].map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void crossSource(text)}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+            <p role="status" aria-live="polite">
+              {crossMessage}
+            </p>
+            {crossAnswer && (
+              <>
+                <p>
+                  Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
+                  Planner: {crossAnswer.record.plan.planner} · Model synthesis:{' '}
+                  {crossAnswer.record.modelStatus}
+                </p>
+                <p>
+                  Accounts:{' '}
+                  {crossAnswer.record.customerIds.join(', ') ||
+                    'No retained losses'}
+                </p>
+                {crossAnswer.evidence
+                  .filter(
+                    (item) => item.source === 'synthetic_operational_records',
+                  )
+                  .map((item) => (
+                    <article
+                      key={item.evidenceId}
+                      className="my-4 overflow-x-auto rounded border p-4"
+                    >
+                      <h3>{String(item.scope.source)} evidence</h3>
+                      <p>
+                        Freshness: {item.freshness} · Missing coverage:{' '}
+                        {Array.isArray(item.content.missingCustomerIds)
+                          ? item.content.missingCustomerIds.join(', ') || 'None'
+                          : 'Unavailable'}{' '}
+                        · Stale coverage:{' '}
+                        {Array.isArray(item.content.staleCustomerIds)
+                          ? item.content.staleCustomerIds.join(', ') || 'None'
+                          : 'Unavailable'}
+                      </p>
+                      <table>
+                        <caption>
+                          Observed synthetic operational records
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th>Account</th>
+                            <th>Month</th>
+                            <th>Category</th>
+                            <th>Active users</th>
+                            <th>Source excerpt</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(item.content.rows) &&
+                            item.content.rows.map((row) => (
+                              <tr key={row.recordId}>
+                                <td>{row.customerId}</td>
+                                <td>{row.month}</td>
+                                <td>{row.category}</td>
+                                <td>{row.activeUsers ?? 'Not applicable'}</td>
+                                <td>{row.note}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                      {Array.isArray(item.content.usageComparisons) && (
+                        <ul>
+                          {item.content.usageComparisons.map((row) => (
+                            <li key={row.customerId}>
+                              {row.customerId}: active users{' '}
+                              {row.previousActiveUsers ?? 'Missing'} →{' '}
+                              {row.currentActiveUsers ?? 'Missing'}, change{' '}
+                              {row.activeUserChange ?? 'Unavailable'} (query
+                              evidence below).
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void inspect(item.evidenceId, crossSession.current)
+                        }
+                      >
+                        Inspect {String(item.scope.source)} query evidence
+                      </button>
+                    </article>
+                  ))}
+                {crossAnswer.evidence
+                  .filter((item) => item.type === 'document_chunk')
+                  .map((item) => (
+                    <article key={item.evidenceId}>
+                      <h3>Document context</h3>
+                      <blockquote>
+                        {String(item.content.excerpt ?? '')}
+                      </blockquote>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void inspect(item.evidenceId, crossSession.current)
+                        }
+                      >
+                        Inspect document {item.sourceRef}
+                      </button>
+                    </article>
+                  ))}
+                <h3>Tentative hypotheses</h3>
+                {crossAnswer.record.hypotheses.length === 0 && (
+                  <p>
+                    No validated model explanation is available. Review the
+                    observed records and document excerpts.
+                  </p>
+                )}
+                {crossAnswer.record.hypotheses.map((hypothesis, index) => (
+                  <article key={index}>
+                    <p>
+                      {hypothesis.kind} may be relevant to the retained losses;
+                      causality is unconfirmed.
+                    </p>
+                    <p>Supporting references:</p>
+                    {hypothesis.supportingEvidenceIds.map((id) => (
+                      <button
+                        key={id}
+                        onClick={() => void inspect(id, crossSession.current)}
+                      >
+                        {id}
+                      </button>
+                    ))}
+                    <p>Contradictory references:</p>
+                    {hypothesis.contradictoryEvidenceIds.map((id) => (
+                      <button
+                        key={id}
+                        onClick={() => void inspect(id, crossSession.current)}
+                      >
+                        {id}
+                      </button>
+                    ))}
+                  </article>
+                ))}
+                <h3>Coverage and limitations</h3>
+                <ul>
+                  {crossAnswer.record.warnings.map((text, index) => (
+                    <li key={index}>{text}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void inspect('cross_parent', crossSession.current)
+                  }
+                >
+                  Inspect retained revenue and parent provenance
+                </button>
+              </>
+            )}
+          </section>
+          <section
             id="customer-drilldown"
             aria-labelledby="customer-heading"
             aria-busy={busy}
@@ -809,7 +1104,7 @@ function App() {
         </p>
         {evidence ? (
           <>
-            <h3>{evidence.sourceRef}</h3>
+            <h3 className="[overflow-wrap:anywhere]">{evidence.sourceRef}</h3>
             <dl>
               <dt>Evidence ID</dt>
               <dd>{evidence.evidenceId}</dd>

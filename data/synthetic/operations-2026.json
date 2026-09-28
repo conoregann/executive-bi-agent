@@ -1,0 +1,225 @@
+{
+  "label": "synthetic",
+  "rows": [
+    {
+      "recordId": "synthetic_usage_0_2026-06-01",
+      "customerId": "cust_acme",
+      "source": "usage",
+      "month": "2026-06-01",
+      "observedAt": "2026-06-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_0_2026-07-01",
+      "customerId": "cust_acme",
+      "source": "usage",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_support_acme",
+      "customerId": "cust_acme",
+      "source": "support",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-25T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": null,
+      "category": "escalation",
+      "note": "Synthetic performance escalation preceding cancellation; relationship unconfirmed."
+    },
+    {
+      "recordId": "synthetic_usage_0_2026-08-01",
+      "customerId": "cust_acme",
+      "source": "usage",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 10,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_crm_0",
+      "customerId": "cust_acme",
+      "source": "crm",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": null,
+      "category": "budget_frozen",
+      "note": "Account owner recorded a budget freeze, conflicting with a general pricing explanation."
+    },
+    {
+      "recordId": "synthetic_usage_1_2026-06-01",
+      "customerId": "cust_berlin",
+      "source": "usage",
+      "month": "2026-06-01",
+      "observedAt": "2026-06-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_1_2026-07-01",
+      "customerId": "cust_berlin",
+      "source": "usage",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_1_2026-08-01",
+      "customerId": "cust_berlin",
+      "source": "usage",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_crm_1",
+      "customerId": "cust_berlin",
+      "source": "crm",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": null,
+      "category": "renewal",
+      "note": "Synthetic account event; reported reason is not causal proof."
+    },
+    {
+      "recordId": "synthetic_usage_2_2026-06-01",
+      "customerId": "cust_london",
+      "source": "usage",
+      "month": "2026-06-01",
+      "observedAt": "2026-06-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_2_2026-07-01",
+      "customerId": "cust_london",
+      "source": "usage",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_2_2026-08-01",
+      "customerId": "cust_london",
+      "source": "usage",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 10,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_crm_2",
+      "customerId": "cust_london",
+      "source": "crm",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": null,
+      "category": "renewal",
+      "note": "Synthetic account event; reported reason is not causal proof."
+    },
+    {
+      "recordId": "synthetic_usage_3_2026-06-01",
+      "customerId": "cust_nordic",
+      "source": "usage",
+      "month": "2026-06-01",
+      "observedAt": "2026-06-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_3_2026-07-01",
+      "customerId": "cust_nordic",
+      "source": "usage",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_3_2026-08-01",
+      "customerId": "cust_nordic",
+      "source": "usage",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_4_2026-06-01",
+      "customerId": "cust_riviera",
+      "source": "usage",
+      "month": "2026-06-01",
+      "observedAt": "2026-06-01T00:00:00Z",
+      "freshness": "2026-07-01T00:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_4_2026-07-01",
+      "customerId": "cust_riviera",
+      "source": "usage",
+      "month": "2026-07-01",
+      "observedAt": "2026-07-01T00:00:00Z",
+      "freshness": "2026-07-01T00:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_usage_4_2026-08-01",
+      "customerId": "cust_riviera",
+      "source": "usage",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-07-01T00:00:00Z",
+      "activeUsers": 50,
+      "category": "monthly_active_users",
+      "note": "Synthetic monthly usage summary"
+    },
+    {
+      "recordId": "synthetic_crm_4",
+      "customerId": "cust_riviera",
+      "source": "crm",
+      "month": "2026-08-01",
+      "observedAt": "2026-08-01T00:00:00Z",
+      "freshness": "2026-09-01T08:00:00Z",
+      "activeUsers": null,
+      "category": "pricing_objection",
+      "note": "Synthetic account event; reported reason is not causal proof."
+    }
+  ]
+}

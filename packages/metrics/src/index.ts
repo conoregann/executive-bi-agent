@@ -1030,3 +1030,66 @@ function sum(values: Iterable<number>): number {
   for (const value of values) total += value;
   return total;
 }
+
+/** Chart geometry is derived only from a reconciled retained movement, in integer cents. */
+export function createRetainedMrrWaterfall(
+  input: unknown,
+  sourceEvidenceId: string,
+) {
+  if (!input || typeof input !== 'object' || !sourceEvidenceId)
+    return undefined;
+  const row = input as Record<string, unknown>;
+  const keys = [
+    'priorMrrEurCents',
+    'newMrrEurCents',
+    'expansionMrrEurCents',
+    'contractionMrrEurCents',
+    'churnedMrrEurCents',
+    'currentMrrEurCents',
+  ] as const;
+  if (
+    row.reconciles !== true ||
+    keys.some(
+      (key) => !Number.isSafeInteger(row[key]) || (row[key] as number) < 0,
+    )
+  )
+    return undefined;
+  const [prior, added, expansion, contraction, churn, current] = keys.map(
+    (key) => row[key] as number,
+  ) as [number, number, number, number, number, number];
+  if (prior + added + expansion - contraction - churn !== current)
+    return undefined;
+  let total = prior;
+  const data = [
+    {
+      label: 'Previous MRR',
+      startEurCents: 0,
+      endEurCents: prior,
+      valueEurCents: prior,
+    },
+  ];
+  for (const [label, value] of [
+    ['New', added],
+    ['Expansion', expansion],
+    ['Contraction', -contraction],
+    ['Churn', -churn],
+  ] as const) {
+    const start = total;
+    total += value;
+    data.push({
+      label,
+      startEurCents: start,
+      endEurCents: total,
+      valueEurCents: value,
+    });
+  }
+  data.push({
+    label: 'Current MRR',
+    startEurCents: 0,
+    endEurCents: current,
+    valueEurCents: current,
+  });
+  if (data.some((item) => !Number.isSafeInteger(item.endEurCents)))
+    return undefined;
+  return { sourceEvidenceId, data };
+}

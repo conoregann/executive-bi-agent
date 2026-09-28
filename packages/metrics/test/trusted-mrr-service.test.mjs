@@ -519,3 +519,26 @@ test('synthetic unsafe contribution totals never carry valid calculation evidenc
     'customer_country_contributions_not_reconciled',
   ]);
 });
+
+test('retained waterfall reconciles and rejects corrupted movement', async () => {
+  const { createRetainedMrrWaterfall } = await import('../dist/index.js');
+  const movement = {
+    priorMrrEurCents: 420000,
+    newMrrEurCents: 60000,
+    expansionMrrEurCents: 20000,
+    contractionMrrEurCents: 10000,
+    churnedMrrEurCents: 240000,
+    currentMrrEurCents: 250000,
+    reconciles: true,
+  };
+  const chart = createRetainedMrrWaterfall(movement, 'movement');
+  assert.equal(chart.data.at(-2).endEurCents, 250000);
+  assert.equal(chart.data.at(-1).valueEurCents, 250000);
+  assert.equal(
+    createRetainedMrrWaterfall(
+      { ...movement, currentMrrEurCents: 0 },
+      'movement',
+    ),
+    undefined,
+  );
+});

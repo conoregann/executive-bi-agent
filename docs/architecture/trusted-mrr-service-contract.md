@@ -130,3 +130,11 @@ losses. It includes undisplayed losses. All rows remain retained; presentation
 truncation never truncates the reconciliation. Two customer-country query
 snapshots and linked calculation evidence support every value. No contextual
 retrieval or causal inference runs.
+
+## Retained revenue waterfall
+
+`createRetainedMrrWaterfall` accepts a retained MRR movement and its evidence ID.
+It emits previous MRR, new, expansion, contraction, churn and current MRR with
+integer-cent start/end positions. Missing, unsafe, negative source components or
+non-reconciliation return no chart. Geometry is calculated centrally and does
+not query analytics or execute a model. The answer cites the retained movement.

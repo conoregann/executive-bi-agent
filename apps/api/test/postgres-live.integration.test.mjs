@@ -345,3 +345,96 @@ test(
     }
   },
 );
+
+test(
+  'PostgreSQL cross-source evidence is readable after restart without analytics',
+  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  async () => {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const analytics = new Pool({
+      connectionString: process.env.ANALYTICS_DATABASE_URL,
+    });
+    const id = `test_cross_${randomUUID().replaceAll('-', '')}`,
+      childId = `${id}_child`;
+    const request = (path, body, token) =>
+      new Request(`http://api.test/v1/investigations/${path}`, {
+        method: body ? 'POST' : 'GET',
+        headers: {
+          'content-type': 'application/json',
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+    try {
+      const api = await createPostgresMrrDeclineApi(
+        analytics,
+        new PostgresInvestigationStore(pool),
+      );
+      const parent = await (
+        await api.fetch(
+          request('mrr-decline', {
+            investigationId: id,
+            month: '2026-08-01',
+            permittedCustomerIds: ['cust_acme'],
+          }),
+        )
+      ).json();
+      const created = await (
+        await api.fetch(
+          request(
+            `${id}/cross-source-follow-ups`,
+            {
+              investigationId: childId,
+              question: 'Investigate revenue losses across sources',
+            },
+            parent.accessToken,
+          ),
+        )
+      ).json();
+      assert.equal(created.status, 'completed');
+      const original = await (
+        await api.fetch(
+          request(`${childId}/answer`, undefined, created.accessToken),
+        )
+      ).json();
+      assert.equal(original.status, 'ok');
+      assert.ok(
+        original.answer.evidence
+          .find((e) => e.evidenceId === 'ops_support')
+          .content.rows.some((row) => row.category === 'escalation'),
+      );
+      await analytics.end();
+      const restarted = await createPostgresMrrDeclineApi(
+        {
+          async query() {
+            throw Error('Analytics unavailable after restart');
+          },
+        },
+        new PostgresInvestigationStore(pool),
+      );
+      assert.deepEqual(
+        await (
+          await restarted.fetch(
+            request(`${childId}/answer`, undefined, created.accessToken),
+          )
+        ).json(),
+        original,
+      );
+      assert.equal(
+        (
+          await restarted.fetch(
+            request(`${childId}/answer`, undefined, parent.accessToken),
+          )
+        ).status,
+        404,
+      );
+    } finally {
+      await pool.query(
+        'DELETE FROM app.investigations WHERE investigation_id = ANY($1::text[])',
+        [[id, childId]],
+      );
+      if (!analytics.ended) await analytics.end();
+      await pool.end();
+    }
+  },
+);

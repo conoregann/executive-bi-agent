@@ -58,4 +58,6 @@ WHERE source = 'analytics.subscription_month';
 \ir init/02-investigations.sql
 \ir init/03-analytics-role.sql
 
+\ir init/04-operations.sql
+
 COMMIT;
