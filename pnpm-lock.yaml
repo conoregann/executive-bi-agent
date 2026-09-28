@@ -19,6 +19,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@executive-bi/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@executive-bi/analytics':
         specifier: workspace:*
         version: link:../../packages/analytics
@@ -28,6 +31,9 @@ importers:
       '@executive-bi/metrics':
         specifier: workspace:*
         version: link:../../packages/metrics
+      '@executive-bi/operations':
+        specifier: workspace:*
+        version: link:../../packages/operations
       '@executive-bi/retrieval':
         specifier: workspace:*
         version: link:../../packages/retrieval
@@ -50,6 +56,9 @@ importers:
       '@executive-bi/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas
+      '@fontsource-variable/instrument-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
       react:
         specifier: ^19.0.0
         version: 19.3.0
@@ -82,10 +91,21 @@ importers:
         specifier: ^7.0.0
         version: 7.3.6(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)
 
+  packages/ai: {}
+
   packages/analytics: {}
 
   packages/investigations:
     dependencies:
+      '@executive-bi/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@executive-bi/metrics':
+        specifier: workspace:*
+        version: link:../metrics
+      '@executive-bi/operations':
+        specifier: workspace:*
+        version: link:../operations
       '@executive-bi/schemas':
         specifier: workspace:*
         version: link:../schemas
@@ -95,6 +115,12 @@ importers:
         version: 22.20.4
 
   packages/metrics: {}
+
+  packages/operations:
+    dependencies:
+      '@executive-bi/schemas':
+        specifier: workspace:*
+        version: link:../schemas
 
   packages/retrieval: {}
 
@@ -338,6 +364,12 @@ packages:
     engines: { node: '>=18' }
     cpu: [x64]
     os: [win32]
+
+  '@fontsource-variable/instrument-sans@5.3.0':
+    resolution:
+      {
+        integrity: sha512-u4gKbDBTNFGkg997tfQn3eHOhHuquWUFTRT/rwzuKtrxX5P2ekfs2x+LgBPP4P32+cC+vUwF1Cr+IdRoPQbrGw==,
+      }
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution:
@@ -1331,6 +1363,8 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@fontsource-variable/instrument-sans@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:

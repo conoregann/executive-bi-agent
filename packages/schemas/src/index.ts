@@ -136,6 +136,24 @@ export const mrrPlanChartSchema = z
     'Chart rows must be unique and reconciliation must match unassigned MRR.',
   );
 
+export const mrrWaterfallSchema = z
+  .object({
+    sourceEvidenceId: z.string().min(1),
+    data: z
+      .array(
+        z
+          .object({
+            label: z.string(),
+            startEurCents: z.number().int().safe(),
+            endEurCents: z.number().int().safe(),
+            valueEurCents: z.number().int().safe(),
+          })
+          .strict(),
+      )
+      .length(6),
+  })
+  .strict();
+
 export const investigationAnswerSchema = z
   .object({
     investigationId: opaqueIdentifier,
@@ -169,6 +187,7 @@ export const investigationAnswerSchema = z
       )
       .min(1),
     chart: mrrPlanChartSchema.optional(),
+    waterfall: mrrWaterfallSchema.optional(),
     recommendedNextStep: z
       .object({
         owner: z.literal('Revenue operations'),
@@ -204,6 +223,15 @@ export const investigationAnswerSchema = z
         code: z.ZodIssueCode.custom,
         message:
           'Chart requires matching scope and inspectable metric evidence.',
+      });
+    if (
+      answer.waterfall &&
+      evidence.get(answer.waterfall.sourceEvidenceId)?.type !== 'calculation'
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Waterfall requires inspectable movement calculation evidence.',
       });
     for (const claim of [answer.answer, ...answer.drivers, ...answer.context]) {
       const citations = claim.evidenceIds.map((id) => evidence.get(id));
@@ -532,11 +560,6 @@ export const customerFollowUpRecordSchema = countryFollowUpRecordSchema
     plan: customerFollowUpPlanSchema,
   })
   .strict();
-export const storedInvestigationRecordSchema = z.union([
-  mrrDeclineRecordSchema,
-  countryFollowUpRecordSchema,
-  customerFollowUpRecordSchema,
-]);
 export const customerFollowUpAnswerSchema = z
   .object({
     investigationId: opaqueIdentifier,
@@ -571,3 +594,132 @@ export type CustomerFollowUpPlan = z.infer<typeof customerFollowUpPlanSchema>;
 export type CustomerFollowUpAnswer = z.infer<
   typeof customerFollowUpAnswerSchema
 >;
+
+export const operationalSourceSchema = z.enum(['crm', 'support', 'usage']);
+export const operationalRecordSchema = z
+  .object({
+    recordId: opaqueIdentifier,
+    customerId: z.string().min(1),
+    source: operationalSourceSchema,
+    month: calendarMonth,
+    observedAt: z.string().datetime(),
+    freshness: z.string().datetime(),
+    activeUsers: z.number().int().nonnegative().safe().nullable(),
+    category: z.string().min(1).max(100),
+    note: z.string().min(1).max(1000),
+  })
+  .strict();
+export const operationalSnapshotSchema = z
+  .object({
+    label: z.literal('synthetic'),
+    rows: z.array(operationalRecordSchema).max(5000),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      new Set(value.rows.map((row) => row.recordId)).size === value.rows.length,
+    'Record IDs must be unique.',
+  )
+  .refine((value) => {
+    const usage = value.rows.filter((row) => row.source === 'usage');
+    return (
+      new Set(usage.map((row) => `${row.customerId}:${row.month}`)).size ===
+      usage.length
+    );
+  }, 'Monthly usage observations must be unique per customer.');
+export const operationalRequestSchema = z
+  .object({
+    month: calendarMonth,
+    customerIds,
+    source: operationalSourceSchema,
+  })
+  .strict();
+export type OperationalRecord = z.infer<typeof operationalRecordSchema>;
+export type OperationalSource = z.infer<typeof operationalSourceSchema>;
+
+export const crossSourceRequestSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    question: z.enum([
+      'Investigate revenue losses across sources',
+      'Did those accounts have support escalations or declining usage?',
+      'What evidence supports a pricing-related explanation?',
+    ]),
+  })
+  .strict();
+export const modelPlanSchema = z
+  .object({ tools: z.array(operationalSourceSchema).min(1).max(3) })
+  .strict()
+  .refine(
+    (plan) => new Set(plan.tools).size === plan.tools.length,
+    'Tools must be unique.',
+  );
+export const modelSynthesisSchema = z
+  .object({
+    hypotheses: z
+      .array(
+        z
+          .object({
+            kind: z.enum(['pricing', 'support', 'usage']),
+            supportingEvidenceIds: z.array(opaqueIdentifier).min(1).max(10),
+            contradictoryEvidenceIds: z.array(opaqueIdentifier).max(10),
+          })
+          .strict(),
+      )
+      .max(3),
+  })
+  .strict();
+export const crossSourcePlanSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    steps: z.array(operationalSourceSchema).max(3),
+    maximumToolCalls: z.literal(4),
+    deadlineMs: z.literal(30000),
+    planner: z.enum(['deterministic', 'model', 'unavailable']),
+  })
+  .strict();
+export const crossSourceRecordSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    kind: z.literal('mrr_cross_source'),
+    month: calendarMonth,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    customerIds: z.array(z.string().min(1)).max(50),
+    plan: crossSourcePlanSchema,
+    status: z.enum(['completed', 'blocked']),
+    evidenceIds: z.array(z.string().min(1)),
+    warnings: z.array(z.string().min(1)),
+    question: crossSourceRequestSchema.shape.question,
+    hypotheses: modelSynthesisSchema.shape.hypotheses,
+    modelStatus: z.enum(['disabled', 'completed', 'unavailable']),
+    elapsedMs: z.number().nonnegative(),
+  })
+  .strict();
+export type CrossSourceRecord = z.infer<typeof crossSourceRecordSchema>;
+export type CrossSourcePlan = z.infer<typeof crossSourcePlanSchema>;
+export const crossSourceResponseSchema = z
+  .object({
+    status: z.enum(['completed', 'blocked']),
+    record: crossSourceRecordSchema,
+    accessToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+    warnings: z.array(z.string()),
+  })
+  .strict();
+
+export const storedInvestigationRecordSchema = z.union([
+  mrrDeclineRecordSchema,
+  countryFollowUpRecordSchema,
+  customerFollowUpRecordSchema,
+  crossSourceRecordSchema,
+]);
+
+export const crossSourceAnswerSchema = z
+  .object({
+    record: crossSourceRecordSchema,
+    evidence: investigationEvidenceSchema.array(),
+    operationalEvidenceIds: z.array(z.string()),
+    parentEvidence: investigationEvidenceSchema.array(),
+  })
+  .strict();
+export type CrossSourceAnswer = z.infer<typeof crossSourceAnswerSchema>;

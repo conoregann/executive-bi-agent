@@ -124,3 +124,25 @@ defaults to read-only transactions, and has a five-second statement timeout.
 Run `pnpm db:migrate` for an existing volume. Analytics tool failures produce a retained blocked investigation (`422`);
 persistence failures return a sanitized `503`. There is no JSON metric fallback. Retained evidence
 remains readable independently of the analytics connection.
+
+## Gemini through AI Studio
+
+For model-guided context investigations, add these entries to your local `.env`:
+
+```dotenv
+GEMINI_API_KEY=your_full_ai_studio_key
+GEMINI_INVESTIGATION_MODEL=gemini-3.8-flash
+```
+
+Keep the key local; `.env` is ignored by Git. A Gemini key selects Gemini by
+default; `INVESTIGATION_MODEL_PROVIDER=openai` explicitly selects OpenAI when
+both providers are configured. Provider failures do not switch providers.
+Gemini proposals pass through the same scope, citation and deadline validation.
+
+Rebuild the API (`pnpm --filter @executive-bi/api... build`) and restart its
+terminal after loading `.env` using the startup instructions above. Run August
+MRR, then select **Investigate revenue losses across sources**. A successful
+context answer shows **Planner: model** and **Model synthesis: completed**.
+The first MRR answer remains deterministic. Free-tier quotas and model access
+are controlled by Google; a rate-limited or rejected request retains a safe
+limitation rather than an invented explanation.
