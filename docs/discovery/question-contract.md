@@ -34,8 +34,8 @@ Question text is not persisted as investigation evidence or used as authorizatio
 
 ### Authenticated conversational follow-up
 
-A completed MRR-decline investigation supports exactly “Break that down by
-country” through the authenticated country-follow-up endpoint, with an optional
+A completed MRR-decline investigation supports “Break that down by
+country” and “Compare Germany with the UK” through the authenticated country-follow-up endpoint, with an optional
 single terminal `.`, `!` or `?`, case-insensitive and outer whitespace trimmed.
 It executes both months at the parent's exact customer scope. The standalone
 question resolver remains for new investigations and does not infer parent
@@ -84,3 +84,10 @@ Every investigation response contains these ordered sections:
 6. **Recommended next step** — bounded follow-up, never an autonomous action.
 
 The answer must not assert causality from a time correlation alone.
+
+The Germany/UK phrase executes the retained complete country comparison and shows
+both countries within that table; it introduces no country permission filter.
+The UI's country actions select a retained row for the bounded account drill-down.
+Cross-source questions use dedicated actions specified in the
+[cross-source contract](../architecture/cross-source-investigation-contract.md).
+They do not add general conversational resolution or scope inference.

@@ -1,3 +1,4 @@
+import { createRetainedMrrWaterfall } from '@executive-bi/metrics';
 import {
   investigationAnswerSchema,
   mrrPlanChartSchema,
@@ -182,8 +183,13 @@ export function synthesizeMrrDeclineAnswer(
       breakdown.content.totalMrrEurCents
       ? chartResult.data
       : undefined;
+  const waterfall = createRetainedMrrWaterfall(
+    movement.content,
+    movement.evidenceId,
+  );
   const citedIds = new Set(claims.flatMap((claim) => claim.evidenceIds));
   if (chart) citedIds.add(chart.sourceEvidenceId);
+  if (waterfall) citedIds.add(waterfall.sourceEvidenceId);
   const result = investigationAnswerSchema.safeParse({
     investigationId: record.investigationId,
     scope: {
@@ -221,6 +227,7 @@ export function synthesizeMrrDeclineAnswer(
         freshness: item.freshness,
       })),
     ...(chart ? { chart } : {}),
+    ...(waterfall ? { waterfall } : {}),
     recommendedNextStep: {
       owner: 'Revenue operations',
       text:

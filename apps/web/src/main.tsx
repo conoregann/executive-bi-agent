@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
+  CrossSourceAnswer,
   InvestigationAnswer,
   CountryFollowUpAnswer,
   CustomerFollowUpAnswer,
   MrrDeclineApiResponse,
 } from '@executive-bi/schemas';
 import {
+  investigateCrossSource,
   startCustomerFollowUp,
   readCustomerFollowUpAnswer,
   readAnswer,
@@ -23,6 +25,37 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [crossAnswer, setCrossAnswer] = useState<CrossSourceAnswer>();
+  const [crossMessage, setCrossMessage] = useState('');
+  const crossSession = useRef<{ id: string; token: string } | undefined>(
+    undefined,
+  );
+  async function crossSource(question: string) {
+    const active = customerSession.current ?? session.current;
+    if (!active) return;
+    setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage(
+      'Validating retained revenue evidence, planning approved sources, then gathering scoped context…',
+    );
+    try {
+      const result = await investigateCrossSource(
+        active.id,
+        active.token,
+        question,
+      );
+      setCrossAnswer(result.answer);
+      crossSession.current = result.session;
+      setCrossMessage('Context investigation complete.');
+    } catch (error) {
+      setCrossMessage(
+        error instanceof Error ? error.message : 'Context unavailable.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const [customerAnswer, setCustomerAnswer] =
     useState<CustomerFollowUpAnswer>();
   const [customerMessage, setCustomerMessage] = useState('');
@@ -60,6 +93,9 @@ function App() {
     evidenceRequest.current++;
     setBusy(true);
     setAnswer(undefined);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     setCustomerMessage('');
     customerSession.current = undefined;
@@ -121,6 +157,9 @@ function App() {
     const active = session.current;
     if (!active) return;
     setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     setCustomerMessage('');
     customerSession.current = undefined;
@@ -162,6 +201,9 @@ function App() {
     const active = followSession.current;
     if (!active) return;
     setBusy(true);
+    setCrossAnswer(undefined);
+    setCrossMessage('');
+    crossSession.current = undefined;
     setCustomerAnswer(undefined);
     customerSession.current = undefined;
     setCustomerMessage(

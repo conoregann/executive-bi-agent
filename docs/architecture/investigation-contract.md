@@ -104,7 +104,7 @@ they do not classify churn, acquisition or causes.
 The table describes intended general tools. Current executable MRR operations
 are listed in the [trusted service contract](trusted-mrr-service-contract.md),
 and lexical retrieval in the [knowledge contract](company-knowledge-retrieval-contract.md).
-Support-ticket/CRM tools and generic metric/chart bindings are not implemented.
+Scoped CRM/support/usage tools are defined in the [cross-source contract](cross-source-investigation-contract.md); generic metric bindings remain planned.
 
 ## Intended general tools
 
@@ -162,5 +162,4 @@ snapshot of the parent record and evidence with local IDs and remapped input
 links. A separate bearer token protects its record, answer and citations.
 Retained reads validate both provenance chains and run no analytics tools;
 they remain available after restart without analytics access or the parent
-token. Parent records remain immutable. Customer drill-downs cannot become
-parents; the supported maximum path is MRR → country → customers.
+token. Parent records remain immutable. Customer drill-downs can parent a bounded [cross-source context investigation](cross-source-investigation-contract.md). The supported path is MRR → country → customers → cross-source context; contextual children cannot parent further investigations.

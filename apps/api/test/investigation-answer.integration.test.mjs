@@ -47,6 +47,7 @@ test('returns a deterministic executive answer with inspectable metric and docum
     'limitations',
     'evidence',
     'chart',
+    'waterfall',
     'recommendedNextStep',
   ]);
   assert.match(

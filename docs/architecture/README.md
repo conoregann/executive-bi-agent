@@ -24,3 +24,5 @@ The initial architecture deliberately excludes exploratory SQL and external inte
   executive presentation of persisted investigations and inspectable citations.
 
 - [Executive web interface](executive-web-contract.md) — structured synthetic MRR submissions and authenticated citation inspection.
+
+- [Cross-source revenue investigation](cross-source-investigation-contract.md) — scoped operational evidence, optional model guidance, retained provenance and failure handling.

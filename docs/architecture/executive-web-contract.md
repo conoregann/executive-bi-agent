@@ -101,3 +101,15 @@ Blocked children expose their retained identifier without numerical claims.
 Tokens stay in separate page-memory references. A new investigation, country
 comparison or page reload clears prior customer access/results; stored server
 results remain available through their token-protected routes after restart.
+
+## Cross-source workspace
+
+Completed MRR answers show a reconciled revenue-movement waterfall with a value
+table and evidence inspection. Cross-source actions use the selected customer
+drill-down when present, otherwise the initial MRR investigation. Busy status
+and the retained approved plan identify the contextual investigation; execution
+remains synchronous without streaming. CRM, support and usage cards show source
+records, deterministic active-user deltas, coverage and freshness, document
+excerpts, tentative model hypotheses and explicit limitations. Each contextual
+child has a separate evidence token. Parent answers remain visible. See the
+[cross-source contract](cross-source-investigation-contract.md).
