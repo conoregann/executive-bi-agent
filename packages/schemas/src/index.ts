@@ -294,6 +294,84 @@ export const countryFollowUpRequestSchema = z
     'Provide exactly one action or question.',
   );
 
+export const churnFollowUpRequestSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    action: z.literal('get_customer_churn_rate'),
+  })
+  .strict();
+export const customerChurnRateSchema = z
+  .object({
+    currentMonth: calendarMonth,
+    previousMonth: calendarMonth,
+    churnedCustomers: z.number().int().nonnegative().safe(),
+    startingCustomers: z.number().int().nonnegative().safe(),
+    rate: z.number().min(0).max(1).nullable(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const previous = new Date(`${value.currentMonth}T00:00:00Z`);
+    previous.setUTCMonth(previous.getUTCMonth() - 1);
+    if (
+      previous.toISOString().slice(0, 10) !== value.previousMonth ||
+      value.churnedCustomers > value.startingCustomers ||
+      value.rate !==
+        (value.startingCustomers === 0
+          ? null
+          : value.churnedCustomers / value.startingCustomers)
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Customer churn rate must reconcile.',
+      });
+  });
+export const churnFollowUpPlanSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    steps: z.tuple([z.literal('get_customer_churn_rate')]),
+    maximumToolCalls: z.literal(1),
+  })
+  .strict();
+export const churnFollowUpRecordSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    kind: z.literal('customer_churn_follow_up'),
+    month: calendarMonth,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    plan: churnFollowUpPlanSchema,
+    status: z.enum(['completed', 'blocked']),
+    evidenceIds: z.array(z.string().min(1)),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export const churnFollowUpAnswerSchema = z
+  .object({
+    investigationId: opaqueIdentifier,
+    parentInvestigationId: opaqueIdentifier,
+    permittedCustomerIds: z.array(z.string().min(1)),
+    value: customerChurnRateSchema,
+    sourceEvidenceIds: z.tuple([
+      z.string().min(1),
+      z.string().min(1),
+      z.string().min(1),
+    ]),
+    evidence: z.array(investigationEvidenceSchema).length(3),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export const churnFollowUpResponseSchema = z
+  .object({
+    status: z.enum(['completed', 'blocked']),
+    record: churnFollowUpRecordSchema,
+    accessToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export type ChurnFollowUpRecord = z.infer<typeof churnFollowUpRecordSchema>;
+export type ChurnFollowUpPlan = z.infer<typeof churnFollowUpPlanSchema>;
+export type ChurnFollowUpAnswer = z.infer<typeof churnFollowUpAnswerSchema>;
+
 export const countryMrrComparisonSchema = z
   .object({
     currentMonth: calendarMonth,
@@ -709,6 +787,7 @@ export const crossSourceResponseSchema = z
 
 export const storedInvestigationRecordSchema = z.union([
   mrrDeclineRecordSchema,
+  churnFollowUpRecordSchema,
   countryFollowUpRecordSchema,
   customerFollowUpRecordSchema,
   crossSourceRecordSchema,

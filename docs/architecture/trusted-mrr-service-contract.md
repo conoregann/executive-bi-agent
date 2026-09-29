@@ -21,14 +21,15 @@ driver.
 
 ## Initial supported operations
 
-| Operation                    | Required input                                                          | Output                                                             |
-| ---------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `get_mrr`                    | one complete UTC month, optional allowed filters                        | MRR in cents and metric-query evidence                             |
-| `compare_mrr`                | current and previous complete UTC months, same filters                  | both values, absolute/percent change, calculation evidence         |
-| `get_mrr_movement`           | current and immediately preceding UTC month, optional allowed filters   | new, expansion, contraction, churned MRR and reconciliation status |
-| `get_customer_mrr_movement`  | current and immediately preceding UTC month, optional filters and limit | ranked changed customers and movement classification               |
-| `breakdown_mrr`              | one complete UTC month, one allowed dimension, optional allowed filters | ranked MRR rows and explicit reconciliation status                 |
-| `create_mrr_breakdown_chart` | valid `breakdown_mrr` input                                             | chart-ready bar specification referencing breakdown evidence       |
+| Operation                    | Required input                                                          | Output                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `get_mrr`                    | one complete UTC month, optional allowed filters                        | MRR in cents and metric-query evidence                                                                    |
+| `compare_mrr`                | current and previous complete UTC months, same filters                  | both values, absolute/percent change, calculation evidence                                                |
+| `get_mrr_movement`           | current and immediately preceding UTC month, optional allowed filters   | new, expansion, contraction, churned MRR and reconciliation status                                        |
+| `get_customer_mrr_movement`  | current and immediately preceding UTC month, optional filters and limit | ranked changed customers and movement classification                                                      |
+| `breakdown_mrr`              | one complete UTC month, one allowed dimension, optional allowed filters | ranked MRR rows and explicit reconciliation status                                                        |
+| `create_mrr_breakdown_chart` | valid `breakdown_mrr` input                                             | chart-ready bar specification referencing breakdown evidence                                              |
+| `get_customer_churn_rate`    | current complete UTC month and optional allowed filters                 | churned and starting customer counts, nullable rate, two snapshot queries and linked calculation evidence |
 
 The implementation deliberately excludes multiple simultaneous groupings,
 free-form SQL, partial months, and comparison periods other than the immediately
@@ -110,6 +111,19 @@ use opaque identifiers.
 - No silent coercion of malformed dates, filters, or zero denominators.
 
 ## Customer contributions to country MRR
+
+### Customer churn rate
+
+`getCustomerChurnRate` accepts the strict month/filter request. The previous month
+is derived from the requested month. It sums active subscription MRR by customer
+in each complete monthly snapshot. Starting customers have positive previous
+MRR; churned customers have positive previous MRR and zero current MRR, including
+customers absent from the current snapshot. A missing snapshot returns
+`data_unavailable`. With no starting customers, the rate is `null` and the
+result warns `zero_customer_churn_denominator`. The two query evidence items
+carry the customer cohort IDs and counts at the inherited scope; calculation
+evidence links both queries and the formula. A retained answer must validate
+those links, counts, scope and rate before presenting the result.
 
 `getCustomerCountryContributions` accepts `month`, an explicit `country` (or
 `null` for unassigned MRR), and optional inherited `filters.customerIds` only.

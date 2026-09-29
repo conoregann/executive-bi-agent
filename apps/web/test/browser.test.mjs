@@ -133,6 +133,24 @@ test('synthetic investigation renders all answer sections and protected citation
   await page.reload();
   assert.equal(await page.getByRole('article').count(), 0);
 });
+test('synthetic customer churn follow-up shows retained 1 / 4 and inspectable citation', async (t) => {
+  const page = await pageForTest(t);
+  await complete(page);
+  await page.getByRole('button', { name: 'Calculate customer churn' }).click();
+  await page.getByText('1 customer churned / 4 starting customers').waitFor();
+  assert.equal(await page.getByText('25%', { exact: true }).count(), 1);
+  await page
+    .getByRole('button', { name: /^Inspect churn evidence/ })
+    .last()
+    .click();
+  await page.getByRole('heading', { name: 'Evidence detail' }).waitFor();
+  await page.getByText(/customer_churn_rate = churned_customers/).waitFor();
+  assert.match(
+    await page.locator('#evidence-detail').textContent(),
+    /customer_churn_rate/,
+  );
+  await assertNoHorizontalOverflow(page);
+});
 test('header control hides the left panel fully and restores its form state', async (t) => {
   const page = await pageForTest(t);
   assert.equal(

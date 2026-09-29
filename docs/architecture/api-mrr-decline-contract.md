@@ -58,6 +58,19 @@ Read routes require `Authorization: Bearer <accessToken>`:
   returns the completed record only when month and customer scope exactly
   match the stored request. It does not run tools.
 
+### Executable customer churn follow-up
+
+`POST /v1/investigations/:investigationId/customer-churn-follow-ups` accepts
+exactly `{ "investigationId": "august-churn", "action": "get_customer_churn_rate" }`
+with the completed MRR-decline parent's bearer token. Month and customer scope
+are inherited and cannot be overridden. Unknown fields return `400`; invalid
+parents return `422`; reused child IDs return `409`. Success returns `201`
+with a retained child record and separate token. Missing or invalid metric
+evidence returns a retained `422 blocked` child. The child's record, answer,
+and evidence use the existing authenticated GET routes. A completed answer
+includes churned and starting customer counts, nullable rate, two query IDs,
+and linked calculation evidence; retained reads validate it without analytics.
+
 ### Executable country follow-ups
 
 `POST /v1/investigations/:investigationId/country-follow-ups` authenticates with

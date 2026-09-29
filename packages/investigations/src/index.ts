@@ -5,6 +5,15 @@ import {
 export { readCrossSourceAnswer } from './cross-source.js';
 import type { CrossSourceRecord, CrossSourcePlan } from '@executive-bi/schemas';
 import {
+  churnFollowUpRequestSchema,
+  churnFollowUpRecordSchema,
+  customerChurnRateSchema,
+  type ChurnFollowUpRecord,
+  type ChurnFollowUpPlan,
+} from '@executive-bi/schemas';
+import { synthesizeChurnFollowUpAnswer } from './churn-answer.js';
+export { synthesizeChurnFollowUpAnswer } from './churn-answer.js';
+import {
   customerFollowUpRequestSchema,
   customerFollowUpRecordSchema,
   type CustomerFollowUpRecord,
@@ -88,6 +97,7 @@ export interface MrrDeclineTools {
     input: unknown,
   ): Promise<ToolResult<unknown>>;
   compareCountryMrr?(input: unknown): Promise<ToolResult<unknown>>;
+  getCustomerChurnRate?(input: unknown): Promise<ToolResult<unknown>>;
 }
 
 export interface MrrDeclineInvestigationRequest {
@@ -135,11 +145,13 @@ export interface FollowUpContextResult {
 }
 
 export type StoredRecord =
+  | ChurnFollowUpRecord
   | CrossSourceRecord
   | InvestigationRecord
   | CountryFollowUpRecord
   | CustomerFollowUpRecord;
 export type StoredPlan =
+  | ChurnFollowUpPlan
   | CrossSourcePlan
   | InvestigationPlan
   | CountryFollowUpPlan
@@ -385,6 +397,79 @@ export class MrrDeclineInvestigationService {
     )
       return { status: 'scope_mismatch' };
     return { status: 'ok', record: found.record };
+  }
+
+  async startChurnFollowUp(parentId: string, token: string, input: unknown) {
+    const parent = await this.getInvestigation(parentId, token);
+    if (parent.status !== 'ok') return { status: 'not_found' as const };
+    if (
+      parent.record.kind !== 'mrr_decline' ||
+      parent.record.status !== 'completed' ||
+      synthesizeMrrDeclineAnswer(parent.record, parent.evidence).status !== 'ok'
+    )
+      return { status: 'invalid_parent' as const };
+    const parsed = churnFollowUpRequestSchema.safeParse(input);
+    if (!parsed.success)
+      return {
+        status: 'invalid_request' as const,
+        error: parsed.error.message,
+      };
+    const plan: ChurnFollowUpPlan = {
+      investigationId: parsed.data.investigationId,
+      steps: ['get_customer_churn_rate'],
+      maximumToolCalls: 1,
+    };
+    Object.freeze(plan.steps);
+    Object.freeze(plan);
+    const accessToken = randomBytes(32).toString('base64url');
+    if (!(await this.store.reserve(plan, hashToken(accessToken))))
+      return { status: 'conflict' as const };
+    const result = await safeMetric(() =>
+      this.tools.getCustomerChurnRate
+        ? this.tools.getCustomerChurnRate({
+            month: parent.record.month,
+            ...(parent.record.permittedCustomerIds.length
+              ? { filters: { customerIds: parent.record.permittedCustomerIds } }
+              : {}),
+          })
+        : Promise.resolve({
+            status: 'data_unavailable' as const,
+            evidence: [],
+            warnings: ['customer_churn_unavailable'],
+          }),
+    );
+    const evidence = [...result.evidence];
+    const record: ChurnFollowUpRecord = {
+      investigationId: plan.investigationId,
+      parentInvestigationId: parentId,
+      kind: 'customer_churn_follow_up',
+      month: parent.record.month,
+      permittedCustomerIds: [...parent.record.permittedCustomerIds],
+      plan,
+      status: 'completed',
+      evidenceIds: evidence.map((item) => item.evidenceId),
+      warnings: [...result.warnings],
+    };
+    if (
+      !isUsable(result) ||
+      !customerChurnRateSchema.safeParse(result.value).success ||
+      synthesizeChurnFollowUpAnswer(record, evidence).status !== 'ok'
+    ) {
+      record.status = 'blocked';
+      record.warnings.push('customer_churn_evidence_unavailable_or_invalid');
+    }
+    churnFollowUpRecordSchema.parse(record);
+    Object.freeze(record.permittedCustomerIds);
+    Object.freeze(record.evidenceIds);
+    Object.freeze(record.warnings);
+    Object.freeze(record);
+    await this.store.finalize(record.investigationId, record, evidence);
+    return {
+      status: record.status,
+      record,
+      accessToken,
+      warnings: record.warnings,
+    };
   }
 
   async startCountryFollowUp(parentId: string, token: string, input: unknown) {

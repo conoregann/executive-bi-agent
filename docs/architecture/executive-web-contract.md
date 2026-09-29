@@ -57,6 +57,14 @@ a retained plan, not execution timing or live progress. It uses the creation
 response's validated record and the answer's cited evidence; opening it runs no
 tools. New submissions and reloads clear the prior trail with the answer.
 
+## Customer churn follow-up
+
+A completed parent offers “Calculate customer churn”. The result presents the
+inherited month and customer scope, “customers churned / starting customers”,
+the formatted rate, warnings, and authenticated query/calculation citations.
+The browser formats the trusted rate; it does not derive cohort counts. A
+blocked child shows its retained identifier and warnings without a rate.
+
 ## Country comparison follow-up
 
 Completed parent answers offer “Break down by country” and a dedicated
