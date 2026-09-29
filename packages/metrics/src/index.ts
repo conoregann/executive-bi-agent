@@ -271,6 +271,10 @@ export class TrustedMrrService {
   ): Promise<MetricResult<CustomerChurnRate>> {
     const parsed = parseRequest(input);
     if (!parsed.ok) return invalidRequest(parsed.error);
+    if (hasDimensionFilters(parsed.value.filters))
+      return invalidRequest(
+        'Customer churn supports only customerIds filters; segment transfers are not churn.',
+      );
     const currentMonth = parsed.value.month;
     const previousMonth = priorMonth(currentMonth);
     const [previous, current] = await Promise.all([
@@ -343,6 +347,10 @@ export class TrustedMrrService {
   async getMrrMovement(input: unknown): Promise<MetricResult<MrrMovement>> {
     const parsed = parseRequest(input);
     if (!parsed.ok) return invalidRequest(parsed.error);
+    if (hasDimensionFilters(parsed.value.filters))
+      return invalidRequest(
+        'MRR movement supports only customerIds filters; segment transfers are not lifecycle movement.',
+      );
 
     const previousMonth = priorMonth(parsed.value.month);
     const [current, previous] = await Promise.all([
@@ -390,6 +398,10 @@ export class TrustedMrrService {
   ): Promise<MetricResult<CustomerMrrMovement>> {
     const parsed = parseCustomerMovementRequest(input);
     if (!parsed.ok) return invalidRequest(parsed.error);
+    if (hasDimensionFilters(parsed.value.filters))
+      return invalidRequest(
+        'Customer MRR movement supports only customerIds filters; segment transfers are not lifecycle movement.',
+      );
 
     const previousMonth = priorMonth(parsed.value.month);
     const [current, previous] = await Promise.all([
@@ -918,6 +930,10 @@ function parseFilters(
     };
   }
   return { ok: true, value: input as MetricFilters };
+}
+
+function hasDimensionFilters(filters: MetricFilters): boolean {
+  return FILTER_FIELDS.some((field) => filters[field] !== undefined);
 }
 
 function calculateMovement(
