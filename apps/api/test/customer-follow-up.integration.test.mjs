@@ -183,7 +183,10 @@ test('synthetic missing months, stale totals and tampered parent evidence retain
       snapshot.rows = snapshot.rows.filter((row) => row.month !== '2026-07-01');
     if (mode === 'stale')
       snapshot.rows.find(
-        (row) => row.country === 'DE' && row.isActiveAtMonthEnd,
+        (row) =>
+          row.month === '2026-07-01' &&
+          row.country === 'DE' &&
+          row.isActiveAtMonthEnd,
       ).mrrEurCents += 1;
     if (mode === 'tampered') {
       const originalGet = store.get.bind(store);

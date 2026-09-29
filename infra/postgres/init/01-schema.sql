@@ -29,6 +29,21 @@ CREATE TABLE raw.subscription_month_snapshots (
   PRIMARY KEY (customer_id, subscription_id, month)
 );
 
+-- Synthetic reporting dimensions are captured once per customer and period.
+CREATE TABLE raw.customer_month_dimensions (
+  customer_id TEXT NOT NULL REFERENCES raw.customers(customer_id),
+  month DATE NOT NULL CHECK (month = date_trunc('month', month)::DATE),
+  plan TEXT NOT NULL CHECK (plan IN ('starter', 'growth', 'enterprise')),
+  country TEXT NOT NULL CHECK (country ~ '^[A-Z]{2}$'),
+  industry TEXT NOT NULL,
+  company_size TEXT NOT NULL CHECK (company_size IN ('small', 'mid_market', 'enterprise')),
+  PRIMARY KEY (customer_id, month)
+);
+
+ALTER TABLE raw.subscription_month_snapshots
+  ADD CONSTRAINT subscription_month_dimensions_fk
+  FOREIGN KEY (customer_id, month) REFERENCES raw.customer_month_dimensions(customer_id, month);
+
 CREATE TABLE raw.support_tickets (
   ticket_id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL REFERENCES raw.customers(customer_id),
@@ -78,14 +93,21 @@ SELECT
   snapshot.month,
   snapshot.mrr_eur_cents,
   snapshot.subscription_status,
-  customer.plan,
-  customer.country,
-  customer.region,
-  customer.industry,
-  customer.company_size,
+  dimension.plan,
+  dimension.country,
+  CASE
+    WHEN dimension.country IN ('GB', 'IE') THEN 'uk_ireland'
+    WHEN dimension.country IN ('DE', 'AT', 'CH') THEN 'dach'
+    WHEN dimension.country IN ('DK', 'FI', 'NO', 'SE') THEN 'nordics'
+    WHEN dimension.country IN ('CA', 'US') THEN 'north_america'
+    ELSE 'rest_of_europe'
+  END AS region,
+  dimension.industry,
+  dimension.company_size,
   snapshot.cancelled_at
 FROM raw.subscription_month_snapshots AS snapshot
-JOIN staging.customers AS customer USING (customer_id);
+JOIN raw.customer_month_dimensions AS dimension
+  ON dimension.customer_id = snapshot.customer_id AND dimension.month = snapshot.month;
 
 CREATE VIEW analytics.subscription_month AS
 SELECT

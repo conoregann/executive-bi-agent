@@ -20,7 +20,7 @@ function request(body, options = {}) {
 
 test('loads only labeled synthetic fixtures and completes the scoped MRR-decline endpoint', async () => {
   const dependencies = await loadSyntheticMrrDeclineDependencies();
-  assert.equal(dependencies.snapshot.rows.length, 10);
+  assert.equal(dependencies.snapshot.rows.length, 16);
   assert.deepEqual(
     dependencies.documents.map((document) => document.documentId),
     ['payment-incident-281', 'august-sales-review'],

@@ -205,13 +205,15 @@ test('invalid or out-of-scope document evidence is excluded without inventing co
 
 test('zero baselines, increases and year boundaries retain truthful comparison wording', async () => {
   const dependencies = await loadSyntheticMrrDeclineDependencies();
-  dependencies.snapshot.rows = dependencies.snapshot.rows.map((row) => ({
-    ...row,
-    month: row.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
-    ...(row.month === '2026-07-01'
-      ? { mrrEurCents: 0, isActiveAtMonthEnd: false }
-      : {}),
-  }));
+  dependencies.snapshot.rows = dependencies.snapshot.rows
+    .filter((row) => row.month !== '2026-06-01')
+    .map((row) => ({
+      ...row,
+      month: row.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
+      ...(row.month === '2026-07-01'
+        ? { mrrEurCents: 0, isActiveAtMonthEnd: false }
+        : {}),
+    }));
   const api = createMrrDeclineApi(dependencies);
   const created = await api.fetch(
     new Request('http://api.test/v1/investigations/mrr-decline', {

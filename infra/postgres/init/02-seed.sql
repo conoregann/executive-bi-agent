@@ -5,10 +5,34 @@ INSERT INTO raw.customers (customer_id, customer_name, industry, country, compan
   ('cust_acme', 'Acme Industrial', 'manufacturing', 'DE', 'enterprise', 'enterprise', 'sales_outbound', 'Marta Fischer', '2025-02-10T09:00:00Z'),
   ('cust_berlin', 'Berlin Legal', 'professional_services', 'DE', 'mid_market', 'growth', 'partner', 'Jonas Weber', '2025-04-18T09:00:00Z'),
   ('cust_london', 'London Retail Group', 'retail', 'GB', 'enterprise', 'enterprise', 'sales_outbound', 'Amelia Smith', '2025-01-12T09:00:00Z'),
-  ('cust_nordic', 'Nordic Ventures', 'technology', 'SE', 'small', 'starter', 'product_led', 'Lina Berg', '2026-08-05T09:00:00Z'),
+  ('cust_nordic', 'Nordic Ventures', 'technology', 'SE', 'small', 'starter', 'product_led', 'Lina Berg', '2026-05-05T09:00:00Z'),
   ('cust_riviera', 'Riviera Advisory', 'financial_services', 'FR', 'mid_market', 'growth', 'paid_search', 'Claire Martin', '2025-06-02T09:00:00Z');
 
+-- Synthetic period-start reporting dimensions; Berlin transfers and upgrades in July.
+INSERT INTO raw.customer_month_dimensions (customer_id, month, plan, country, industry, company_size) VALUES
+  ('cust_acme', '2026-06-01', 'enterprise', 'DE', 'manufacturing', 'enterprise'),
+  ('cust_berlin', '2026-06-01', 'starter', 'GB', 'professional_services', 'mid_market'),
+  ('cust_london', '2026-06-01', 'enterprise', 'GB', 'retail', 'enterprise'),
+  ('cust_nordic', '2026-06-01', 'starter', 'SE', 'technology', 'small'),
+  ('cust_riviera', '2026-06-01', 'growth', 'FR', 'financial_services', 'mid_market'),
+  ('cust_acme', '2026-07-01', 'enterprise', 'DE', 'manufacturing', 'enterprise'),
+  ('cust_berlin', '2026-07-01', 'growth', 'DE', 'professional_services', 'mid_market'),
+  ('cust_london', '2026-07-01', 'enterprise', 'GB', 'retail', 'enterprise'),
+  ('cust_nordic', '2026-07-01', 'starter', 'SE', 'technology', 'small'),
+  ('cust_riviera', '2026-07-01', 'growth', 'FR', 'financial_services', 'mid_market'),
+  ('cust_acme', '2026-08-01', 'enterprise', 'DE', 'manufacturing', 'enterprise'),
+  ('cust_berlin', '2026-08-01', 'growth', 'DE', 'professional_services', 'mid_market'),
+  ('cust_london', '2026-08-01', 'enterprise', 'GB', 'retail', 'enterprise'),
+  ('cust_nordic', '2026-08-01', 'starter', 'SE', 'technology', 'small'),
+  ('cust_riviera', '2026-08-01', 'growth', 'FR', 'financial_services', 'mid_market');
+
 INSERT INTO raw.subscription_month_snapshots (customer_id, subscription_id, month, mrr_eur_cents, subscription_status, cancelled_at) VALUES
+  ('cust_acme', 'sub_acme', '2026-06-01', 240000, 'active', NULL),
+  ('cust_berlin', 'sub_berlin', '2026-06-01', 70000, 'active', NULL),
+  ('cust_berlin', 'sub_berlin_extra', '2026-06-01', 20000, 'active', NULL),
+  ('cust_london', 'sub_london', '2026-06-01', 50000, 'active', NULL),
+  ('cust_nordic', 'sub_nordic', '2026-06-01', 60000, 'active', NULL),
+  ('cust_riviera', 'sub_riviera', '2026-06-01', 40000, 'active', NULL),
   ('cust_acme', 'sub_acme', '2026-07-01', 240000, 'active', NULL), ('cust_berlin', 'sub_berlin', '2026-07-01', 90000, 'active', NULL),
   ('cust_london', 'sub_london', '2026-07-01', 50000, 'active', NULL), ('cust_nordic', 'sub_nordic', '2026-07-01', 0, 'cancelled', NULL),
   ('cust_riviera', 'sub_riviera', '2026-07-01', 40000, 'active', NULL), ('cust_acme', 'sub_acme', '2026-08-01', 0, 'cancelled', '2026-08-12T10:00:00Z'),

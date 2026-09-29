@@ -16,16 +16,17 @@ staging.*              conformed customer dimensions and snapshots
 analytics.*            metric-ready subscription and movement views
 ```
 
-`raw` retains source semantics. `staging` owns canonical customer joins and the country-to-region mapping. `analytics` owns metric-ready grains; tools may read only this schema in the first implementation.
+`raw` retains source semantics, including one captured reporting-dimension row per customer and month in `raw.customer_month_dimensions`. `staging` joins each subscription snapshot to its matching customer-month dimensions and derives region from that period's country. The mutable `raw.customers` record supplies identity and current account details, not historical reporting dimensions. `analytics` owns metric-ready grains; tools may read only this schema in the first implementation. The composite foreign key prevents a subscription snapshot without period dimensions.
 
 ## Initial dataset
 
-The fixtures cover July and August 2026 and are designed to make the MRR movement contract testable:
+The fixtures cover June through August 2026 and are designed to make the MRR movement contract testable:
 
-| Month       |    MRR | Expected movement versus July                            |
-| ----------- | -----: | -------------------------------------------------------- |
-| July 2026   | €4,200 | Starting point                                           |
-| August 2026 | €2,500 | €600 new, €200 expansion, €100 contraction, €2,400 churn |
+| Month       |    MRR | Scenario                                                        |
+| ----------- | -----: | --------------------------------------------------------------- |
+| June 2026   | €4,800 | Berlin has two subscriptions on Starter in GB; Nordic is active |
+| July 2026   | €4,200 | Starting point                                                  |
+| August 2026 | €2,500 | €600 new, €200 expansion, €100 contraction, €2,400 churn        |
 
 The movement reconciles in cents:
 
@@ -36,7 +37,7 @@ The movement reconciles in cents:
 Supporting synthetic support and knowledge records provide dated context for the churned customer. They are not evidence of a causal relationship.
 
 `data/synthetic/subscription-month-2026.json` and
-`analytics.subscription_month` contain the same ten subscription-month rows,
+`analytics.subscription_month` contain the same sixteen subscription-month rows,
 including customer IDs, dimensions, cancellation timestamps, and MRR cents.
 `analytics.subscription_month_freshness` carries the same source freshness as
 the JSON fixture. The read-only PostgreSQL repository in `packages/analytics`
@@ -51,12 +52,23 @@ pnpm db:up
 pnpm db:verify
 ```
 
-The PostgreSQL image executes `infra/postgres/init/01-schema.sql` and `02-seed.sql` only on first volume initialization. `infra/postgres/verify.sql` asserts the expected MRR values, reconciliation, and churn count.
+The PostgreSQL image executes `infra/postgres/init/01-schema.sql` and `02-seed.sql` only on first volume initialization. `infra/postgres/verify.sql` asserts fixture parity, MRR reconciliation, segment transfer behavior, reactivation, and historical stability after a current-record edit.
 
 For an existing local synthetic volume, run `pnpm db:migrate` before
-`pnpm db:verify`. The migration adds the cancellation and freshness fields
-without replacing existing data. Verification also checks every PostgreSQL
-subscription-month row against the mounted JSON fixture.
+`pnpm db:verify`. The migration backfills the known synthetic customer-month
+dimensions explicitly, adds June's bounded scenario, and preserves existing
+July–August subscription rows. Verification also checks every PostgreSQL
+subscription-month row against the mounted JSON fixture. Existing volumes with
+additional subscription months need matching customer-month dimensions before
+the foreign key can be installed.
+
+Berlin's June Starter/GB and July Growth/DE snapshots retain their own dimensions
+even if its current customer record changes. Its €900 customer MRR is unchanged
+across the transfer, so the country and plan breakdowns move €900 between
+segments while customer movement remains `none`. Nordic's June active, July
+inactive, and August active snapshots demonstrate reactivation. The current
+zero-to-positive movement definition labels August as `new`; it does not yet
+distinguish reactivation from first acquisition.
 
 To deliberately reseed local data, stop the service and remove the named Docker volume, then run `pnpm db:up`. Do not use that operation for real environments.
 

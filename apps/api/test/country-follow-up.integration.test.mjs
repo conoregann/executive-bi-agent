@@ -219,7 +219,10 @@ test('changed or unavailable analytics block and retain follow-ups without an an
     const snapshot = structuredClone(dependencies.snapshot);
     if (missing)
       snapshot.rows = snapshot.rows.filter((row) => row.month !== '2026-07-01');
-    else snapshot.rows.find((row) => row.isActiveAtMonthEnd).mrrEurCents += 100;
+    else
+      snapshot.rows.find(
+        (row) => row.month === '2026-07-01' && row.isActiveAtMonthEnd,
+      ).mrrEurCents += 100;
     const changed = createMrrDeclineApi({ ...dependencies, snapshot }, store);
     const response = await changed.fetch(
       request('parent/country-follow-ups', original.accessToken, {
@@ -359,7 +362,7 @@ test('authorization, unsupported wording and invalid parents cannot reserve or r
     await api.fetch(
       request('mrr-decline', undefined, {
         investigationId: 'blocked-parent',
-        month: '2026-07-01',
+        month: '2026-06-01',
       }),
     )
   ).json();
