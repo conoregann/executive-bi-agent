@@ -10,10 +10,20 @@ import {
 } from '../dist/index.js';
 import { PostgresInvestigationStore } from '../dist/postgres-store.js';
 
+const hasDatabaseConnections = Boolean(
+  process.env.DATABASE_URL && process.env.ANALYTICS_DATABASE_URL,
+);
+if (process.env.CI) {
+  assert.ok(
+    hasDatabaseConnections,
+    'CI requires DATABASE_URL and ANALYTICS_DATABASE_URL for PostgreSQL integration tests',
+  );
+}
+
 test(
   'PostgreSQL retains a scoped investigation and evidence across API instances',
   {
-    skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL,
+    skip: !hasDatabaseConnections,
   },
   async () => {
     const pool = new Pool({
@@ -151,7 +161,7 @@ test(
 
 test(
   'PostgreSQL retains linked country follow-ups and evidence across service restart',
-  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  { skip: !hasDatabaseConnections },
   async () => {
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -243,7 +253,7 @@ test(
 
 test(
   'synthetic PostgreSQL retains account drill-downs across restart without analytics access',
-  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  { skip: !hasDatabaseConnections },
   async () => {
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
@@ -348,7 +358,7 @@ test(
 
 test(
   'PostgreSQL cross-source evidence is readable after restart without analytics',
-  { skip: !process.env.DATABASE_URL || !process.env.ANALYTICS_DATABASE_URL },
+  { skip: !hasDatabaseConnections },
   async () => {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const analytics = new Pool({
