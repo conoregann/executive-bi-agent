@@ -27,7 +27,7 @@ focused contract, surface the conflict before changing that boundary.
 | `apps/web`                | React/Vite interface for structured synthetic MRR investigations, cited answers, evidence-backed MRR-by-plan charts, country comparisons and customer drill-downs, retained plans, and authenticated evidence inspection. Bounded natural-language MRR-decline input and scoped cross-source context; no streaming.      |
 | `apps/api`                | Node.js HTTP API for synthetic MRR-decline investigations, PostgreSQL plan/evidence persistence, bearer-token reads, exact-scope follow-up context, executable country comparisons, customer drill-downs, and scoped cross-source evidence with optional model guidance. Not NestJS or a production tenant/RBAC service. |
 | `packages/analytics`      | Validated in-memory and injected PostgreSQL subscription-month repositories using fixed analytics-view queries.                                                                                                                                                                                                          |
-| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, and evidence-linked bar specifications. Evidence-linked movement waterfalls; other catalog metrics are not yet executable.                                                                                                              |
+| `packages/metrics`        | Deterministic MRR retrieval, comparison, customer/aggregate movement, breakdown, customer churn rate, and evidence-linked bar specifications. Evidence-linked movement waterfalls; other catalog metrics are not yet executable.                                                                                         |
 | `packages/retrieval`      | Validated synthetic documents, deterministic chunking, bounded customer-scoped lexical search; no embeddings or vector search.                                                                                                                                                                                           |
 | `packages/investigations` | Five-step MRR-decline orchestration, two-step country follow-ups and one-step customer drill-downs, blocked outcomes, retained scope, deterministic metric answers and bounded model-guided operational context.                                                                                                         |
 | `packages/operations`     | Typed CRM/support history and deterministic active-user comparisons; synthetic fixtures and fixed scoped PostgreSQL queries.                                                                                                                                                                                             |
@@ -518,9 +518,9 @@ Every executive investigation runs through an inspectable state machine managed 
 
 ## 9. Planned Evaluation Framework & Benchmark Targets
 
-The planned benchmark will contain 100 deterministic executive questions.
-Current `evals/` contains Markdown acceptance cases, not this benchmark or measured
-quality/latency results.
+The planned broader benchmark will contain 100 deterministic executive questions.
+Current `evals/` contains Markdown acceptance cases and a 46-case executable
+synthetic cross-source contract benchmark, but no live model quality/cost results.
 
 ### Question Categories
 

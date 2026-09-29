@@ -28,3 +28,5 @@ jobs:
       - run: pnpm test
         env:
           DATABASE_URL: postgres://executive_bi:executive_bi_local_only@127.0.0.1:5433/executive_bi
+          ANALYTICS_DATABASE_URL: postgres://executive_bi_analytics:synthetic_analytics_local_only@127.0.0.1:5433/executive_bi
+      - run: pnpm eval:cross-source
