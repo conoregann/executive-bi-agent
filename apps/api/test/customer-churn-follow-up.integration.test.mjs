@@ -210,6 +210,9 @@ test('synthetic unavailable monthly snapshot retains a blocked churn child', asy
   const root = await parent(api);
   const snapshot = structuredClone(dependencies.snapshot);
   snapshot.rows = snapshot.rows.filter((row) => row.month !== '2026-07-01');
+  snapshot.coverage = snapshot.coverage.filter(
+    (item) => item.month !== '2026-07-01',
+  );
   const changed = createMrrDeclineApi({ ...dependencies, snapshot }, store);
   const response = await changed.fetch(
     request('parent/customer-churn-follow-ups', root.accessToken, {

@@ -14,11 +14,18 @@ export interface SubscriptionMonthRecord {
 
 export interface SubscriptionMonthRepository {
   getMonth(month: string): Promise<readonly SubscriptionMonthRecord[]>;
+  coverage(month: string): Promise<PeriodCoverage>;
   freshness(): Promise<string>;
+}
+
+export interface PeriodCoverage {
+  status: 'complete' | 'incomplete' | 'unavailable' | 'stale';
+  freshness: string;
 }
 
 export interface SubscriptionMonthSnapshot {
   freshness: string;
+  coverage: readonly ({ month: string } & PeriodCoverage)[];
   rows: readonly SubscriptionMonthRecord[];
 }
 
@@ -50,6 +57,11 @@ const SUBSCRIPTION_MONTH_FRESHNESS_SQL = `
 SELECT to_char(freshness AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS freshness
 FROM analytics.subscription_month_freshness`;
 
+const SUBSCRIPTION_MONTH_COVERAGE_SQL = `
+SELECT status, to_char(freshness AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS freshness
+FROM analytics.subscription_month_coverage
+WHERE month = $1::date`;
+
 /**
  * Creates a deterministic, read-only adapter for metric-ready synthetic data.
  * The adapter rejects malformed source rows instead of allowing a metric layer
@@ -60,6 +72,26 @@ export function createSubscriptionMonthRepository(
 ): SubscriptionMonthRepository {
   if (!isIsoTimestamp(snapshot.freshness)) {
     throw new Error('Snapshot freshness must be an ISO timestamp.');
+  }
+
+  if (!Array.isArray(snapshot.coverage)) {
+    throw new Error('Snapshot coverage must be an array.');
+  }
+  const coverageByMonth = new Map<string, PeriodCoverage>();
+  for (const item of snapshot.coverage) {
+    if (
+      !isRecord(item) ||
+      !isCalendarMonth(item.month) ||
+      !isCoverageStatus(item.status) ||
+      !isIsoTimestamp(item.freshness) ||
+      coverageByMonth.has(item.month)
+    ) {
+      throw new Error('Invalid or duplicate subscription-month coverage.');
+    }
+    coverageByMonth.set(
+      item.month,
+      Object.freeze({ status: item.status, freshness: item.freshness }),
+    );
   }
 
   const rowsByMonth = new Map<string, readonly SubscriptionMonthRecord[]>();
@@ -76,6 +108,13 @@ export function createSubscriptionMonthRepository(
     const rows = rowsByMonth.get(row.month) ?? [];
     rowsByMonth.set(row.month, [...rows, freezeRow(row)]);
   }
+  for (const month of rowsByMonth.keys()) {
+    if (!coverageByMonth.has(month)) {
+      throw new Error(
+        `Subscription-month rows lack coverage metadata: ${month}.`,
+      );
+    }
+  }
   for (const [month, rows] of rowsByMonth) {
     rowsByMonth.set(month, Object.freeze(rows));
   }
@@ -84,6 +123,14 @@ export function createSubscriptionMonthRepository(
     async getMonth(month) {
       if (!isCalendarMonth(month)) return [];
       return rowsByMonth.get(month) ?? [];
+    },
+    async coverage(month) {
+      return (
+        coverageByMonth.get(month) ?? {
+          status: 'unavailable',
+          freshness: snapshot.freshness,
+        }
+      );
     },
     async freshness() {
       return snapshot.freshness;
@@ -118,6 +165,24 @@ export function createPostgresSubscriptionMonthRepository(
         return freezeRow(row);
       });
       return Object.freeze(rows);
+    },
+    async coverage(month) {
+      if (!isCalendarMonth(month))
+        return { status: 'unavailable', freshness: await this.freshness() };
+      const result = await client.query(SUBSCRIPTION_MONTH_COVERAGE_SQL, [
+        month,
+      ]);
+      if (result.rows.length > 1)
+        throw new Error('Duplicate PostgreSQL coverage rows.');
+      if (result.rows.length === 0)
+        return { status: 'unavailable', freshness: await this.freshness() };
+      const row = result.rows[0];
+      if (!isCoverageStatus(row?.status) || !isIsoTimestamp(row.freshness)) {
+        throw new Error(
+          'PostgreSQL returned invalid subscription-month coverage.',
+        );
+      }
+      return Object.freeze({ status: row.status, freshness: row.freshness });
     },
     async freshness() {
       const result = await client.query(SUBSCRIPTION_MONTH_FRESHNESS_SQL);
@@ -239,4 +304,13 @@ function isIsoTimestamp(value: unknown): value is string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCoverageStatus(value: unknown): value is PeriodCoverage['status'] {
+  return (
+    value === 'complete' ||
+    value === 'incomplete' ||
+    value === 'unavailable' ||
+    value === 'stale'
+  );
 }

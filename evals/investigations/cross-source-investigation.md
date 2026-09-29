@@ -2,12 +2,14 @@
 
 Contract: [cross-source investigations](../../docs/architecture/cross-source-investigation-contract.md).
 
-Run `pnpm eval:cross-source` after building the workspace. It executes 46 synthetic
+Run `pnpm eval:cross-source` after building the workspace. It executes 47 synthetic
 cases against the API and retained-answer boundaries: malformed plans and
 synthesis, unknown citations, permissions, customer/date overrides, unsupported
 questions, missing sources, contradictory CRM context, stale coverage, malicious
 source instructions, restart reads, valid support hypotheses and the thirty-second
 model deadline. Every case specifies an executable assertion and stable ID.
+Coverage cases distinguish a missing support feed from an explicitly complete
+feed with no event for a permitted customer.
 
 The JSON output separates deterministic contract results and measured harness
 latency from live model quality and cost. The adapter is injected or disabled;

@@ -2,6 +2,23 @@
   "label": "Synthetic data for Northstar Workspace; not real customer data.",
   "source": "analytics.subscription_month",
   "freshness": "2026-09-01T08:00:00Z",
+  "coverage": [
+    {
+      "month": "2026-06-01",
+      "status": "complete",
+      "freshness": "2026-09-01T08:00:00Z"
+    },
+    {
+      "month": "2026-07-01",
+      "status": "complete",
+      "freshness": "2026-09-01T08:00:00Z"
+    },
+    {
+      "month": "2026-08-01",
+      "status": "complete",
+      "freshness": "2026-09-01T08:00:00Z"
+    }
+  ],
   "rows": [
     {
       "customerId": "cust_acme",

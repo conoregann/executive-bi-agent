@@ -44,6 +44,22 @@ BEGIN
     RAISE EXCEPTION 'PostgreSQL freshness differs from the JSON fixture';
   END IF;
 
+  WITH expected AS (
+    SELECT value AS row FROM jsonb_array_elements(fixture->'coverage')
+  ), actual AS (
+    SELECT jsonb_build_object('month', month::text, 'status', status,
+      'freshness', to_char(freshness AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) AS row
+    FROM analytics.subscription_month_coverage
+  ), differences AS (
+    (SELECT row FROM expected EXCEPT SELECT row FROM actual)
+    UNION ALL
+    (SELECT row FROM actual EXCEPT SELECT row FROM expected)
+  )
+  SELECT COUNT(*) INTO mismatches FROM differences;
+  IF mismatches <> 0 OR (SELECT COUNT(*) FROM analytics.subscription_month_coverage) <> jsonb_array_length(fixture->'coverage') THEN
+    RAISE EXCEPTION 'PostgreSQL coverage differs from the JSON fixture';
+  END IF;
+
   SELECT mrr_eur_cents INTO actual
   FROM analytics.mrr_monthly
   WHERE month = DATE '2026-06-01';
@@ -130,6 +146,13 @@ SELECT 'analytics verification passed' AS result;
 
 DO $$
 BEGIN
+ IF NOT has_table_privilege('executive_bi_analytics','analytics.subscription_month_coverage','SELECT')
+ OR has_table_privilege('executive_bi_analytics','raw.subscription_month_coverage','SELECT') THEN
+ RAISE EXCEPTION 'Coverage reader permission boundary failed'; END IF;
+END $$;
+
+DO $$
+BEGIN
  IF (SELECT count(*) FROM analytics.operational_records) <> (SELECT jsonb_array_length(pg_read_file('/fixtures/operations-2026.json')::jsonb->'rows')) THEN
  RAISE EXCEPTION 'Synthetic operational fixture parity failed';
  END IF;
@@ -143,7 +166,16 @@ BEGIN
   LEFT JOIN analytics.operational_records actual ON actual.record_id = item->>'recordId'
   WHERE actual.record IS DISTINCT FROM item
  ) THEN RAISE EXCEPTION 'Synthetic operational record parity failed'; END IF;
+ IF EXISTS (
+  WITH expected AS (SELECT item FROM jsonb_array_elements(pg_read_file('/fixtures/operations-2026.json')::jsonb->'coverage') item),
+  actual AS (SELECT jsonb_build_object('source',source,'month',month::text,'status',status,'freshness',to_char(freshness AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) item FROM analytics.operational_coverage)
+  (SELECT item FROM expected EXCEPT SELECT item FROM actual)
+  UNION ALL
+  (SELECT item FROM actual EXCEPT SELECT item FROM expected)
+ ) THEN RAISE EXCEPTION 'Synthetic operational coverage parity failed'; END IF;
  IF NOT has_table_privilege('executive_bi_analytics','analytics.operational_records','SELECT')
- OR has_table_privilege('executive_bi_analytics','raw.operational_records','SELECT') THEN
+ OR NOT has_table_privilege('executive_bi_analytics','analytics.operational_coverage','SELECT')
+ OR has_table_privilege('executive_bi_analytics','raw.operational_records','SELECT')
+ OR has_table_privilege('executive_bi_analytics','raw.operational_coverage','SELECT') THEN
  RAISE EXCEPTION 'Operational reader permission boundary failed'; END IF;
 END $$;

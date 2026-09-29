@@ -201,7 +201,7 @@ test('invalid scope and missing comparison data show recoverable outcomes', asyn
     .click();
   await page.getByRole('status').filter({ hasText: '50 unique' }).waitFor();
   await page.getByLabel('Customer IDs (optional)').fill('');
-  await page.getByLabel('Reporting month').fill('2026-06');
+  await page.getByLabel('Reporting month').fill('2026-05');
   await page
     .getByRole('button', { name: 'Investigate MRR', exact: true })
     .click();

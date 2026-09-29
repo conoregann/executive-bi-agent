@@ -41,7 +41,11 @@ Supporting synthetic support and knowledge records provide dated context for the
 including customer IDs, dimensions, cancellation timestamps, and MRR cents.
 `analytics.subscription_month_freshness` carries the same source freshness as
 the JSON fixture. The read-only PostgreSQL repository in `packages/analytics`
-uses fixed queries against these two approved views, binds the requested month,
+also reads `analytics.subscription_month_coverage`, one explicit status and
+freshness timestamp per reporting month. `complete` authorizes a metric read,
+including a zero-row month; `incomplete`, `unavailable`, and `stale` block it.
+An absent coverage row is `unavailable`, never proof of zero activity. The
+repository uses fixed queries against these approved views, binds the requested month,
 and validates returned rows before metrics consume them.
 
 ## Local operation
@@ -91,3 +95,7 @@ existing read-only role. Migration updates only these synthetic fixture records.
 Verification checks complete JSON parity and reader permissions. Operational
 usage deltas are current minus previous observed active-user counts; either
 missing observation produces null, never zero. No account-health score is inferred.
+`analytics.operational_coverage` supplies explicit source/month completeness and
+freshness. For CRM and support, an empty complete window confirms no recorded
+events for the requested customers; an incomplete, unavailable, or stale feed
+retains missing-coverage status. Usage still requires both customer observations.

@@ -264,6 +264,11 @@ test('synthetic customer tools run only after reservation; invalid parents and s
   const metrics = new TrustedMrrService({
     getMonth: async (month) =>
       dependencies.snapshot.rows.filter((row) => row.month === month),
+    coverage: async (month) =>
+      dependencies.snapshot.coverage.find((item) => item.month === month) ?? {
+        status: 'unavailable',
+        freshness: dependencies.snapshot.freshness,
+      },
     freshness: async () => dependencies.snapshot.freshness,
   });
   const store = new InMemoryInvestigationStore();

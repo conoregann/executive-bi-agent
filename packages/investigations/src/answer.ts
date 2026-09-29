@@ -225,6 +225,9 @@ export function synthesizeMrrDeclineAnswer(
         sourceRef: item.sourceRef,
         type: item.type,
         freshness: item.freshness,
+        ...(item.type === 'metric_query'
+          ? { sourceStatus: item.scope.sourceStatus }
+          : {}),
       })),
     ...(chart ? { chart } : {}),
     ...(waterfall ? { waterfall } : {}),

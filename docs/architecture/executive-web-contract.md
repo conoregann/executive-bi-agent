@@ -10,7 +10,7 @@ metrics. Routes are explicit API paths; there is no filesystem URL routing.
 The form accepts a reporting month and an optional comma-separated list of at
 most 50 unique customer IDs. Empty scope means the full synthetic dataset, not
 production permission discovery. June–August 2026 are available in the synthetic
-dataset; June lacks a May comparison and produces a blocked outcome. Each
+dataset; May lacks source coverage and produces a blocked outcome. Each
 submission uses a new investigation identifier.
 
 An optional question field and “Resolve question” action populate the reporting

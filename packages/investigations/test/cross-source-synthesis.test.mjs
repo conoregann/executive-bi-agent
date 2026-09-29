@@ -34,6 +34,9 @@ async function run(hypotheses) {
         companySize: 'mid_market',
       }));
     },
+    async coverage() {
+      return { status: 'complete', freshness: '2026-09-01T08:00:00Z' };
+    },
     async freshness() {
       return '2026-09-01T08:00:00Z';
     },

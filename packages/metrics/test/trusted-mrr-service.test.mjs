@@ -23,12 +23,20 @@ function record(customerId, month, mrrEurCents, options = {}) {
   };
 }
 
-function fixtureRepository(months) {
+function fixtureRepository(months, statuses = {}) {
   let calls = 0;
   return {
     async getMonth(month) {
       calls += 1;
       return months[month] ?? [];
+    },
+    async coverage(month) {
+      return {
+        status:
+          statuses[month] ??
+          (Object.hasOwn(months, month) ? 'complete' : 'unavailable'),
+        freshness: '2026-09-01T08:00:00Z',
+      };
     },
     async freshness() {
       return '2026-09-01T08:00:00Z';
@@ -290,8 +298,51 @@ test('does not fabricate a comparison when the previous snapshot is unavailable'
   const result = await service(repository).compareMrr({ month: AUGUST });
 
   assert.equal(result.status, 'data_unavailable');
-  assert.deepEqual(result.evidence, []);
-  assert.deepEqual(result.warnings, ['month_not_available']);
+  assert.equal(result.evidence[0].content.sourceStatus, 'unavailable');
+  assert.equal(result.evidence[0].content.absenceConfirmed, false);
+  assert.deepEqual(result.warnings, ['source_unavailable']);
+});
+
+test('synthetic partial and stale months block MRR and churn despite loaded rows', async () => {
+  for (const status of ['incomplete', 'stale']) {
+    const repository = fixtureRepository(
+      {
+        [JULY]: [record('customer', JULY, 100)],
+        [AUGUST]: [record('customer', AUGUST, 0)],
+      },
+      { [AUGUST]: status },
+    );
+    const metrics = service(repository);
+    const mrr = await metrics.getMrr({ month: AUGUST });
+    const churn = await metrics.getCustomerChurnRate({ month: AUGUST });
+    assert.equal(mrr.status, 'data_unavailable');
+    assert.equal(churn.status, 'data_unavailable');
+    assert.deepEqual(mrr.warnings, [`source_${status}`]);
+    assert.equal(mrr.evidence[0].content.sourceStatus, status);
+    assert.equal(mrr.evidence[0].content.absenceConfirmed, false);
+    assert.equal(repository.calls(), 1);
+  }
+});
+
+test('synthetic explicitly complete empty month returns zero MRR and valid query evidence', async () => {
+  const metrics = service(fixtureRepository({ [AUGUST]: [] }));
+  const result = await metrics.getMrr({ month: AUGUST });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.value.mrrEurCents, 0);
+  assert.equal(result.evidence[0].scope.sourceStatus, 'complete');
+  assert.equal(result.evidence[0].integrity, 'valid');
+});
+
+test('synthetic comparison evidence retains each complete period freshness', async () => {
+  const repository = fixtureRepository({ [JULY]: [], [AUGUST]: [] });
+  repository.coverage = async (month) => ({
+    status: 'complete',
+    freshness: month === JULY ? '2026-08-01T08:00:00Z' : '2026-09-01T08:00:00Z',
+  });
+  const result = await service(repository).compareMrr({ month: AUGUST });
+  assert.equal(result.status, 'ok');
+  assert.equal(result.evidence[0].freshness, '2026-09-01T08:00:00Z');
+  assert.equal(result.evidence[1].freshness, '2026-08-01T08:00:00Z');
 });
 
 test('returns null and a warning for a zero comparison denominator', async () => {

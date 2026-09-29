@@ -74,7 +74,10 @@ this metric warning path. No adapter validation is relaxed by this operation.
   unknown keys are rejected.
 - A breakdown accepts exactly one catalog dimension: `plan`, `country`,
   `region`, `industry`, or `companySize`.
-- An unavailable month is a typed `data_unavailable` outcome, not a zero.
+- A month is usable only with explicit `complete` source coverage. `incomplete`,
+  `unavailable`, and `stale` return typed `data_unavailable` outcomes with coverage
+  evidence. A complete month with no rows returns zero; no coverage row is
+  `unavailable`, never a zero substitute.
 
 ## Calculation semantics
 
@@ -107,6 +110,9 @@ item. Comparisons and movement reconciliation also emit calculation evidence
 that names the input query evidence ID and formula. Evidence IDs are generated
 by the calling boundary so tests can use deterministic IDs and production can
 use opaque identifiers.
+Metric query evidence states `sourceStatus: complete` and source freshness.
+Blocked coverage evidence states the period, status, freshness, and that absence
+of events is unconfirmed. Retained answers expose source status with citations.
 
 ## Non-goals
 

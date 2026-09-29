@@ -266,6 +266,11 @@ test('authorization, unsupported wording and invalid parents cannot reserve or r
   // Labeled synthetic controlled repository: adapter validation remains strict.
   const metrics = new TrustedMrrService({
     getMonth: async (month) => rows.filter((row) => row.month === month),
+    coverage: async (month) =>
+      dependencies.snapshot.coverage.find((item) => item.month === month) ?? {
+        status: 'unavailable',
+        freshness: '2026-09-01T08:00:00Z',
+      },
     freshness: async () => '2026-09-01T08:00:00Z',
   });
   let calls = 0;
@@ -362,7 +367,7 @@ test('authorization, unsupported wording and invalid parents cannot reserve or r
     await api.fetch(
       request('mrr-decline', undefined, {
         investigationId: 'blocked-parent',
-        month: '2026-06-01',
+        month: '2026-05-01',
       }),
     )
   ).json();
