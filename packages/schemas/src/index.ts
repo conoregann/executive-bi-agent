@@ -182,6 +182,9 @@ export const investigationAnswerSchema = z
             sourceRef: z.string().min(1),
             type: z.enum(['metric_query', 'calculation', 'document_chunk']),
             freshness: z.string().datetime(),
+            sourceStatus: z
+              .enum(['complete', 'incomplete', 'unavailable', 'stale'])
+              .optional(),
           })
           .strict(),
       )
@@ -605,6 +608,7 @@ export const customerCountryQueryEvidenceSchema = investigationEvidenceSchema
         filters: z.object({ customerIds: customerIds.optional() }).strict(),
         metric: z.literal('customer_country_mrr'),
         definitionVersion: z.string().min(1),
+        sourceStatus: z.literal('complete'),
       })
       .strict(),
     content: z
@@ -690,9 +694,25 @@ export const operationalRecordSchema = z
 export const operationalSnapshotSchema = z
   .object({
     label: z.literal('synthetic'),
+    coverage: z.array(
+      z
+        .object({
+          source: operationalSourceSchema,
+          month: calendarMonth,
+          status: z.enum(['complete', 'incomplete', 'unavailable', 'stale']),
+          freshness: z.string().datetime(),
+        })
+        .strict(),
+    ),
     rows: z.array(operationalRecordSchema).max(5000),
   })
   .strict()
+  .refine(
+    (value) =>
+      new Set(value.coverage.map((item) => `${item.source}:${item.month}`))
+        .size === value.coverage.length,
+    'Coverage periods must be unique.',
+  )
   .refine(
     (value) =>
       new Set(value.rows.map((row) => row.recordId)).size === value.rows.length,

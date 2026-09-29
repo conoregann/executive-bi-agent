@@ -439,6 +439,16 @@ function App() {
               previous month · Customers:{' '}
               {answer.scope.permittedCustomerIds.join(', ') || 'All customers'}
             </p>
+            <p className="meta-line">
+              Source status:{' '}
+              {answer.evidence.some(
+                (item) =>
+                  item.type === 'metric_query' &&
+                  item.sourceStatus === 'complete',
+              )
+                ? 'Complete for cited metric periods'
+                : 'Unknown'}
+            </p>
             {claim(answer.answer)}
           </section>
           {answer.waterfall && (
@@ -646,6 +656,9 @@ function App() {
                     </button>
                     <span>
                       {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
+                      {item.sourceStatus
+                        ? ` Source: ${item.sourceStatus} ·`
+                        : ''}{' '}
                       Freshness: {item.freshness}
                     </span>
                   </li>
@@ -678,6 +691,16 @@ function App() {
                   {churnAnswer.value.currentMonth.slice(0, 7)} · Customers:{' '}
                   {churnAnswer.permittedCustomerIds.join(', ') ||
                     'All customers'}
+                </p>
+                <p className="meta-line">
+                  Source status:{' '}
+                  {churnAnswer.evidence
+                    .filter((item) => item.type === 'metric_query')
+                    .map(
+                      (item) =>
+                        `${String(item.scope.month).slice(0, 7)} ${String(item.scope.sourceStatus ?? 'unknown')}`,
+                    )
+                    .join(' · ')}
                 </p>
                 <p>
                   {churnAnswer.value.churnedCustomers}{' '}
@@ -1047,6 +1070,7 @@ function App() {
                     <div className="cross-source" key={item.evidenceId}>
                       <h3>{String(item.scope.source)} evidence</h3>
                       <p className="meta-line">
+                        Source status: {String(item.scope.sourceStatus)} ·
                         Freshness: {item.freshness} · Missing coverage:{' '}
                         {Array.isArray(item.content.missingCustomerIds)
                           ? item.content.missingCustomerIds.join(', ') || 'None'
@@ -1054,6 +1078,14 @@ function App() {
                         · Stale coverage:{' '}
                         {Array.isArray(item.content.staleCustomerIds)
                           ? item.content.staleCustomerIds.join(', ') || 'None'
+                          : 'Unavailable'}
+                      </p>
+                      <p className="meta-line">
+                        Confirmed no events:{' '}
+                        {Array.isArray(item.content.confirmedAbsentCustomerIds)
+                          ? item.content.confirmedAbsentCustomerIds.join(
+                              ', ',
+                            ) || 'None'
                           : 'Unavailable'}
                       </p>
                       <div
@@ -1242,6 +1274,12 @@ function App() {
                 <dd>{evidence.source}</dd>
                 <dt>Freshness</dt>
                 <dd>{evidence.freshness}</dd>
+                {typeof evidence.scope.sourceStatus === 'string' && (
+                  <>
+                    <dt>Source status</dt>
+                    <dd>{evidence.scope.sourceStatus}</dd>
+                  </>
+                )}
                 <dt>Integrity</dt>
                 <dd>{evidence.integrity}</dd>
               </dl>

@@ -24,11 +24,15 @@ Operational records are explicitly synthetic. A reproducible generator covers
 June–August 2026 for the stable subscription customer IDs. Source grain is one
 CRM event, support event or monthly usage summary per record ID. Money remains
 in the metric package; usage counts are source observations. Fixed PostgreSQL
-queries read `analytics.operational_records`, derived through staging from raw
-records, using the existing dedicated read-only connection, its five-second
+queries read `analytics.operational_records` and explicit source/month status in
+`analytics.operational_coverage`, derived from raw records, using the existing dedicated read-only connection, its five-second
 statement timeout, bound customer/date parameters and a 500-row ceiling. Invalid
-or truncated results are unavailable, without fixture fallback. Missing records
-mean missing coverage, not evidence that no event occurred.
+or truncated results are unavailable, without fixture fallback. An empty CRM or
+support result confirms no recorded event for a permitted customer only when both
+source months are marked `complete`; absent or partial coverage leaves absence
+unconfirmed. Usage requires both monthly customer observations even when source
+coverage is complete. Evidence retains status, freshness, missing coverage and
+confirmed absence separately.
 
 The optional OpenAI Responses adapter uses structured outputs with `store:false`.
 Set both `OPENAI_API_KEY` and `OPENAI_INVESTIGATION_MODEL` to enable it; otherwise

@@ -8,6 +8,14 @@ const ids = [
   'cust_riviera',
 ];
 const rows = [];
+const coverage = ['usage', 'crm', 'support'].flatMap((source) =>
+  ['2026-06-01', '2026-07-01', '2026-08-01'].map((month) => ({
+    source,
+    month,
+    status: 'complete',
+    freshness: '2026-09-01T08:00:00Z',
+  })),
+);
 for (const [i, customerId] of ids.entries()) {
   for (const month of ['2026-06-01', '2026-07-01', '2026-08-01']) {
     const observedAt = `${month}T00:00:00Z`;
@@ -67,5 +75,5 @@ for (const [i, customerId] of ids.entries()) {
 }
 writeFileSync(
   new URL('./operations-2026.json', import.meta.url),
-  JSON.stringify({ label: 'synthetic', rows }, null, 2) + '\n',
+  JSON.stringify({ label: 'synthetic', coverage, rows }, null, 2) + '\n',
 );

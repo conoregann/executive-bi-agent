@@ -1,6 +1,8 @@
 // Executable synthetic contract benchmark. Provider quality/cost are separate, unmeasured results.
 import assert from 'node:assert/strict';
 import { performance } from 'node:perf_hooks';
+import { readFileSync } from 'node:fs';
+import { createOperationalRepository } from '../../packages/operations/dist/index.js';
 import { scenario, send } from '../../apps/api/test/helpers/cross-source.mjs';
 import { createMrrDeclineApi } from '../../apps/api/dist/features/mrr/composition.js';
 import { readCrossSourceAnswer } from '../../packages/investigations/dist/index.js';
@@ -222,8 +224,31 @@ add('stale-coverage', async () => {
   assert.ok(result.child.warnings.includes('usage_coverage_stale'));
 });
 add('missing-coverage', async () => {
-  const result = await scenario();
+  const snapshot = JSON.parse(
+    readFileSync(
+      new URL('../../data/synthetic/operations-2026.json', import.meta.url),
+    ),
+  );
+  snapshot.coverage = snapshot.coverage.filter(
+    (item) => !(item.source === 'support' && item.month === '2026-08-01'),
+  );
+  const result = await scenario(
+    undefined,
+    undefined,
+    undefined,
+    createOperationalRepository(snapshot),
+  );
   assert.ok(result.child.warnings.includes('support_coverage_missing'));
+});
+add('confirmed-absence', async () => {
+  const result = await scenario();
+  const evidence = (await result.store.get('cross')).evidence.find(
+    (item) => item.evidenceId === 'ops_support',
+  );
+  assert.deepEqual(evidence.content.confirmedAbsentCustomerIds, [
+    'cust_riviera',
+  ]);
+  assert.deepEqual(evidence.content.missingCustomerIds, []);
 });
 add('prompt-injection-as-data', async () => {
   const result = await scenario(
@@ -327,7 +352,7 @@ add('mixed-synthesis-stale-usage', async () => {
   ).json();
   assert.equal(answer.status, 'ok');
 });
-assert.equal(cases.length, 46);
+assert.equal(cases.length, 47);
 const results = [];
 for (const entry of cases) {
   const started = performance.now();

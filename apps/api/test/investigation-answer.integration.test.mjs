@@ -212,6 +212,12 @@ test('zero baselines, increases and year boundaries retain truthful comparison w
       ? { mrrEurCents: 0, isActiveAtMonthEnd: false }
       : {}),
   }));
+  dependencies.snapshot.coverage = dependencies.snapshot.coverage.map(
+    (item) => ({
+      ...item,
+      month: item.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
+    }),
+  );
   const api = createMrrDeclineApi(dependencies);
   const created = await api.fetch(
     new Request('http://api.test/v1/investigations/mrr-decline', {

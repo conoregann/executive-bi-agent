@@ -4,11 +4,37 @@ import test from 'node:test';
 
 import {
   createMrrDeclineServer,
+  createMrrDeclineApi,
   createSyntheticMrrDeclineApi,
   loadSyntheticMrrDeclineDependencies,
 } from '../dist/index.js';
 
 const endpoint = 'http://api.test/v1/investigations/mrr-decline';
+
+test('synthetic partial month blocks the API and retains source coverage evidence', async () => {
+  const dependencies = await loadSyntheticMrrDeclineDependencies();
+  const snapshot = structuredClone(dependencies.snapshot);
+  snapshot.coverage.find((item) => item.month === '2026-08-01').status =
+    'incomplete';
+  const api = createMrrDeclineApi({ ...dependencies, snapshot });
+  const response = await api.fetch(
+    request({ investigationId: 'partial-august', month: '2026-08-01' }),
+  );
+  const body = await response.json();
+  assert.equal(response.status, 422);
+  assert.equal(body.status, 'blocked');
+  assert.ok(body.warnings.includes('source_incomplete'));
+  const evidenceResponse = await api.fetch(
+    new Request(
+      `http://api.test/v1/investigations/partial-august/evidence/${body.record.evidenceIds[0]}`,
+      { headers: { authorization: `Bearer ${body.accessToken}` } },
+    ),
+  );
+  assert.equal(evidenceResponse.status, 200);
+  const detail = await evidenceResponse.json();
+  assert.equal(detail.evidence.content.sourceStatus, 'incomplete');
+  assert.equal(detail.evidence.content.absenceConfirmed, false);
+});
 
 function request(body, options = {}) {
   return new Request(endpoint, {

@@ -352,6 +352,9 @@ test('composes trusted metric and knowledge capabilities without generated claim
             ? august
             : [];
       },
+      async coverage() {
+        return { status: 'complete', freshness: '2026-09-01T08:00:00Z' };
+      },
       async freshness() {
         return '2026-09-01T08:00:00Z';
       },

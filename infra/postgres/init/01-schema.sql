@@ -7,6 +7,12 @@ CREATE TABLE raw.source_snapshots (
   freshness TIMESTAMPTZ NOT NULL
 );
 
+CREATE TABLE raw.subscription_month_coverage (
+  month DATE PRIMARY KEY CHECK (month = date_trunc('month', month)::DATE),
+  status TEXT NOT NULL CHECK (status IN ('complete', 'incomplete', 'unavailable', 'stale')),
+  freshness TIMESTAMPTZ NOT NULL
+);
+
 CREATE TABLE raw.customers (
   customer_id TEXT PRIMARY KEY,
   customer_name TEXT NOT NULL,
@@ -106,6 +112,9 @@ CREATE VIEW analytics.subscription_month_freshness AS
 SELECT freshness
 FROM raw.source_snapshots
 WHERE source = 'analytics.subscription_month';
+
+CREATE VIEW analytics.subscription_month_coverage AS
+SELECT month, status, freshness FROM raw.subscription_month_coverage;
 
 CREATE VIEW analytics.mrr_monthly AS
 SELECT
