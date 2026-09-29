@@ -1,6 +1,10 @@
 INSERT INTO raw.source_snapshots (source, freshness) VALUES
   ('analytics.subscription_month', '2026-09-01T08:00:00Z');
 
+INSERT INTO raw.subscription_month_coverage (month, status, freshness) VALUES
+  ('2026-07-01', 'complete', '2026-09-01T08:00:00Z'),
+  ('2026-08-01', 'complete', '2026-09-01T08:00:00Z');
+
 INSERT INTO raw.customers (customer_id, customer_name, industry, country, company_size, plan, acquisition_channel, account_owner, created_at) VALUES
   ('cust_acme', 'Acme Industrial', 'manufacturing', 'DE', 'enterprise', 'enterprise', 'sales_outbound', 'Marta Fischer', '2025-02-10T09:00:00Z'),
   ('cust_berlin', 'Berlin Legal', 'professional_services', 'DE', 'mid_market', 'growth', 'partner', 'Jonas Weber', '2025-04-18T09:00:00Z'),

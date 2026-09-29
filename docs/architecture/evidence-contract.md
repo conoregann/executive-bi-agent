@@ -6,18 +6,19 @@ Every material statement in an executive answer must be traceable to one or more
 
 ## Evidence item
 
-| Field          | Requirement                                                           |
-| -------------- | --------------------------------------------------------------------- |
-| `evidence_id`  | Immutable, opaque identifier.                                         |
-| `type`         | `metric_query`, `record`, `document_chunk`, or `calculation`.         |
-| `source`       | Human-readable system or dataset name.                                |
-| `source_ref`   | Query, record, document, or chunk identifier.                         |
-| `observed_at`  | When the source fact occurred, if applicable.                         |
-| `retrieved_at` | When this item was retrieved.                                         |
-| `scope`        | Period, filters, permissions, and grain used.                         |
-| `content`      | Minimal supporting values or excerpt; no unrelated sensitive content. |
-| `freshness`    | Source freshness timestamp and expectation.                           |
-| `integrity`    | `valid`, `warning`, or `invalid`.                                     |
+| Field          | Requirement                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `evidence_id`  | Immutable, opaque identifier.                                                                                       |
+| `type`         | `metric_query`, `record`, `document_chunk`, or `calculation`.                                                       |
+| `source`       | Human-readable system or dataset name.                                                                              |
+| `source_ref`   | Query, record, document, or chunk identifier.                                                                       |
+| `observed_at`  | When the source fact occurred, if applicable.                                                                       |
+| `retrieved_at` | When this item was retrieved.                                                                                       |
+| `scope`        | Period, filters, permissions, and grain used.                                                                       |
+| `content`      | Minimal supporting values or excerpt; no unrelated sensitive content.                                               |
+| `freshness`    | Source freshness timestamp and expectation.                                                                         |
+| `sourceStatus` | For covered metric and operational sources: `complete`, `incomplete`, `unavailable`, or `stale`, retained in scope. |
+| `integrity`    | `valid`, `warning`, or `invalid`.                                                                                   |
 
 `calculation` evidence names its input evidence IDs and formula. It may not hide a transformation inside generated narrative.
 

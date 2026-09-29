@@ -182,6 +182,7 @@ export async function runCrossSource(
       if (result.status !== 'ok') throw new Error('Source unavailable');
       const rows = operationalSnapshotSchema.parse({
         label: 'synthetic',
+        coverage: [],
         rows: result.rows,
       }).rows;
       const previous = new Date(`${parent.month}T00:00:00Z`);
@@ -197,27 +198,12 @@ export async function runCrossSource(
         )
       )
         throw new Error('Scope violation');
-      const missing = ids.filter(
-        (id) =>
-          !rows.some(
-            (row) =>
-              row.customerId === id &&
-              (source !== 'usage' || row.month === parent.month),
-          ) ||
-          (source === 'usage' &&
-            !rows.some(
-              (row) => row.customerId === id && row.month === previousMonth,
-            )),
-      );
-      const stale = ids.filter((id) =>
-        rows.some(
-          (row) =>
-            row.customerId === id &&
-            row.freshness < `${parent.month}T00:00:00Z`,
-        ),
-      );
+      const missing = result.missingCustomerIds;
+      const stale = result.staleCustomerIds;
       if (missing.length) warnings.push(`${source}_coverage_missing`);
       if (stale.length) warnings.push(`${source}_coverage_stale`);
+      if (result.sourceStatus !== 'complete')
+        warnings.push(`${source}_source_${result.sourceStatus}`);
       evidence.push({
         evidenceId: `ops_${source}`,
         type: 'metric_query',
@@ -225,13 +211,23 @@ export async function runCrossSource(
         sourceRef: result.queryId,
         observedAt: parent.month,
         retrievedAt: now,
-        freshness: rows.map((row) => row.freshness).sort()[0] ?? now,
-        integrity: stale.length ? 'warning' : 'valid',
-        scope: { month: parent.month, previousMonth, customerIds: ids, source },
+        freshness: result.freshness,
+        integrity:
+          stale.length || result.sourceStatus !== 'complete'
+            ? 'warning'
+            : 'valid',
+        scope: {
+          month: parent.month,
+          previousMonth,
+          customerIds: ids,
+          source,
+          sourceStatus: result.sourceStatus,
+        },
         content: {
           rows,
           missingCustomerIds: missing,
           staleCustomerIds: stale,
+          confirmedAbsentCustomerIds: result.confirmedAbsentCustomerIds,
           ...(source === 'usage'
             ? {
                 usageComparisons: compareCustomerUsage(rows, ids, parent.month),
@@ -385,6 +381,7 @@ function hypothesisRejection(
       return false;
     const rows = operationalSnapshotSchema.safeParse({
       label: 'synthetic',
+      coverage: [],
       rows: item.content.rows,
     });
     if (!rows.success) return false;
@@ -462,6 +459,7 @@ export function readCrossSourceAnswer(
   for (const item of operational) {
     const rows = operationalSnapshotSchema.safeParse({
       label: 'synthetic',
+      coverage: [],
       rows: item.content.rows,
     });
     if (
@@ -481,6 +479,50 @@ export function readCrossSourceAnswer(
           row.month < previousMonth ||
           row.month > record.month,
       )
+    )
+      return unavailable;
+    const sourceStatus = item.scope.sourceStatus;
+    if (
+      !['complete', 'incomplete', 'unavailable', 'stale'].includes(
+        String(sourceStatus),
+      )
+    )
+      return unavailable;
+    const expectedMissing =
+      sourceStatus !== 'complete'
+        ? record.customerIds
+        : item.scope.source === 'usage'
+          ? record.customerIds.filter(
+              (id) =>
+                !rows.data.rows.some(
+                  (row) => row.customerId === id && row.month === record.month,
+                ) ||
+                !rows.data.rows.some(
+                  (row) => row.customerId === id && row.month === previousMonth,
+                ),
+            )
+          : [];
+    const expectedAbsent =
+      sourceStatus === 'complete' && item.scope.source !== 'usage'
+        ? record.customerIds.filter(
+            (id) => !rows.data.rows.some((row) => row.customerId === id),
+          )
+        : [];
+    const expectedStale = record.customerIds.filter((id) =>
+      rows.data.rows.some(
+        (row) =>
+          row.customerId === id && row.freshness < `${record.month}T00:00:00Z`,
+      ),
+    );
+    if (
+      JSON.stringify(item.content.missingCustomerIds) !==
+        JSON.stringify(expectedMissing) ||
+      JSON.stringify(item.content.confirmedAbsentCustomerIds) !==
+        JSON.stringify(expectedAbsent) ||
+      JSON.stringify(item.content.staleCustomerIds) !==
+        JSON.stringify(expectedStale) ||
+      (item.integrity === 'valid') !==
+        (sourceStatus === 'complete' && expectedStale.length === 0)
     )
       return unavailable;
     if (item.scope.source === 'usage') {

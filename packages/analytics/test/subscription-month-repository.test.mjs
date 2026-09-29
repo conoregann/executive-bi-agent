@@ -29,6 +29,14 @@ test('loads the labeled synthetic snapshot by complete UTC month', async () => {
   assert.ok(Object.isFrozen(july));
   assert.ok(Object.isFrozen(july[0]));
   assert.equal(await repository.freshness(), '2026-09-01T08:00:00Z');
+  assert.deepEqual(await repository.coverage('2026-08-01'), {
+    status: 'complete',
+    freshness: snapshot.freshness,
+  });
+  assert.deepEqual(await repository.coverage('2026-09-01'), {
+    status: 'unavailable',
+    freshness: snapshot.freshness,
+  });
 });
 
 test("preserves the fixture's MRR reconciliation inputs", async () => {
@@ -60,6 +68,13 @@ test('rejects ambiguous source rows before they become metric inputs', () => {
     () =>
       createSubscriptionMonthRepository({
         freshness: '2026-09-01T08:00:00Z',
+        coverage: [
+          {
+            month: '2026-08-01',
+            status: 'complete',
+            freshness: '2026-09-01T08:00:00Z',
+          },
+        ],
         rows: [
           {
             customerId: 'cust_1',
@@ -80,6 +95,22 @@ test('rejects ambiguous source rows before they become metric inputs', () => {
   );
 });
 
+test('rejects unlabeled and duplicate synthetic month coverage', async () => {
+  const snapshot = await fixture();
+  assert.throws(
+    () => createSubscriptionMonthRepository({ ...snapshot, coverage: [] }),
+    /lack coverage metadata/,
+  );
+  assert.throws(
+    () =>
+      createSubscriptionMonthRepository({
+        ...snapshot,
+        coverage: [...snapshot.coverage, snapshot.coverage[0]],
+      }),
+    /duplicate subscription-month coverage/i,
+  );
+});
+
 test('reads a parameterized month from approved PostgreSQL views', async () => {
   const snapshot = await fixture();
   const calls = [];
@@ -88,6 +119,13 @@ test('reads a parameterized month from approved PostgreSQL views', async () => {
       calls.push({ sql, parameters });
       if (sql.includes('analytics.subscription_month_freshness')) {
         return { rows: [{ freshness: snapshot.freshness }] };
+      }
+      if (sql.includes('analytics.subscription_month_coverage')) {
+        return {
+          rows: snapshot.coverage
+            .filter((item) => item.month === parameters?.[0])
+            .map(({ status, freshness }) => ({ status, freshness })),
+        };
       }
       return {
         rows: snapshot.rows
@@ -107,6 +145,14 @@ test('reads a parameterized month from approved PostgreSQL views', async () => {
     await memory.getMonth('2026-08-01'),
   );
   assert.equal(await postgres.freshness(), await memory.freshness());
+  assert.deepEqual(
+    await postgres.coverage('2026-08-01'),
+    await memory.coverage('2026-08-01'),
+  );
+  assert.deepEqual(
+    await postgres.coverage('2026-09-01'),
+    await memory.coverage('2026-09-01'),
+  );
   assert.match(
     calls[0].sql,
     /FROM analytics\.subscription_month\s+WHERE month = \$1::date/u,
@@ -117,7 +163,7 @@ test('reads a parameterized month from approved PostgreSQL views', async () => {
     await postgres.getMonth('2026-08-01; DROP TABLE raw.customers'),
     [],
   );
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 5);
 });
 
 test('rejects malformed PostgreSQL rows and missing freshness', async () => {

@@ -9,4 +9,4 @@ $$;
 ALTER ROLE executive_bi_analytics SET default_transaction_read_only = on;
 ALTER ROLE executive_bi_analytics SET statement_timeout = '5s';
 GRANT USAGE ON SCHEMA analytics TO executive_bi_analytics;
-GRANT SELECT ON analytics.subscription_month, analytics.subscription_month_freshness TO executive_bi_analytics;
+GRANT SELECT ON analytics.subscription_month, analytics.subscription_month_freshness, analytics.subscription_month_coverage TO executive_bi_analytics;

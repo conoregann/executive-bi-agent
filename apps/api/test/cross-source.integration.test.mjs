@@ -12,7 +12,11 @@ test('retained scoped operational evidence, contradictions, authentication and r
   assert.equal(answer.status, 'ok');
   assert.equal(answer.answer.operationalEvidenceIds.length, 3);
   assert.ok(child.warnings.some((w) => w.includes('conflict')));
-  assert.ok(child.warnings.includes('support_coverage_missing'));
+  assert.deepEqual(
+    answer.answer.evidence.find((item) => item.evidenceId === 'ops_support')
+      .content.confirmedAbsentCustomerIds,
+    ['cust_riviera'],
+  );
   assert.equal(
     (await send(api, 'cross/answer', undefined, parent.accessToken)).status,
     404,
@@ -31,6 +35,31 @@ test('retained scoped operational evidence, contradictions, authentication and r
     parent.accessToken,
   );
   assert.equal(invalid.status, 400);
+});
+
+test('retained operational answer rejects a fabricated confirmed absence', async () => {
+  const { api, child, store } = await scenario();
+  const originalGet = store.get.bind(store);
+  store.get = async (id) => {
+    const stored = await originalGet(id);
+    if (id === 'cross' && stored) {
+      const support = stored.evidence.find(
+        (item) => item.evidenceId === 'ops_support',
+      );
+      support.content.confirmedAbsentCustomerIds = [
+        'cust_acme',
+        'cust_riviera',
+      ];
+    }
+    return stored;
+  };
+  const response = await send(
+    api,
+    'cross/answer',
+    undefined,
+    child.accessToken,
+  );
+  assert.equal(response.status, 422);
 });
 test('model plan and citation failures are safe', async () => {
   const broken = await scenario({

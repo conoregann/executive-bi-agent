@@ -26,6 +26,10 @@ export interface SubscriptionMonthRecord {
 
 export interface SubscriptionMonthRepository {
   getMonth(month: string): Promise<readonly SubscriptionMonthRecord[]>;
+  coverage(month: string): Promise<{
+    status: 'complete' | 'incomplete' | 'unavailable' | 'stale';
+    freshness: string;
+  }>;
   freshness(): Promise<string>;
 }
 
@@ -193,7 +197,7 @@ export class TrustedMrrService {
     const data = await this.loadMonth(parsed.value);
     if (!data.ok) return data.result;
 
-    const freshness = await this.repository.freshness();
+    const freshness = data.freshness;
     const value = {
       month: parsed.value.month,
       mrrEurCents: totalMrr(data.rows),
@@ -218,7 +222,10 @@ export class TrustedMrrService {
     if (!current.ok) return current.result;
     if (!previous.ok) return previous.result;
 
-    const freshness = await this.repository.freshness();
+    const freshness =
+      current.freshness < previous.freshness
+        ? current.freshness
+        : previous.freshness;
     const currentValue = {
       month: parsed.value.month,
       mrrEurCents: totalMrr(current.rows),
@@ -238,12 +245,12 @@ export class TrustedMrrService {
     const currentEvidence = this.metricEvidence(
       currentValue,
       parsed.value.filters,
-      freshness,
+      current.freshness,
     );
     const previousEvidence = this.metricEvidence(
       previousValue,
       parsed.value.filters,
-      freshness,
+      previous.freshness,
     );
     const calculation = this.calculationEvidence(
       'mrr_change = current_mrr - previous_mrr; percent_change = change / previous_mrr',
@@ -301,8 +308,15 @@ export class TrustedMrrService {
       startingCustomers,
       rate,
     };
-    const freshness = await this.repository.freshness();
-    const query = (month: string, activeCustomerIds: string[]): Evidence => ({
+    const freshness =
+      current.freshness < previous.freshness
+        ? current.freshness
+        : previous.freshness;
+    const query = (
+      month: string,
+      activeCustomerIds: string[],
+      sourceFreshness: string,
+    ): Evidence => ({
       evidenceId: this.nextEvidenceId('metric'),
       type: 'metric_query',
       source: 'analytics.subscription_month',
@@ -313,6 +327,7 @@ export class TrustedMrrService {
         month,
         filters: parsed.value.filters,
         metric: 'customer_churn_cohort',
+        sourceStatus: 'complete',
         definitionVersion: METRIC_DEFINITION_VERSION,
       },
       content: {
@@ -320,11 +335,11 @@ export class TrustedMrrService {
         activeCustomerIds,
         activeCustomers: activeCustomerIds.length,
       },
-      freshness,
+      freshness: sourceFreshness,
       integrity: 'valid',
     });
-    const priorEvidence = query(previousMonth, previousIds);
-    const currentEvidence = query(currentMonth, currentIds);
+    const priorEvidence = query(previousMonth, previousIds, previous.freshness);
+    const currentEvidence = query(currentMonth, currentIds, current.freshness);
     const calculation = this.calculationEvidence(
       'customer_churn_rate = churned_customers / starting_customers',
       [priorEvidence.evidenceId, currentEvidence.evidenceId],
@@ -352,7 +367,10 @@ export class TrustedMrrService {
     if (!current.ok) return current.result;
     if (!previous.ok) return previous.result;
 
-    const freshness = await this.repository.freshness();
+    const freshness =
+      current.freshness < previous.freshness
+        ? current.freshness
+        : previous.freshness;
     const movement = calculateMovement(
       previous.rows,
       current.rows,
@@ -362,12 +380,12 @@ export class TrustedMrrService {
     const priorEvidence = this.metricEvidence(
       { month: previousMonth, mrrEurCents: movement.priorMrrEurCents },
       parsed.value.filters,
-      freshness,
+      previous.freshness,
     );
     const currentEvidence = this.metricEvidence(
       { month: parsed.value.month, mrrEurCents: movement.currentMrrEurCents },
       parsed.value.filters,
-      freshness,
+      current.freshness,
     );
     const integrity = movement.reconciles ? 'valid' : 'invalid';
     const reconciliation = this.calculationEvidence(
@@ -407,7 +425,10 @@ export class TrustedMrrService {
         parsed.value.limit,
       ),
     };
-    const freshness = await this.repository.freshness();
+    const freshness =
+      current.freshness < previous.freshness
+        ? current.freshness
+        : previous.freshness;
     const evidence: Evidence = {
       evidenceId: this.nextEvidenceId('metric'),
       type: 'metric_query',
@@ -420,6 +441,7 @@ export class TrustedMrrService {
         filters: parsed.value.filters,
         limit: parsed.value.limit,
         metric: 'customer_mrr_movement',
+        sourceStatus: 'complete',
         definitionVersion: METRIC_DEFINITION_VERSION,
       },
       content: { ...value },
@@ -436,7 +458,7 @@ export class TrustedMrrService {
     const data = await this.loadMonth(parsed.value);
     if (!data.ok) return data.result;
 
-    const freshness = await this.repository.freshness();
+    const freshness = data.freshness;
     const breakdown = calculateBreakdown(data.rows, parsed.value);
     const integrity: Evidence['integrity'] = breakdown.reconciles
       ? 'valid'
@@ -453,6 +475,7 @@ export class TrustedMrrService {
         filters: parsed.value.filters,
         groupBy: parsed.value.groupBy,
         metric: 'mrr',
+        sourceStatus: 'complete',
         definitionVersion: METRIC_DEFINITION_VERSION,
       },
       content: { ...breakdown },
@@ -546,7 +569,7 @@ export class TrustedMrrService {
       'country_change = current_country_mrr - previous_country_mrr; includes explicit unassigned MRR',
       evidence.map((item) => item.evidenceId),
       value,
-      await this.repository.freshness(),
+      evidence.map((item) => item.freshness).sort()[0]!,
       reconciles ? (missingDimensions ? 'warning' : 'valid') : 'invalid',
     );
     return {
@@ -643,7 +666,10 @@ export class TrustedMrrService {
       sum(rows.map((row) => row.previousMrrEurCents)) === previousMrrEurCents &&
       sum(rows.map((row) => row.currentMrrEurCents)) === currentMrrEurCents &&
       sum(rows.map((row) => row.mrrChangeEurCents)) === mrrChangeEurCents;
-    const freshness = await this.repository.freshness();
+    const freshness =
+      current.freshness < previous.freshness
+        ? current.freshness
+        : previous.freshness;
     const queries = [previousMonth, parsed.value.month].map(
       (month, index): Evidence => ({
         ...this.metricEvidence(
@@ -652,7 +678,7 @@ export class TrustedMrrService {
             mrrEurCents: index === 0 ? previousMrrEurCents : currentMrrEurCents,
           },
           parsed.value.filters,
-          freshness,
+          index === 0 ? previous.freshness : current.freshness,
         ),
         sourceRef: `mrr:${month}:country_customers`,
         scope: {
@@ -660,6 +686,7 @@ export class TrustedMrrService {
           filters: parsed.value.filters,
           country,
           metric: 'customer_country_mrr',
+          sourceStatus: 'complete',
           definitionVersion: METRIC_DEFINITION_VERSION,
         },
         content: {
@@ -709,7 +736,8 @@ export class TrustedMrrService {
     const sourceEvidence = breakdown.evidence[0];
     if (!sourceEvidence)
       return invalidRequest('Breakdown evidence is unavailable.');
-    const freshness = await this.repository.freshness();
+    const freshness =
+      breakdown.evidence[0]?.freshness ?? (await this.repository.freshness());
     const chart: MrrBreakdownChart = {
       chartType: 'bar',
       title: `MRR by ${breakdown.value.groupBy} for ${breakdown.value.month}`,
@@ -736,24 +764,49 @@ export class TrustedMrrService {
   private async loadMonth(
     request: ValidatedRequest,
   ): Promise<
-    | { ok: true; rows: readonly SubscriptionMonthRecord[] }
+    | { ok: true; rows: readonly SubscriptionMonthRecord[]; freshness: string }
     | { ok: false; result: MetricResult<never> }
   > {
-    const rows = await this.repository.getMonth(request.month);
-    if (rows.length === 0) {
+    const coverage = await this.repository.coverage(request.month);
+    if (coverage.status !== 'complete') {
+      const warning = `source_${coverage.status}`;
       return {
         ok: false,
         result: {
           status: 'data_unavailable',
-          evidence: [],
-          warnings: ['month_not_available'],
-          error: `No subscription-month snapshot is available for ${request.month}.`,
+          evidence: [
+            {
+              evidenceId: this.nextEvidenceId('metric'),
+              type: 'metric_query',
+              source: 'analytics.subscription_month_coverage',
+              sourceRef: `coverage:${request.month}`,
+              observedAt: request.month,
+              retrievedAt: this.now(),
+              scope: {
+                month: request.month,
+                filters: request.filters,
+                metric: 'source_coverage',
+                sourceStatus: coverage.status,
+              },
+              content: {
+                month: request.month,
+                sourceStatus: coverage.status,
+                absenceConfirmed: false,
+              },
+              freshness: coverage.freshness,
+              integrity: 'warning',
+            },
+          ],
+          warnings: [warning],
+          error: `Subscription-month source for ${request.month} is ${coverage.status}.`,
         },
       };
     }
+    const rows = await this.repository.getMonth(request.month);
     return {
       ok: true,
       rows: rows.filter((row) => matchesFilters(row, request.filters)),
+      freshness: coverage.freshness,
     };
   }
 
@@ -773,6 +826,7 @@ export class TrustedMrrService {
         month: value.month,
         filters,
         metric: 'mrr',
+        sourceStatus: 'complete',
         definitionVersion: METRIC_DEFINITION_VERSION,
       },
       content: { ...value },

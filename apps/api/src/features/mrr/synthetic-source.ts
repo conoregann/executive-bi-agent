@@ -72,10 +72,12 @@ function parseSyntheticSnapshot(value: unknown): SubscriptionMonthSnapshot {
     Array.isArray(value) ||
     !('label' in value) ||
     !('freshness' in value) ||
+    !('coverage' in value) ||
     !('rows' in value) ||
     typeof value.label !== 'string' ||
     !value.label.startsWith('Synthetic data') ||
     typeof value.freshness !== 'string' ||
+    !Array.isArray(value.coverage) ||
     !Array.isArray(value.rows)
   ) {
     throw new Error(
@@ -84,6 +86,7 @@ function parseSyntheticSnapshot(value: unknown): SubscriptionMonthSnapshot {
   }
   return {
     freshness: value.freshness,
+    coverage: value.coverage as SubscriptionMonthSnapshot['coverage'],
     rows: value.rows as SubscriptionMonthSnapshot['rows'],
   };
 }
