@@ -52,6 +52,7 @@ export async function loadSyntheticKnowledgeDocuments(): Promise<
       observedAt: '2026-08-16T17:30:00Z',
       freshness: '2026-09-01T08:00:00Z',
       content: paymentIncident,
+      access: { audience: 'company' },
     },
     {
       documentId: 'august-sales-review',
@@ -61,6 +62,7 @@ export async function loadSyntheticKnowledgeDocuments(): Promise<
       freshness: '2026-09-01T08:00:00Z',
       content: salesReview,
       customerIds: ['cust_acme'],
+      access: { audience: 'customers', customerIds: ['cust_acme'] },
     },
   ];
 }

@@ -78,7 +78,13 @@ function composeMrrDeclineApi(
         }
       : undefined,
   );
-  return new MrrDeclineApi(investigation, access);
+  return new MrrDeclineApi(
+    investigation,
+    access,
+    new Map(
+      documents.map((document) => [document.documentId, document.access]),
+    ),
+  );
 }
 
 export async function createSyntheticMrrDeclineApi(

@@ -12,15 +12,24 @@ function document(documentId, content, options = {}) {
     freshness: options.freshness ?? '2026-09-01T08:00:00Z',
     content,
     customerIds: options.customerIds,
+    access:
+      options.access ??
+      (options.customerIds?.length
+        ? { audience: 'customers', customerIds: options.customerIds }
+        : { audience: 'company' }),
   };
 }
 
 function search(documents) {
   let id = 0;
-  return createCompanyKnowledgeSearch(documents, {
+  const knowledge = createCompanyKnowledgeSearch(documents, {
     now: () => '2026-09-01T09:00:00Z',
     nextEvidenceId: () => `knowledge-${++id}`,
   });
+  return {
+    search: (input, viewer = { role: 'admin', customerIds: [] }) =>
+      knowledge.search(input, viewer),
+  };
 }
 
 test('returns ranked, inspectable document-chunk evidence', async () => {
@@ -49,7 +58,12 @@ test('returns ranked, inspectable document-chunk evidence', async () => {
     sourceRef: 'payment-incident:chunk:1',
     observedAt: '2026-08-16T17:30:00Z',
     retrievedAt: '2026-09-01T09:00:00Z',
-    scope: { customerIds: [], retrievalVersion: '1.0.0' },
+    scope: {
+      customerIds: [],
+      retrievalVersion: '1.1.0',
+      documentId: 'payment-incident',
+      documentAccess: { audience: 'company' },
+    },
     content: {
       excerpt:
         'Payment provider incident caused elevated authorization failures. The incident was resolved.',
@@ -80,6 +94,87 @@ test('restricts customer-scoped searches to explicitly tagged documents', async 
     ['sales-review'],
   );
   assert.deepEqual(result.hits[0]?.evidence.scope.customerIds, ['cust_acme']);
+});
+
+test('document access is checked independently of matching tags and relevance', async () => {
+  const knowledge = search([
+    document('admin-review', 'Acme pricing secret', {
+      customerIds: ['cust_acme'],
+      access: { audience: 'admin' },
+    }),
+    document('mixed-review', 'Acme and Other pricing secret', {
+      customerIds: ['cust_acme', 'cust_other'],
+      access: {
+        audience: 'customers',
+        customerIds: ['cust_acme', 'cust_other'],
+      },
+    }),
+    document('acme-review', 'Acme pricing approved', {
+      customerIds: ['cust_acme'],
+    }),
+  ]);
+  const acme = { role: 'restricted', customerIds: ['cust_acme'] };
+  const result = await knowledge.search(
+    { query: 'pricing', customerIds: ['cust_acme'] },
+    acme,
+  );
+  assert.deepEqual(
+    result.hits.map((hit) => hit.documentId),
+    ['acme-review'],
+  );
+  assert.deepEqual(result.hits[0].evidence.scope.documentAccess, {
+    audience: 'customers',
+    customerIds: ['cust_acme'],
+  });
+  assert.equal(
+    (
+      await knowledge.search(
+        { query: 'secret', customerIds: ['cust_acme'] },
+        acme,
+      )
+    ).hits.length,
+    0,
+  );
+  assert.deepEqual(
+    (
+      await knowledge.search(
+        { query: 'secret', customerIds: ['cust_acme'] },
+        { role: 'restricted', customerIds: ['cust_acme', 'cust_other'] },
+      )
+    ).hits.map((hit) => hit.documentId),
+    ['mixed-review'],
+  );
+});
+
+test('untagged documents need an explicit policy and invalid viewers fail closed', async () => {
+  assert.throws(
+    () => search([{ ...document('untagged', 'Secret'), access: undefined }]),
+    /explicit access policy/,
+  );
+  assert.throws(
+    () =>
+      search([
+        document('bad', 'Secret', {
+          customerIds: ['cust_acme', 'cust_other'],
+          access: { audience: 'customers', customerIds: ['cust_acme'] },
+        }),
+      ]),
+    /cover every tagged customer/,
+  );
+  const knowledge = search([document('company', 'Incident context')]);
+  assert.equal(
+    (await knowledge.search({ query: 'incident' }, null)).status,
+    'invalid_request',
+  );
+  assert.equal(
+    (
+      await knowledge.search(
+        { query: 'incident', customerIds: ['cust_acme'] },
+        { role: 'restricted', customerIds: ['cust_acme'] },
+      )
+    ).hits.length,
+    0,
+  );
 });
 
 test('returns an explicit no-match warning instead of inventing context', async () => {
