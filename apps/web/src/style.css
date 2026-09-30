@@ -718,3 +718,33 @@ pre {
     transition: none;
   }
 }
+
+.signin-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background: #f5f5f2;
+}
+.signin-form {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 26rem);
+  padding: 2rem;
+  background: white;
+  border-radius: 1rem;
+}
+.signin-form h1 {
+  margin: 0;
+}
+.signin-form .field-label {
+  display: grid;
+  gap: 0.4rem;
+}
+.access-label {
+  display: block;
+  font-size: 0.8rem;
+}
+.signout-button {
+  margin-left: auto;
+}

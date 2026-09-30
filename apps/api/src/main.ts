@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { createPostgresMrrDeclineApi } from './index.js';
 import { createMrrDeclineServer } from './http-server.js';
 import { PostgresInvestigationStore } from './persistence/postgres-investigation-store.js';
+import { PostgresAccessStore } from './access.js';
 
 const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const connectionString = process.env.DATABASE_URL;
@@ -36,6 +37,7 @@ const server = createMrrDeclineServer(
   await createPostgresMrrDeclineApi(
     analyticsPool,
     new PostgresInvestigationStore(pool),
+    new PostgresAccessStore(pool),
   ),
 );
 server.listen(port);

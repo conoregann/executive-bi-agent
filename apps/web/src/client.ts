@@ -16,6 +16,39 @@ import {
   mrrDeclineResponseSchema,
 } from '@executive-bi/schemas';
 
+let sessionToken: string | undefined;
+export async function login(username: string, password: string) {
+  const response = await fetch('/v1/sessions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+    cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Sign in failed. Check your credentials.');
+  const body: unknown = await response.json();
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    !('sessionToken' in body) ||
+    typeof body.sessionToken !== 'string'
+  )
+    throw new Error('Sign in failed.');
+  sessionToken = body.sessionToken;
+  return body as { sessionToken: string; role: string; customerIds: string[] };
+}
+export function signOut() {
+  sessionToken = undefined;
+}
+async function sessionFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  return fetch(input, {
+    ...init,
+    headers: {
+      ...Object.fromEntries(new Headers(init.headers)),
+      ...(sessionToken ? { 'x-session-token': sessionToken } : {}),
+    },
+  });
+}
+
 export async function readJson(response: Response): Promise<unknown> {
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok && response.status !== 422)
@@ -42,7 +75,7 @@ export async function startInvestigation(month: string, customers: string) {
   });
   if (!request.success)
     throw new Error('Choose a valid month and at most 50 unique customer IDs.');
-  const response = await fetch('/v1/investigations/mrr-decline', {
+  const response = await sessionFetch('/v1/investigations/mrr-decline', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request.data),
@@ -58,7 +91,7 @@ export async function startInvestigation(month: string, customers: string) {
   return result;
 }
 export async function readAnswer(id: string, token: string) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/answer`,
     { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
   );
@@ -83,7 +116,7 @@ export async function readEvidence(
   token: string,
   evidenceId: string,
 ) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/evidence/${encodeURIComponent(evidenceId)}`,
     { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
   );
@@ -96,7 +129,7 @@ export async function resolveQuestion(question: string) {
   const request = resolveQuestionRequestSchema.safeParse({ question });
   if (!request.success)
     throw new Error('Enter a question of at most 1000 characters.');
-  const response = await fetch('/v1/investigations/resolve-question', {
+  const response = await sessionFetch('/v1/investigations/resolve-question', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request.data),
@@ -123,7 +156,7 @@ export async function startCountryFollowUp(
       ? { action: 'breakdown_mrr_by_country' }
       : { question }),
   });
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/country-follow-ups`,
     {
       method: 'POST',
@@ -159,7 +192,7 @@ export async function startChurnFollowUp(id: string, token: string) {
     investigationId: crypto.randomUUID(),
     action: 'get_customer_churn_rate',
   });
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/customer-churn-follow-ups`,
     {
       method: 'POST',
@@ -179,7 +212,7 @@ export async function startChurnFollowUp(id: string, token: string) {
   return parsed.data;
 }
 export async function readChurnFollowUpAnswer(id: string, token: string) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/answer`,
     {
       headers: { authorization: `Bearer ${token}` },
@@ -199,7 +232,7 @@ export async function readChurnFollowUpAnswer(id: string, token: string) {
   return parsed.data;
 }
 export async function readCountryFollowUpAnswer(id: string, token: string) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/answer`,
     { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
   );
@@ -223,7 +256,7 @@ export async function startCustomerFollowUp(
     investigationId: crypto.randomUUID(),
     country,
   });
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/customer-follow-ups`,
     {
       method: 'POST',
@@ -245,7 +278,7 @@ export async function startCustomerFollowUp(
   return parsed.data;
 }
 export async function readCustomerFollowUpAnswer(id: string, token: string) {
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/answer`,
     { headers: { authorization: `Bearer ${token}` }, cache: 'no-store' },
   );
@@ -276,7 +309,7 @@ export async function investigateCrossSource(
     investigationId: crypto.randomUUID(),
     question,
   });
-  const response = await fetch(
+  const response = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(id)}/cross-source-follow-ups`,
     {
       method: 'POST',
@@ -291,7 +324,7 @@ export async function investigateCrossSource(
   const child = crossSourceResponseSchema.parse(await readJson(response));
   if (child.status === 'blocked')
     throw new Error(`Investigation blocked: ${child.warnings.join(' ')}`);
-  const answerResponse = await fetch(
+  const answerResponse = await sessionFetch(
     `/v1/investigations/${encodeURIComponent(child.record.investigationId)}/answer`,
     {
       headers: { authorization: `Bearer ${child.accessToken}` },

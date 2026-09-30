@@ -24,6 +24,7 @@ before(async () => {
       host: '127.0.0.1',
       port: 0,
       proxy: {
+        '/v1/sessions': { target: `http://127.0.0.1:${api.address().port}` },
         '/v1/investigations': {
           target: `http://127.0.0.1:${api.address().port}`,
         },
@@ -46,7 +47,23 @@ async function pageForTest(t, viewport = { width: 1200, height: 900 }) {
   t.after(() => context.close());
   const page = await context.newPage();
   page.setDefaultTimeout(10_000);
+  await page.route('**/v1/sessions', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        sessionToken: 'x'.repeat(43),
+        role: 'admin',
+        customerIds: [],
+      }),
+    }),
+  );
   await page.goto(`http://127.0.0.1:${web.httpServer.address().port}`);
+  await page.getByLabel('Username').fill('synthetic_admin');
+  await page.getByLabel('Password').fill('synthetic_password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Hide request panel' }).waitFor();
   return page;
 }
 async function complete(page) {
@@ -647,5 +664,19 @@ test('cross-source journey retains country scope and cites operational records o
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
     true,
+  );
+});
+test('sign-out clears retained answers and requires another sign-in', async (t) => {
+  const page = await pageForTest(t);
+  await complete(page);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign in' }).waitFor();
+  await page.getByLabel('Username').fill('synthetic_admin');
+  await page.getByLabel('Password').fill('synthetic_password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Hide request panel' }).waitFor();
+  assert.equal(
+    await page.getByRole('article', { name: 'Executive answer' }).count(),
+    0,
   );
 });

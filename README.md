@@ -71,6 +71,20 @@ If you changed the database user, password, name, or port, use matching values
 in that connection URL. `POSTGRES_PORT` alone configures Docker; the API requires
 both database URLs.
 
+Provision a local user after `pnpm db:migrate` and `pnpm --filter @executive-bi/api build`:
+
+```bash
+set -a
+source .env
+set +a
+BI_USER_PASSWORD='<choose a local password>' pnpm --filter @executive-bi/api user:add -- demo admin
+```
+
+For a restricted user, replace `demo admin` with, for example,
+`analyst restricted cust_acme`. Grants come from the database, so entered
+customer IDs only narrow a user's authorized scope. See the
+[user access contract](docs/architecture/user-access-contract.md) for revocation.
+
 Keep these processes running in separate terminals from the repository root.
 Terminal 1 starts the separate backend and loads the local database configuration:
 
@@ -89,8 +103,8 @@ pnpm --filter @executive-bi/web dev
 
 Open [http://127.0.0.1:5173](http://127.0.0.1:5173), or the URL Vite prints if
 that port is occupied. The web server proxies requests to the API on port 3001;
-keep the API on that port. Select **August 2026**, leave customer IDs empty for
-the full synthetic dataset, or enter `cust_acme` for a scoped investigation.
+keep the API on that port. Sign in with the provisioned user. Select **August 2026**, leave customer IDs empty for
+all customers in that user's access scope, or enter `cust_acme` for a scoped investigation.
 Click **Investigate MRR** to see the cited answer and MRR-by-plan chart. Open
 **How this answer was generated** for the retained plan, or any **Inspect**
 citation to view evidence.
@@ -104,7 +118,7 @@ A password-authentication error can also mean an existing Docker volume retains
 the original database role password: changing `.env` does not update that stored
 password. Use the original credential or explicitly update the local database
 role to match the intended configuration; do not delete the volume to fix this.
-Reloading the page clears the in-memory investigation token. All data is synthetic.
+Reloading the page clears the in-memory user session and investigation token. All data is synthetic.
 See [the database guide](packages/database/README.md) for database details.
 
 Install Chromium before running browser acceptance tests:

@@ -12,7 +12,7 @@ fixtures in `data/synthetic`; it is not a production data-source adapter.
 without running tools or reserving an investigation. See the
 [question contract](../discovery/question-contract.md) for inputs, typed outcomes,
 UTC date rules and unsupported scope. Resolved months feed the endpoint below;
-customer permissions remain explicit structured input.
+customer access is resolved from the authenticated user.
 
 ## Endpoint
 
@@ -28,8 +28,8 @@ customer permissions remain explicit structured input.
 
 `investigationId` is an opaque identifier, `month` is a first-of-month UTC
 calendar value, and `permittedCustomerIds` is optional but must contain 1–50
-unique IDs when provided. Unknown fields are rejected before the investigation
-runs.
+unique IDs when provided. These are requested filters, not access grants. The server intersects them with the active user scope and rejects out-of-scope IDs. Unknown fields are rejected before the investigation
+runs. See the [user access contract](user-access-contract.md).
 
 Successful responses return the immutable investigation record, its ordered
 five-step plan, evidence IDs, drivers, warnings, and a one-time 43-character
@@ -39,12 +39,12 @@ returns `201`; an evidence-blocked investigation returns `422`; invalid input
 returns a contract-valid `400`; and a reused investigation ID returns `409`.
 
 The local API requires `DATABASE_URL` pointing to a PostgreSQL database with
-`infra/postgres/init/02-investigations.sql` applied. `pnpm db:migrate` applies
+`infra/postgres/init/02-investigations.sql` and `05-access.sql` applied. `pnpm db:migrate` applies
 the additive migration to an existing local volume. The app stores the plan
 before any tools run, then atomically stores the terminal record and full
 evidence items. A reserved but non-terminal ID cannot be reused or read.
 
-Read routes require `Authorization: Bearer <accessToken>`:
+All routes require `X-Session-Token: <sessionToken>`. Read and follow-up routes also require `Authorization: Bearer <accessToken>`:
 
 - `GET /v1/investigations/:investigationId` returns the terminal record.
 - `GET /v1/investigations/:investigationId/answer` returns the cited executive

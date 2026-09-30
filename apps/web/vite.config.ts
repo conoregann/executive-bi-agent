@@ -4,6 +4,9 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   plugins: [tailwindcss()],
   server: {
-    proxy: { '/v1/investigations': { target: 'http://127.0.0.1:3001' } },
+    proxy: {
+      '/v1/sessions': { target: 'http://127.0.0.1:3001' },
+      '/v1/investigations': { target: 'http://127.0.0.1:3001' },
+    },
   },
 });
