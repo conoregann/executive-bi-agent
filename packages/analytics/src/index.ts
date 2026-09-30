@@ -96,8 +96,10 @@ export function createSubscriptionMonthRepository(
 
   const rowsByMonth = new Map<string, readonly SubscriptionMonthRecord[]>();
   const seenKeys = new Set<string>();
+  const dimensionsByCustomerMonth = new Map<string, string>();
   for (const row of snapshot.rows) {
     validateRow(row);
+    assertConsistentDimensions(row, dimensionsByCustomerMonth);
     const key = `${row.month}:${row.subscriptionId}`;
     if (seenKeys.has(key)) {
       throw new Error(`Duplicate subscription-month row: ${key}.`);
@@ -146,6 +148,7 @@ export function createPostgresSubscriptionMonthRepository(
 
       const result = await client.query(SUBSCRIPTION_MONTH_SQL, [month]);
       const seenKeys = new Set<string>();
+      const dimensionsByCustomerMonth = new Map<string, string>();
       const rows = result.rows.map((databaseRow) => {
         const row = parsePostgresRow(databaseRow);
         if (row.month !== month) {
@@ -153,6 +156,7 @@ export function createPostgresSubscriptionMonthRepository(
             'PostgreSQL returned a row outside the requested month.',
           );
         }
+        assertConsistentDimensions(row, dimensionsByCustomerMonth);
         const key = `${row.month}:${row.subscriptionId}`;
         if (seenKeys.has(key)) {
           throw new Error(`Duplicate subscription-month row: ${key}.`);
@@ -194,6 +198,25 @@ export function createPostgresSubscriptionMonthRepository(
       return freshness;
     },
   };
+}
+
+function assertConsistentDimensions(
+  row: SubscriptionMonthRecord,
+  dimensionsByCustomerMonth: Map<string, string>,
+): void {
+  const key = `${row.month}:${row.customerId}`;
+  const dimensions = JSON.stringify([
+    row.plan,
+    row.country,
+    row.region,
+    row.industry,
+    row.companySize,
+  ]);
+  const previous = dimensionsByCustomerMonth.get(key);
+  if (previous !== undefined && previous !== dimensions) {
+    throw new Error(`Conflicting customer-month dimensions: ${key}.`);
+  }
+  dimensionsByCustomerMonth.set(key, dimensions);
 }
 
 function parsePostgresRow(

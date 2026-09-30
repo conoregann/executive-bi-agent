@@ -62,6 +62,13 @@ BEGIN
 
   SELECT mrr_eur_cents INTO actual
   FROM analytics.mrr_monthly
+  WHERE month = DATE '2026-06-01';
+  IF actual <> 480000 THEN
+    RAISE EXCEPTION 'Expected June MRR 480000 cents, received %', actual;
+  END IF;
+
+  SELECT mrr_eur_cents INTO actual
+  FROM analytics.mrr_monthly
   WHERE month = DATE '2026-07-01';
   IF actual <> 420000 THEN
     RAISE EXCEPTION 'Expected July MRR 420000 cents, received %', actual;
@@ -88,7 +95,52 @@ BEGIN
   IF actual <> 1 THEN
     RAISE EXCEPTION 'Expected one churned customer in August, received %', actual;
   END IF;
+
+  IF (SELECT COUNT(*) FROM analytics.subscription_month WHERE customer_id = 'cust_berlin' AND month = DATE '2026-06-01') <> 2
+    OR (SELECT SUM(mrr_eur_cents) FROM analytics.subscription_month WHERE customer_id = 'cust_berlin' AND month = DATE '2026-06-01') <> 90000 THEN
+    RAISE EXCEPTION 'Synthetic multi-subscription customer did not aggregate to 90000 cents';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM analytics.customer_mrr_movement_monthly
+    WHERE customer_id = 'cust_berlin' AND month = DATE '2026-07-01'
+      AND prior_mrr_eur_cents = 90000 AND current_mrr_eur_cents = 90000
+      AND movement_type = 'none' AND plan = 'growth' AND country = 'DE'
+  ) THEN
+    RAISE EXCEPTION 'Synthetic plan and country transfer was misclassified as customer movement';
+  END IF;
+
+  IF (SELECT SUM(mrr_eur_cents) FROM analytics.subscription_month WHERE month = DATE '2026-06-01' AND country = 'GB') <> 140000
+    OR (SELECT SUM(mrr_eur_cents) FROM analytics.subscription_month WHERE month = DATE '2026-07-01' AND country = 'GB') <> 50000
+    OR (SELECT SUM(mrr_eur_cents) FROM analytics.subscription_month WHERE month = DATE '2026-06-01' AND country = 'DE') <> 240000
+    OR (SELECT SUM(mrr_eur_cents) FROM analytics.subscription_month WHERE month = DATE '2026-07-01' AND country = 'DE') <> 330000 THEN
+    RAISE EXCEPTION 'Synthetic country transfer does not reconcile across periods';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM analytics.customer_mrr_movement_monthly
+    WHERE customer_id = 'cust_nordic' AND month = DATE '2026-08-01'
+      AND prior_mrr_eur_cents = 0 AND current_mrr_eur_cents = 60000 AND movement_type = 'new'
+  ) THEN
+    RAISE EXCEPTION 'Synthetic reactivation did not follow zero-to-positive movement semantics';
+  END IF;
 END $$;
+
+-- A current-record edit must not alter any historical reporting dimension.
+BEGIN;
+UPDATE raw.customers SET plan = 'enterprise', country = 'FR' WHERE customer_id = 'cust_berlin';
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM analytics.subscription_month
+    WHERE customer_id = 'cust_berlin'
+      AND ((month = DATE '2026-06-01' AND (plan <> 'starter' OR country <> 'GB' OR region <> 'uk_ireland'))
+        OR (month IN (DATE '2026-07-01', DATE '2026-08-01') AND (plan <> 'growth' OR country <> 'DE' OR region <> 'dach')))
+  ) THEN
+    RAISE EXCEPTION 'Current customer edit rewrote historical reporting dimensions';
+  END IF;
+END $$;
+ROLLBACK;
 
 SELECT 'analytics verification passed' AS result;
 

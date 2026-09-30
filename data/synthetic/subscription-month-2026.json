@@ -4,6 +4,11 @@
   "freshness": "2026-09-01T08:00:00Z",
   "coverage": [
     {
+      "month": "2026-06-01",
+      "status": "complete",
+      "freshness": "2026-09-01T08:00:00Z"
+    },
+    {
       "month": "2026-07-01",
       "status": "complete",
       "freshness": "2026-09-01T08:00:00Z"
@@ -15,6 +20,84 @@
     }
   ],
   "rows": [
+    {
+      "customerId": "cust_acme",
+      "subscriptionId": "sub_acme",
+      "month": "2026-06-01",
+      "mrrEurCents": 240000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "enterprise",
+      "country": "DE",
+      "region": "dach",
+      "industry": "manufacturing",
+      "companySize": "enterprise"
+    },
+    {
+      "customerId": "cust_berlin",
+      "subscriptionId": "sub_berlin",
+      "month": "2026-06-01",
+      "mrrEurCents": 70000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "starter",
+      "country": "GB",
+      "region": "uk_ireland",
+      "industry": "professional_services",
+      "companySize": "mid_market"
+    },
+    {
+      "customerId": "cust_berlin",
+      "subscriptionId": "sub_berlin_extra",
+      "month": "2026-06-01",
+      "mrrEurCents": 20000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "starter",
+      "country": "GB",
+      "region": "uk_ireland",
+      "industry": "professional_services",
+      "companySize": "mid_market"
+    },
+    {
+      "customerId": "cust_london",
+      "subscriptionId": "sub_london",
+      "month": "2026-06-01",
+      "mrrEurCents": 50000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "enterprise",
+      "country": "GB",
+      "region": "uk_ireland",
+      "industry": "retail",
+      "companySize": "enterprise"
+    },
+    {
+      "customerId": "cust_nordic",
+      "subscriptionId": "sub_nordic",
+      "month": "2026-06-01",
+      "mrrEurCents": 60000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "starter",
+      "country": "SE",
+      "region": "nordics",
+      "industry": "technology",
+      "companySize": "small"
+    },
+    {
+      "customerId": "cust_riviera",
+      "subscriptionId": "sub_riviera",
+      "month": "2026-06-01",
+      "mrrEurCents": 40000,
+      "isActiveAtMonthEnd": true,
+      "cancelledAt": null,
+      "plan": "growth",
+      "country": "FR",
+      "region": "rest_of_europe",
+      "industry": "financial_services",
+      "companySize": "mid_market"
+    },
     {
       "customerId": "cust_nordic",
       "subscriptionId": "sub_nordic",

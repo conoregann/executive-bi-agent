@@ -22,14 +22,26 @@ test('loads the labeled synthetic snapshot by complete UTC month', async () => {
 
   const july = await repository.getMonth('2026-07-01');
   const august = await repository.getMonth('2026-08-01');
+  const june = await repository.getMonth('2026-06-01');
 
   assert.match(snapshot.label, /^Synthetic data/);
   assert.equal(july.length, 5);
   assert.equal(august.length, 5);
+  assert.equal(june.length, 6);
+  assert.deepEqual(
+    june
+      .filter((row) => row.customerId === 'cust_berlin')
+      .map((row) => row.plan),
+    ['starter', 'starter'],
+  );
   assert.ok(Object.isFrozen(july));
   assert.ok(Object.isFrozen(july[0]));
   assert.equal(await repository.freshness(), '2026-09-01T08:00:00Z');
   assert.deepEqual(await repository.coverage('2026-08-01'), {
+    status: 'complete',
+    freshness: snapshot.freshness,
+  });
+  assert.deepEqual(await repository.coverage('2026-06-01'), {
     status: 'complete',
     freshness: snapshot.freshness,
   });
@@ -49,6 +61,7 @@ test("preserves the fixture's MRR reconciliation inputs", async () => {
 
   assert.equal(await total('2026-07-01'), 420_000);
   assert.equal(await total('2026-08-01'), 250_000);
+  assert.equal(await total('2026-06-01'), 480_000);
 
   const august = await repository.getMonth('2026-08-01');
   assert.deepEqual(
@@ -92,6 +105,43 @@ test('rejects ambiguous source rows before they become metric inputs', () => {
         ],
       }),
     /Invalid subscription-month value/,
+  );
+});
+
+test('rejects conflicting dimensions across synthetic subscriptions in one customer-month', async () => {
+  const snapshot = await fixture();
+  const row = snapshot.rows.find(
+    (item) => item.customerId === 'cust_berlin' && item.month === '2026-06-01',
+  );
+  assert.throws(
+    () =>
+      createSubscriptionMonthRepository({
+        ...snapshot,
+        rows: [
+          ...snapshot.rows,
+          { ...row, subscriptionId: 'synthetic_conflict', country: 'FR' },
+        ],
+      }),
+    /Conflicting customer-month dimensions/,
+  );
+  const postgres = createPostgresSubscriptionMonthRepository({
+    async query() {
+      return {
+        rows: [
+          { ...row, mrrEurCents: String(row.mrrEurCents) },
+          {
+            ...row,
+            subscriptionId: 'synthetic_conflict',
+            country: 'FR',
+            mrrEurCents: String(row.mrrEurCents),
+          },
+        ],
+      };
+    },
+  });
+  await assert.rejects(
+    postgres.getMonth('2026-06-01'),
+    /Conflicting customer-month dimensions/,
   );
 });
 
@@ -184,7 +234,10 @@ test('rejects malformed PostgreSQL rows and missing freshness', async () => {
 });
 
 test('rejects duplicate or out-of-month PostgreSQL rows', async () => {
-  const row = { ...(await fixture()).rows[0], mrrEurCents: '0' };
+  const row = {
+    ...(await fixture()).rows.find((item) => item.month === '2026-07-01'),
+    mrrEurCents: '0',
+  };
   const duplicate = createPostgresSubscriptionMonthRepository({
     async query() {
       return { rows: [row, row] };

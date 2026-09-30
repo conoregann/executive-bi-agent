@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { TrustedMrrService } from '../dist/index.js';
 
 const JULY = '2026-07-01';
 const AUGUST = '2026-08-01';
+const JUNE = '2026-06-01';
 
 function record(customerId, month, mrrEurCents, options = {}) {
   return {
@@ -497,6 +499,76 @@ test('country comparison reconciles both months, includes entering/exiting count
     ).status,
     'data_unavailable',
   );
+});
+
+test('synthetic historical transfer changes segments without customer churn or acquisition', async () => {
+  const snapshot = JSON.parse(
+    await readFile(
+      new URL(
+        '../../../data/synthetic/subscription-month-2026.json',
+        import.meta.url,
+      ),
+      'utf8',
+    ),
+  );
+  const repository = fixtureRepository(
+    Object.groupBy(snapshot.rows, (row) => row.month),
+  );
+  const metrics = service(repository);
+
+  const june = await metrics.breakdownMrr({ month: JUNE, groupBy: 'plan' });
+  const july = await metrics.breakdownMrr({ month: JULY, groupBy: 'plan' });
+  const countries = await metrics.compareCountryMrr({ month: JULY });
+  const movement = await metrics.getMrrMovement({ month: JULY });
+  const customers = await metrics.getCustomerMrrMovement({ month: JULY });
+
+  assert.equal(june.status, 'ok');
+  assert.equal(july.status, 'ok');
+  assert.equal(countries.status, 'ok');
+  assert.equal(movement.status, 'ok');
+  assert.equal(customers.status, 'ok');
+  assert.equal(
+    june.value.rows.find((row) => row.dimensionValue === 'starter').mrrEurCents,
+    150_000,
+  );
+  assert.equal(
+    july.value.rows.find((row) => row.dimensionValue === 'growth').mrrEurCents,
+    130_000,
+  );
+  assert.deepEqual(
+    countries.value.rows
+      .filter((row) => ['GB', 'DE'].includes(row.country))
+      .map(({ country, mrrChangeEurCents }) => [country, mrrChangeEurCents]),
+    [
+      ['GB', -90_000],
+      ['DE', 90_000],
+    ],
+  );
+  assert.equal(countries.value.mrrChangeEurCents, -60_000);
+  assert.equal(countries.evidence[2].integrity, 'valid');
+  assert.equal(movement.value.reconciles, true);
+  assert.equal(movement.value.newMrrEurCents, 0);
+  assert.equal(movement.value.churnedMrrEurCents, 60_000);
+  assert.ok(
+    customers.value.rows.every((row) => row.customerId !== 'cust_berlin'),
+  );
+});
+
+test('synthetic segment-filtered lifecycle requests reject before reading monthly data', async () => {
+  const repository = fixtureRepository({});
+  const metrics = service(repository);
+  for (const result of await Promise.all([
+    metrics.getMrrMovement({ month: JULY, filters: { country: 'GB' } }),
+    metrics.getCustomerMrrMovement({
+      month: JULY,
+      filters: { plan: 'growth' },
+    }),
+    metrics.getCustomerChurnRate({ month: JULY, filters: { region: 'dach' } }),
+  ])) {
+    assert.equal(result.status, 'invalid_request');
+    assert.equal(result.evidence.length, 0);
+  }
+  assert.equal(repository.calls(), 0);
 });
 
 test('synthetic country contributions aggregate subscriptions and transfers without lifecycle labels', async () => {

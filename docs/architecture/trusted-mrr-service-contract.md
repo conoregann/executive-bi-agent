@@ -64,8 +64,12 @@ this metric warning path. No adapter validation is relaxed by this operation.
 - A month is exactly `YYYY-MM-01` and represents the first UTC day of a
   calendar month.
 - The comparison month must be the month immediately before the current month.
-- Filters may use only `plan`, `country`, `region`, `industry`,
-  `company_size`, or an explicit non-empty customer ID list.
+- MRR values, comparisons, and breakdowns may filter by `plan`, `country`,
+  `region`, `industry`, `company_size`, or an explicit non-empty customer ID list.
+- Customer churn and MRR lifecycle movement accept only an explicit customer ID
+  list. A dimension filter across periods can turn a segment transfer into false
+  churn or acquisition, so it is rejected before repository reads. Segment
+  comparisons remain available through period-specific breakdowns.
 - Filter values are exact scalar matches; filter objects, SQL fragments, and
   unknown keys are rejected.
 - A breakdown accepts exactly one catalog dimension: `plan`, `country`,

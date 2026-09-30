@@ -12,7 +12,7 @@ not currently callable metrics.
 - All monetary values are EUR, stored and calculated in minor units, then formatted for display.
 - Calendar reporting is UTC. A `month` is the first UTC day of the reporting month.
 - A metric query always specifies a closed period, optional filters, and an explicit comparison when a change is requested.
-- Dimensions are taken from the customer record as it existed at the start of the reporting period unless the metric says otherwise.
+- Dimensions are captured per customer at the start of each reporting period. Later changes to the current customer record never change a prior period's dimensions. Every subscription for the same customer and month uses the same captured dimensions.
 - All initial-release metrics are calculated from `analytics.subscription_month` or a documented derivative. Raw tables are not a public metric interface.
 
 ## Source model contract
@@ -154,6 +154,10 @@ current MRR = prior MRR + new MRR + expansion MRR - contraction MRR - churned MR
 ```
 
 If this does not reconcile, the result is invalid and must not be presented. A dimension breakdown can fail to reconcile only when the dimension is unavailable for some contributing customer; that missing segment must be explicit.
+
+Plan and country transfers appear as a loss in one segment and a gain in another when comparing period-specific breakdowns. Customer movement is classified after summing all subscriptions by canonical customer, so unchanged customer MRR across a transfer is neither churn nor acquisition. A zero-to-positive month after an inactive month is currently classified as `new`, including reactivation; a separate reactivation label is not yet implemented.
+
+Lifecycle movement and customer churn requests currently accept customer ID scope only. They reject plan, country, region, industry, and company-size filters before data reads because those filters can misclassify a segment transfer. Period-specific MRR comparisons and breakdowns retain dimension filters.
 
 ## Customer MRR movement query
 

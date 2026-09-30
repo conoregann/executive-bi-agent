@@ -124,7 +124,7 @@ test('requires the original token and preserves scoped metrics and driver recomm
 
 test('blocked investigations cannot be presented as executive answers', async () => {
   const { api, url, headers } = await syntheticInvestigation({
-    month: '2026-06-01',
+    month: '2026-05-01',
   });
   const response = await api.fetch(new Request(url, { headers }));
   assert.equal(response.status, 422);
@@ -205,19 +205,21 @@ test('invalid or out-of-scope document evidence is excluded without inventing co
 
 test('zero baselines, increases and year boundaries retain truthful comparison wording', async () => {
   const dependencies = await loadSyntheticMrrDeclineDependencies();
-  dependencies.snapshot.rows = dependencies.snapshot.rows.map((row) => ({
-    ...row,
-    month: row.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
-    ...(row.month === '2026-07-01'
-      ? { mrrEurCents: 0, isActiveAtMonthEnd: false }
-      : {}),
-  }));
-  dependencies.snapshot.coverage = dependencies.snapshot.coverage.map(
-    (item) => ({
+  dependencies.snapshot.rows = dependencies.snapshot.rows
+    .filter((row) => row.month !== '2026-06-01')
+    .map((row) => ({
+      ...row,
+      month: row.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
+      ...(row.month === '2026-07-01'
+        ? { mrrEurCents: 0, isActiveAtMonthEnd: false }
+        : {}),
+    }));
+  dependencies.snapshot.coverage = dependencies.snapshot.coverage
+    .filter((item) => item.month !== '2026-06-01')
+    .map((item) => ({
       ...item,
       month: item.month === '2026-07-01' ? '2025-12-01' : '2026-01-01',
-    }),
-  );
+    }));
   const api = createMrrDeclineApi(dependencies);
   const created = await api.fetch(
     new Request('http://api.test/v1/investigations/mrr-decline', {
