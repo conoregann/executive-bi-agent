@@ -1,4 +1,4 @@
-export const KNOWLEDGE_RETRIEVAL_VERSION = '1.0.0';
+export const KNOWLEDGE_RETRIEVAL_VERSION = '1.1.0';
 
 const MAX_DOCUMENT_CONTENT_LENGTH = 10_000;
 const MAX_CHUNK_LENGTH = 1_200;
@@ -13,6 +13,17 @@ export interface KnowledgeDocument {
   freshness: string;
   content: string;
   customerIds?: readonly string[];
+  access: DocumentAccess;
+}
+
+export type DocumentAccess =
+  | { audience: 'company' }
+  | { audience: 'admin' }
+  | { audience: 'customers'; customerIds: readonly string[] };
+
+export interface KnowledgeViewer {
+  role: 'admin' | 'restricted';
+  customerIds: readonly string[];
 }
 
 export interface KnowledgeChunkEvidence {
@@ -25,6 +36,8 @@ export interface KnowledgeChunkEvidence {
   scope: {
     customerIds: readonly string[];
     retrievalVersion: typeof KNOWLEDGE_RETRIEVAL_VERSION;
+    documentId: string;
+    documentAccess: DocumentAccess;
   };
   content: { excerpt: string; title: string };
   freshness: string;
@@ -48,7 +61,10 @@ export interface KnowledgeSearchResult {
 }
 
 export interface CompanyKnowledgeSearch {
-  search(input: unknown): Promise<KnowledgeSearchResult>;
+  search(
+    input: unknown,
+    viewer: KnowledgeViewer,
+  ): Promise<KnowledgeSearchResult>;
 }
 
 export interface CompanyKnowledgeSearchOptions {
@@ -90,20 +106,31 @@ export function createCompanyKnowledgeSearch(
     });
 
   return {
-    async search(input) {
+    async search(input, viewer) {
       const request = parseSearchRequest(input);
-      if (!request.ok) {
+      if (
+        !request.ok ||
+        !isViewer(viewer) ||
+        (viewer.role === 'restricted' &&
+          request.value.customerIds.some(
+            (id) => !viewer.customerIds.includes(id),
+          ))
+      ) {
         return {
           status: 'invalid_request',
           hits: [],
           warnings: [],
-          error: request.error,
+          error: request.ok
+            ? 'Valid viewer access is required.'
+            : request.error,
         };
       }
 
       const scored = chunks
-        .filter((chunk) =>
-          isInCustomerScope(chunk.document, request.value.customerIds),
+        .filter(
+          (chunk) =>
+            canReadDocument(chunk.document.access, viewer) &&
+            isInCustomerScope(chunk.document, request.value.customerIds),
         )
         .map((chunk) => ({
           chunk,
@@ -135,6 +162,8 @@ export function createCompanyKnowledgeSearch(
             scope: {
               customerIds: [...request.value.customerIds],
               retrievalVersion: KNOWLEDGE_RETRIEVAL_VERSION,
+              documentId: chunk.document.documentId,
+              documentAccess: chunk.document.access,
             },
             content: { excerpt: chunk.excerpt, title: chunk.document.title },
             freshness: chunk.document.freshness,
@@ -264,12 +293,39 @@ function validateDocument(document: KnowledgeDocument): void {
       'Knowledge document customer IDs must be non-empty strings.',
     );
   }
+  if (!isDocumentAccess(document.access)) {
+    throw new Error('Knowledge document requires an explicit access policy.');
+  }
+  if (
+    document.access.audience === 'company' &&
+    (document.customerIds?.length ?? 0) > 0
+  ) {
+    throw new Error(
+      'Customer-tagged documents require customer or admin access.',
+    );
+  }
+  const accessIds =
+    document.access.audience === 'customers' ? document.access.customerIds : [];
+  if (
+    document.access.audience === 'customers' &&
+    document.customerIds?.some((customerId) => !accessIds.includes(customerId))
+  ) {
+    throw new Error('Document access must cover every tagged customer.');
+  }
 }
 
 function freezeDocument(document: KnowledgeDocument): KnowledgeDocument {
   return Object.freeze({
     ...document,
     customerIds: Object.freeze([...(document.customerIds ?? [])]),
+    access: Object.freeze(
+      document.access.audience === 'customers'
+        ? {
+            audience: 'customers',
+            customerIds: Object.freeze([...document.access.customerIds]),
+          }
+        : { audience: document.access.audience },
+    ),
   });
 }
 
@@ -317,6 +373,40 @@ function isInCustomerScope(
     document.customerIds?.some((customerId) =>
       requestedCustomerIds.includes(customerId),
     ) ?? false
+  );
+}
+
+export function canReadDocument(
+  access: DocumentAccess,
+  viewer: KnowledgeViewer,
+): boolean {
+  if (!isDocumentAccess(access) || !isViewer(viewer)) return false;
+  if (viewer.role === 'admin') return true;
+  if (access.audience === 'admin') return false;
+  if (access.audience === 'company') return true;
+  return access.customerIds.every((id) => viewer.customerIds.includes(id));
+}
+
+function isDocumentAccess(value: unknown): value is DocumentAccess {
+  if (!isRecord(value)) return false;
+  if (value.audience === 'company' || value.audience === 'admin')
+    return hasOnlyKeys(value, ['audience']);
+  return (
+    value.audience === 'customers' &&
+    hasOnlyKeys(value, ['audience', 'customerIds']) &&
+    Array.isArray(value.customerIds) &&
+    value.customerIds.length > 0 &&
+    new Set(value.customerIds).size === value.customerIds.length &&
+    value.customerIds.every((id) => typeof id === 'string' && id.trim() !== '')
+  );
+}
+
+function isViewer(value: unknown): value is KnowledgeViewer {
+  return (
+    isRecord(value) &&
+    (value.role === 'admin' || value.role === 'restricted') &&
+    Array.isArray(value.customerIds) &&
+    value.customerIds.every((id) => typeof id === 'string' && id.trim() !== '')
   );
 }
 

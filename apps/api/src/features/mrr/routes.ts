@@ -24,6 +24,11 @@ import { resolveQuestion } from './resolve-question.js';
 import { resolveQuestionRequestSchema } from '@executive-bi/schemas';
 import { parseJson } from '../../http/json.js';
 import {
+  canReadDocument,
+  type DocumentAccess,
+  type KnowledgeViewer,
+} from '@executive-bi/retrieval';
+import {
   newToken,
   tokenHash,
   verifyPassword,
@@ -38,6 +43,7 @@ export class MrrDeclineApi {
   constructor(
     private readonly investigation: MrrDeclineInvestigationService,
     private readonly access?: AccessStore,
+    private readonly documentPolicies?: ReadonlyMap<string, DocumentAccess>,
   ) {}
 
   async fetch(request: Request): Promise<Response> {
@@ -83,10 +89,13 @@ export class MrrDeclineApi {
       ? resolveScope(user, parsed.data.permittedCustomerIds)
       : (parsed.data.permittedCustomerIds ?? []);
     if (!scope) return forbidden();
-    const result = await this.investigation.start({
-      ...parsed.data,
-      ...(scope.length ? { permittedCustomerIds: scope } : {}),
-    });
+    const result = await this.investigation.start(
+      {
+        ...parsed.data,
+        ...(scope.length ? { permittedCustomerIds: scope } : {}),
+      },
+      viewerFor(user),
+    );
     if (user && result.record)
       await this.access!.bind(result.record.investigationId, user.userId);
     if (result.status === 'invalid_request') {
@@ -190,7 +199,12 @@ export class MrrDeclineApi {
       );
       if (
         parent.status !== 'ok' ||
-        !permitsRecord(user, parent.record.permittedCustomerIds)
+        !permitsRecord(user, parent.record.permittedCustomerIds) ||
+        !permitsRetainedDocuments(
+          parent.evidence,
+          viewerFor(user),
+          this.documentPolicies,
+        )
       )
         return notFound();
     }
@@ -237,6 +251,7 @@ export class MrrDeclineApi {
               investigationId,
               token,
               body.value,
+              viewerFor(user),
             )
           : customerFollowUp
             ? await this.investigation.startCustomerFollowUp(
@@ -312,6 +327,14 @@ export class MrrDeclineApi {
     if (found.status !== 'ok') return notFound();
     if (user && !permitsRecord(user, found.record.permittedCustomerIds))
       return notFound();
+    if (
+      !permitsRetainedDocuments(
+        found.evidence,
+        viewerFor(user),
+        this.documentPolicies,
+      )
+    )
+      return notFound();
     if (pathname === `/v1/investigations/${investigationId}/answer`) {
       const result =
         found.record.kind === 'mrr_cross_source'
@@ -345,6 +368,41 @@ export class MrrDeclineApi {
       record: storedInvestigationRecordSchema.parse(found.record),
     });
   }
+}
+
+function viewerFor(user?: UserAccess): KnowledgeViewer {
+  return user
+    ? { role: user.role, customerIds: user.customerIds }
+    : { role: 'admin', customerIds: [] };
+}
+
+function permitsRetainedDocuments(
+  evidence: readonly {
+    type: string;
+    sourceRef: string;
+    scope: Record<string, unknown>;
+    content: Record<string, unknown>;
+  }[],
+  viewer: KnowledgeViewer,
+  policies?: ReadonlyMap<string, DocumentAccess>,
+): boolean {
+  return evidence.every((item) => {
+    if (item.type === 'document_chunk') {
+      const documentId = item.scope.documentId;
+      return (
+        typeof documentId === 'string' &&
+        item.sourceRef.startsWith(`${documentId}:chunk:`) &&
+        canReadDocument(item.scope.documentAccess as DocumentAccess, viewer) &&
+        (!policies ||
+          canReadDocument(policies.get(documentId) as DocumentAccess, viewer))
+      );
+    }
+    const nested = item.content.evidence;
+    return (
+      !Array.isArray(nested) ||
+      permitsRetainedDocuments(nested, viewer, policies)
+    );
+  });
 }
 
 function unauthorized(): Response {

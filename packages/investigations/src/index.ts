@@ -34,6 +34,10 @@ export {
   type InvestigationAnswerResult,
 } from './answer.js';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+export type KnowledgeViewer = {
+  role: 'admin' | 'restricted';
+  customerIds: readonly string[];
+};
 
 export const INVESTIGATION_DEFINITION_VERSION = '1.1.0';
 
@@ -92,7 +96,10 @@ export interface MrrDeclineTools {
     input: unknown,
   ): Promise<ToolResult<CustomerMrrMovement>>;
   breakdownMrr(input: unknown): Promise<ToolResult<MrrBreakdown>>;
-  searchCompanyKnowledge(input: unknown): Promise<KnowledgeSearch>;
+  searchCompanyKnowledge(
+    input: unknown,
+    viewer: KnowledgeViewer,
+  ): Promise<KnowledgeSearch>;
   getCustomerCountryContributions?(
     input: unknown,
   ): Promise<ToolResult<unknown>>;
@@ -220,7 +227,10 @@ export class MrrDeclineInvestigationService {
     private readonly crossSource?: CrossSourceDependencies,
   ) {}
 
-  async start(input: unknown): Promise<MrrDeclineInvestigationResult> {
+  async start(
+    input: unknown,
+    viewer?: KnowledgeViewer,
+  ): Promise<MrrDeclineInvestigationResult> {
     const request = parseRequest(input);
     if (!request.ok) {
       return { status: 'invalid_request', warnings: [], error: request.error };
@@ -315,11 +325,17 @@ export class MrrDeclineInvestigationService {
     let knowledge: KnowledgeSearch | undefined;
     if (driverCustomerIds.length > 0) {
       knowledge = await safeKnowledge(() =>
-        this.tools.searchCompanyKnowledge({
-          query: 'cancelled pricing payment support',
-          customerIds: driverCustomerIds,
-          limit: 5,
-        }),
+        this.tools.searchCompanyKnowledge(
+          {
+            query: 'cancelled pricing payment support',
+            customerIds: driverCustomerIds,
+            limit: 5,
+          },
+          viewer ?? {
+            role: 'restricted',
+            customerIds: request.value.permittedCustomerIds,
+          },
+        ),
       );
       evidence.push(...knowledge.hits.map((hit) => hit.evidence));
       warnings.push(...knowledge.warnings);
@@ -716,6 +732,7 @@ export class MrrDeclineInvestigationService {
     parentId: string,
     token: string,
     input: unknown,
+    viewer?: KnowledgeViewer,
   ) {
     const parent = await this.getInvestigation(parentId, token);
     if (parent.status !== 'ok') return { status: 'not_found' as const };
@@ -725,6 +742,10 @@ export class MrrDeclineInvestigationService {
       input,
       this.store,
       this.crossSource,
+      viewer ?? {
+        role: 'restricted',
+        customerIds: parent.record.permittedCustomerIds,
+      },
     );
   }
 

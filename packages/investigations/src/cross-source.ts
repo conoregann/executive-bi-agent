@@ -24,11 +24,15 @@ import type {
 import { synthesizeMrrDeclineAnswer } from './answer.js';
 import { synthesizeCustomerFollowUpAnswer } from './customer-answer.js';
 import { createHash, randomBytes } from 'node:crypto';
+import type { KnowledgeViewer } from './index.js';
 
 export interface CrossSourceDependencies {
   repository: OperationalRepository;
   model?: InvestigationModel;
-  searchKnowledge?: (input: unknown) => Promise<{
+  searchKnowledge?: (
+    input: unknown,
+    viewer: KnowledgeViewer,
+  ) => Promise<{
     status: string;
     hits: readonly { evidence: InvestigationEvidence; documentId?: string }[];
     warnings: readonly string[];
@@ -82,6 +86,7 @@ export async function runCrossSource(
   input: unknown,
   store: InvestigationStore,
   dependencies?: CrossSourceDependencies,
+  viewer?: KnowledgeViewer,
 ) {
   const request = crossSourceRequestSchema.safeParse(input);
   if (!request.success)
@@ -245,11 +250,17 @@ export async function runCrossSource(
     try {
       const result = await bounded(
         () =>
-          dependencies.searchKnowledge!({
-            query: 'pricing budget cancellation',
-            customerIds: ids,
-            limit: 5,
-          }),
+          dependencies.searchKnowledge!(
+            {
+              query: 'pricing budget cancellation',
+              customerIds: ids,
+              limit: 5,
+            },
+            viewer ?? {
+              role: 'restricted',
+              customerIds: parent.permittedCustomerIds,
+            },
+          ),
         deadline,
       );
       if (result.status !== 'ok') throw new Error('Knowledge unavailable');

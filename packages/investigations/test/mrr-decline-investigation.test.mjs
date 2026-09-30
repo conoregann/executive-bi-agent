@@ -369,6 +369,7 @@ test('composes trusted metric and knowledge capabilities without generated claim
       observedAt: '2026-08-20T12:00:00Z',
       freshness: '2026-09-01T08:00:00Z',
       customerIds: ['cust_churn'],
+      access: { audience: 'customers', customerIds: ['cust_churn'] },
       content:
         'The customer cancelled after a pricing discussion and payment-support escalation.',
     },
@@ -378,13 +379,16 @@ test('composes trusted metric and knowledge capabilities without generated claim
     getMrrMovement: (input) => metrics.getMrrMovement(input),
     getCustomerMrrMovement: (input) => metrics.getCustomerMrrMovement(input),
     breakdownMrr: (input) => metrics.breakdownMrr(input),
-    searchCompanyKnowledge: (input) => knowledge.search(input),
+    searchCompanyKnowledge: (input, viewer) => knowledge.search(input, viewer),
   });
 
-  const result = await service.start({
-    investigationId: 'composed-services',
-    month: '2026-08-01',
-  });
+  const result = await service.start(
+    {
+      investigationId: 'composed-services',
+      month: '2026-08-01',
+    },
+    { role: 'admin', customerIds: [] },
+  );
 
   assert.equal(result.status, 'completed');
   assert.deepEqual(result.record?.driverCustomerIds, ['cust_churn']);
