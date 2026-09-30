@@ -28,11 +28,10 @@ a retained blocked outcome when comparison evidence is missing.
 All unmatched wording is rejected without silently dropping constraints. Other
 metrics, dimensions, country/plan/customer filters in prose, custom comparisons,
 quarters, and general conversational follow-ups remain unsupported. Customer scope stays
-in the separate explicit form field. The UI shows the resolution for review;
-the user submits the existing structured MRR request to run the investigation.
-The UI labels this action “Apply month from question” and explains that the
-resolver is rule-based, not AI. Question text is not persisted as investigation
-evidence or used as authorization.
+in the separate explicit form field. The web interface uses the structured
+month/customer form directly and does not expose the optional resolver helper.
+The resolver remains available to API clients. Question text is not persisted
+as investigation evidence or used as authorization.
 
 ### Authenticated conversational follow-up
 
@@ -41,7 +40,7 @@ country” and “Compare Germany with the UK” through the authenticated count
 single terminal `.`, `!` or `?`, case-insensitive and outer whitespace trimmed.
 It executes both months at the parent's exact customer scope. The standalone
 question resolver remains for new investigations and does not infer parent
-context. The UI provides a dedicated follow-up question field and action.
+context. The web interface uses a named country action instead of a phrase field.
 Additional dates, customer/country filters, other metrics, combined dimensions
 and all unmatched wording return `unsupported` without running tools. Requests
 needing a changed scope require a new investigation.

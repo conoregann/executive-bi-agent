@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   CrossSourceAnswer,
@@ -19,7 +25,6 @@ import {
   readCountryFollowUpAnswer,
   readEvidence,
   startInvestigation,
-  resolveQuestion,
   login,
   signOut,
 } from './client.ts';
@@ -33,13 +38,17 @@ type Claim =
 
 function CopyMarkdownButton({ text }: { text: string }) {
   const [status, setStatus] = useState<'copied' | 'failed' | ''>('');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
   async function copyMarkdown() {
+    clearTimeout(timer.current);
     try {
       await navigator.clipboard.writeText(text);
       setStatus('copied');
     } catch {
       setStatus('failed');
     }
+    timer.current = setTimeout(() => setStatus(''), 2000);
   }
 
   return (
@@ -73,12 +82,47 @@ function CopyMarkdownButton({ text }: { text: string }) {
   );
 }
 
+function EvidenceLinks({ children }: { children: ReactNode }) {
+  return (
+    <details className="citation-details">
+      <summary>Sources</summary>
+      <div className="citation-links">{children}</div>
+    </details>
+  );
+}
+
+type Session = { id: string; token: string };
+type HistoryEntry = {
+  record: Extract<MrrDeclineApiResponse, { record: unknown }>['record'];
+  answer: InvestigationAnswer;
+  session: Session;
+  customers: string;
+  churnAnswer?: ChurnFollowUpAnswer;
+  churnSession?: Session;
+  followAnswer?: CountryFollowUpAnswer;
+  followSession?: Session;
+  customerAnswer?: CustomerFollowUpAnswer;
+  customerSession?: Session;
+  crossAnswer?: CrossSourceAnswer;
+  crossSession?: Session;
+};
+
+function monthLabel(value: string) {
+  return new Date(value.slice(0, 7) + '-01T12:00:00Z').toLocaleDateString(
+    'en',
+    {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    },
+  );
+}
+
 function App() {
   const [signedIn, setSignedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [accessLabel, setAccessLabel] = useState('');
   const [requestOpen, setRequestOpen] = useState(true);
   const [churnAnswer, setChurnAnswer] = useState<ChurnFollowUpAnswer>();
   const [churnMessage, setChurnMessage] = useState('');
@@ -122,15 +166,11 @@ function App() {
   const customerSession = useRef<{ id: string; token: string } | undefined>(
     undefined,
   );
-  const [followQuestion, setFollowQuestion] = useState('');
   const [followAnswer, setFollowAnswer] = useState<CountryFollowUpAnswer>();
   const [followMessage, setFollowMessage] = useState('');
   const followSession = useRef<{ id: string; token: string } | undefined>(
     undefined,
   );
-  const [question, setQuestion] = useState('');
-  const [resolution, setResolution] = useState('');
-  const [resolving, setResolving] = useState(false);
   const [month, setMonth] = useState('2026-08');
   const [customers, setCustomers] = useState('');
   const [busy, setBusy] = useState(false);
@@ -148,6 +188,65 @@ function App() {
   useEffect(() => {
     if (evidence || evidenceError) evidenceHeading.current?.focus();
   }, [evidence, evidenceError]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
+  useEffect(() => {
+    if (busy || !record || !answer || !session.current) return;
+    const entry: HistoryEntry = {
+      record,
+      answer,
+      session: session.current,
+      customers: answer.scope.permittedCustomerIds.join(', '),
+      churnAnswer,
+      churnSession: churnSession.current,
+      followAnswer,
+      followSession: followSession.current,
+      customerAnswer,
+      customerSession: customerSession.current,
+      crossAnswer,
+      crossSession: crossSession.current,
+    };
+    setHistory((previous) =>
+      [
+        entry,
+        ...previous.filter((item) => item.session.id !== entry.session.id),
+      ].slice(0, 20),
+    );
+  }, [
+    busy,
+    record,
+    answer,
+    churnAnswer,
+    followAnswer,
+    customerAnswer,
+    crossAnswer,
+  ]);
+
+  function reopen(entry: HistoryEntry) {
+    evidenceRequest.current++;
+    setEvidence(undefined);
+    setEvidenceError('');
+    setEvidenceBusy(false);
+    setRecord(entry.record);
+    setAnswer(entry.answer);
+    session.current = entry.session;
+    setMonth(entry.answer.scope.month.slice(0, 7));
+    setCustomers(entry.customers);
+    setChurnAnswer(entry.churnAnswer);
+    churnSession.current = entry.churnSession;
+    setFollowAnswer(entry.followAnswer);
+    followSession.current = entry.followSession;
+    setCustomerAnswer(entry.customerAnswer);
+    customerSession.current = entry.customerSession;
+    setCrossAnswer(entry.crossAnswer);
+    crossSession.current = entry.crossSession;
+    setMessage('');
+    setChurnMessage('');
+    setFollowMessage('');
+    setCustomerMessage('');
+    setCrossMessage('');
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     evidenceRequest.current++;
@@ -343,7 +442,7 @@ function App() {
       <div className="claim" key={index}>
         <small>{item.classification.replaceAll('_', ' ')}</small>
         <p>{item.text}</p>
-        <div className="flex flex-wrap gap-2">
+        <EvidenceLinks>
           {item.evidenceIds.map((id) => (
             <button
               type="button"
@@ -354,7 +453,7 @@ function App() {
               {citationLabel(id)}
             </button>
           ))}
-        </div>
+        </EvidenceLinks>
       </div>
     );
   }
@@ -393,12 +492,7 @@ function App() {
             event.preventDefault();
             setLoginError('');
             try {
-              const access = await login(username, password);
-              setAccessLabel(
-                access.role === 'admin'
-                  ? 'All customers'
-                  : access.customerIds.join(', '),
-              );
+              await login(username, password);
               setPassword('');
               setSignedIn(true);
             } catch (error) {
@@ -456,13 +550,14 @@ function App() {
         </button>
         <div className="topbar-title">
           <h1>MRR analysis</h1>
-          <span className="access-label">Access: {accessLabel}</span>
         </div>
         <button
           type="button"
           className="signout-button"
           onClick={() => {
             signOut();
+            setHistory([]);
+            setHistorySearch('');
             setSignedIn(false);
             setAnswer(undefined);
             setRecord(undefined);
@@ -497,57 +592,6 @@ function App() {
         <div className="panel-heading">
           <h2 id="request-heading">New investigation</h2>
         </div>
-        <label className="field-label">
-          Question <span className="optional">optional</span>
-          <input
-            value={question}
-            maxLength={1000}
-            disabled={busy || resolving}
-            placeholder="Why did MRR fall in August 2026?"
-            onChange={(event) => {
-              setQuestion(event.target.value);
-              setResolution('');
-            }}
-          />
-        </label>
-        <p className="field-help question-help">
-          Rule-based helper, not AI. It recognizes supported MRR decline
-          questions and applies the month below for review; it does not run the
-          investigation.
-        </p>
-        <button
-          className="text-button resolve-button"
-          type="button"
-          disabled={busy || resolving || !question.trim()}
-          onClick={async () => {
-            setResolving(true);
-            setResolution('Resolving question…');
-            try {
-              const result = await resolveQuestion(question);
-              if (result.status === 'resolved') {
-                setMonth(result.month.slice(0, 7));
-                setResolution(
-                  `Resolved MRR investigation for ${result.month.slice(0, 7)}, compared with the previous month. Review the month and customer scope below, then select Investigate MRR.`,
-                );
-              } else setResolution(result.message);
-            } catch (error) {
-              setResolution(
-                error instanceof Error
-                  ? error.message
-                  : 'Question resolution unavailable.',
-              );
-            } finally {
-              setResolving(false);
-            }
-          }}
-        >
-          Apply month from question
-        </button>
-        {resolution && (
-          <p className="inline-status" role="status" aria-live="polite">
-            {resolution}
-          </p>
-        )}
         <form className="request-form" onSubmit={(event) => void submit(event)}>
           <label className="field-label">
             Reporting month
@@ -556,7 +600,7 @@ function App() {
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              disabled={busy || resolving}
+              disabled={busy}
             />
           </label>
           <label className="field-label">
@@ -566,14 +610,14 @@ function App() {
               onChange={(event) => setCustomers(event.target.value)}
               placeholder="cust_acme, cust_beta"
               aria-describedby="scope-help"
-              disabled={busy || resolving}
+              disabled={busy}
             />
           </label>
           <p id="scope-help" className="field-help">
             Comma-separated IDs. Leave blank for all customers in your access
             scope.
           </p>
-          <button className="primary-button" disabled={busy || resolving}>
+          <button className="primary-button" disabled={busy}>
             {busy ? 'Investigating…' : 'Investigate MRR'}
           </button>
         </form>
@@ -582,9 +626,61 @@ function App() {
             {message}
           </p>
         )}
-        <p className="panel-footnote">
-          Available: July–August 2026. Access clears on reload.
-        </p>
+        <p className="panel-footnote">Available: July–August 2026.</p>
+        <nav className="history-panel" aria-label="Recent investigations">
+          <h2>Recent investigations</h2>
+          <p className="field-help">
+            This session · clears on reload or sign-out
+          </p>
+          {history.length > 0 && (
+            <input
+              type="search"
+              aria-label="Search investigations"
+              placeholder="Search history"
+              value={historySearch}
+              onChange={(event) => setHistorySearch(event.target.value)}
+            />
+          )}
+          {history.length === 0 && (
+            <p className="field-help">Your investigations will appear here.</p>
+          )}
+          {history
+            .filter((entry) =>
+              (
+                monthLabel(entry.answer.scope.month) +
+                ' ' +
+                (entry.customers || 'All customers')
+              )
+                .toLowerCase()
+                .includes(historySearch.toLowerCase()),
+            )
+            .map((entry) => (
+              <button
+                type="button"
+                key={entry.session.id}
+                disabled={busy}
+                aria-current={
+                  record?.investigationId === entry.session.id
+                    ? 'page'
+                    : undefined
+                }
+                onClick={() => reopen(entry)}
+              >
+                <span>{monthLabel(entry.answer.scope.month)}</span>
+                <small>{entry.customers || 'All customers'}</small>
+              </button>
+            ))}
+          {history.length > 0 &&
+            !history.some((entry) =>
+              (
+                monthLabel(entry.answer.scope.month) +
+                ' ' +
+                (entry.customers || 'All customers')
+              )
+                .toLowerCase()
+                .includes(historySearch.toLowerCase()),
+            ) && <p className="field-help">No matching investigations.</p>}
+        </nav>
       </section>
       {!answer && !busy && !message && (
         <section className="empty-state" aria-label="Getting started">
@@ -593,24 +689,30 @@ function App() {
         </section>
       )}
       {answer && (
-        <article className="results" aria-label="Executive answer">
+        <article
+          key={record?.investigationId}
+          className="results"
+          aria-label="Executive answer"
+        >
           <section className="result-hero">
             <h2>Answer</h2>
-            <p className="scope">
-              Reporting month: {answer.scope.month.slice(0, 7)} · Comparison:
-              previous month · Customers:{' '}
-              {answer.scope.permittedCustomerIds.join(', ') || 'All customers'}
-            </p>
-            <p className="meta-line">
-              Source status:{' '}
-              {answer.evidence.some(
-                (item) =>
-                  item.type === 'metric_query' &&
-                  item.sourceStatus === 'complete',
-              )
-                ? 'Complete for cited metric periods'
-                : 'Unknown'}
-            </p>
+            <dl className="scope">
+              <div>
+                <dt>Reporting month</dt>
+                <dd>{monthLabel(answer.scope.month)}</dd>
+              </div>
+              <div>
+                <dt>Comparison</dt>
+                <dd>Previous month</dd>
+              </div>
+              <div>
+                <dt>Customers</dt>
+                <dd>
+                  {answer.scope.permittedCustomerIds.join(', ') ||
+                    'All customers'}
+                </dd>
+              </div>
+            </dl>
             {claim(answer.answer)}
           </section>
           {answer.waterfall && (
@@ -645,7 +747,7 @@ function App() {
                     );
                     const axisMax =
                       Math.ceil(maxValue / 4 / 10000) * 10000 * 4 || 10000;
-                    const left = 84;
+                    const left = Math.max(104, eur(axisMax).length * 7 + 20);
                     const right = 880;
                     const top = 28;
                     const bottom = 310;
@@ -749,36 +851,41 @@ function App() {
                   })()}
                 </svg>
               </div>
-              <div
-                className="table-scroll"
-                tabIndex={0}
-                role="region"
-                aria-label="Revenue movement values"
-              >
-                <table>
-                  <caption>Deterministic revenue movement in EUR</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Movement</th>
-                      <th scope="col">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {answer.waterfall.data.map((row) => (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td>{eur(row.valueEurCents)}</td>
+              <details className="supporting-details chart-details">
+                <summary>Values & sources</summary>
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Revenue movement values"
+                >
+                  <table>
+                    <caption>Deterministic revenue movement in EUR</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Movement</th>
+                        <th scope="col">Value</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <button
-                type="button"
-                onClick={() => void inspect(answer.waterfall!.sourceEvidenceId)}
-              >
-                Inspect waterfall evidence
-              </button>
+                    </thead>
+                    <tbody>
+                      {answer.waterfall.data.map((row) => (
+                        <tr key={row.label}>
+                          <th scope="row">{row.label}</th>
+                          <td>{eur(row.valueEurCents)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void inspect(answer.waterfall!.sourceEvidenceId)
+                  }
+                >
+                  Inspect waterfall evidence
+                </button>
+              </details>
             </section>
           )}
           <div className="analysis-grid">
@@ -870,12 +977,9 @@ function App() {
             {answer.context.length ? (
               answer.context.map((item, index) => (
                 <div className="claim context-claim" key={index}>
-                  <div className="context-claim-heading">
-                    <small>Source context · causality unconfirmed</small>
-                    <CopyMarkdownButton text={item.text} />
-                  </div>
                   <MarkdownContent text={item.text} />
-                  <div className="flex flex-wrap gap-2">
+                  <CopyMarkdownButton text={item.text} />
+                  <EvidenceLinks>
                     {item.evidenceIds.map((id) => (
                       <button
                         type="button"
@@ -886,7 +990,7 @@ function App() {
                         {citationLabel(id)}
                       </button>
                     ))}
-                  </div>
+                  </EvidenceLinks>
                 </div>
               ))
             ) : (
@@ -900,43 +1004,6 @@ function App() {
               Owner: {answer.recommendedNextStep.owner}
             </p>
           </section>
-          <details className="supporting-details">
-            <summary>
-              Sources & limitations{' '}
-              <span>{answer.evidence.length} sources</span>
-            </summary>
-            <section className="supporting-section">
-              <h2>Limitations</h2>
-              <ul>
-                {answer.limitations.map((text, index) => (
-                  <li key={index}>{text}</li>
-                ))}
-              </ul>
-            </section>
-            <section className="supporting-section">
-              <h2>Evidence</h2>
-              <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
-                {answer.evidence.map((item) => (
-                  <li key={item.evidenceId}>
-                    <button
-                      type="button"
-                      onClick={() => void inspect(item.evidenceId)}
-                      aria-controls="evidence-detail"
-                    >
-                      {citationLabel(item.evidenceId)}
-                    </button>
-                    <span>
-                      {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
-                      {item.sourceStatus
-                        ? ` Source: ${item.sourceStatus} ·`
-                        : ''}{' '}
-                      Freshness: {item.freshness}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </details>
           <section
             className="result-section follow-section"
             aria-labelledby="churn-heading"
@@ -945,13 +1012,17 @@ function App() {
             <h2 id="churn-heading">Customer churn rate</h2>
             <button
               type="button"
-              disabled={busy || resolving}
+              disabled={busy}
               onClick={() => void churnFollowUp()}
             >
               Calculate customer churn
             </button>
             {churnMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={churnAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {churnMessage}
               </p>
             )}
@@ -962,16 +1033,6 @@ function App() {
                   {churnAnswer.value.currentMonth.slice(0, 7)} · Customers:{' '}
                   {churnAnswer.permittedCustomerIds.join(', ') ||
                     'All customers'}
-                </p>
-                <p className="meta-line">
-                  Source status:{' '}
-                  {churnAnswer.evidence
-                    .filter((item) => item.type === 'metric_query')
-                    .map(
-                      (item) =>
-                        `${String(item.scope.month).slice(0, 7)} ${String(item.scope.sourceStatus ?? 'unknown')}`,
-                    )
-                    .join(' · ')}
                 </p>
                 <div
                   className="churn-highlight"
@@ -997,7 +1058,18 @@ function App() {
                     )}
                   </div>
                 </div>
-                <div className="source-actions">
+                <EvidenceLinks>
+                  <p className="meta-line">
+                    Source status:{' '}
+                    {churnAnswer.evidence
+                      .filter((item) => item.type === 'metric_query')
+                      .map(
+                        (item) =>
+                          `${String(item.scope.month).slice(0, 7)} ${String(item.scope.sourceStatus ?? 'unknown')}`,
+                      )
+                      .join(' · ')}
+                  </p>
+
                   {churnAnswer.sourceEvidenceIds.map((id) => {
                     const item = churnAnswer.evidence.find(
                       (candidate) => candidate.evidenceId === id,
@@ -1017,7 +1089,7 @@ function App() {
                       </button>
                     );
                   })}
-                </div>
+                </EvidenceLinks>
                 {churnAnswer.warnings.map((warning) => (
                   <p className="data-note" key={warning}>
                     {warning}
@@ -1033,34 +1105,17 @@ function App() {
             <h2 id="country-heading">Country comparison</h2>
             <button
               type="button"
-              disabled={busy || resolving}
+              disabled={busy}
               onClick={() => void followUp()}
             >
               Break down by country
             </button>
-            <details className="phrase-details">
-              <summary>Use a follow-up question</summary>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void followUp(followQuestion);
-                }}
-              >
-                <label className="flex flex-col gap-2 font-semibold">
-                  Follow-up question
-                  <input
-                    value={followQuestion}
-                    maxLength={1000}
-                    disabled={busy || resolving}
-                    placeholder="Break that down by country"
-                    onChange={(event) => setFollowQuestion(event.target.value)}
-                  />
-                </label>
-                <button disabled={busy || resolving}>Run follow-up</button>
-              </form>
-            </details>
             {followMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={followAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {followMessage}
               </p>
             )}
@@ -1183,7 +1238,7 @@ function App() {
               </>
             )}
           </section>
-          {(followAnswer || customerMessage || customerAnswer) && (
+          {(customerMessage || customerAnswer) && (
             <section
               id="customer-drilldown"
               aria-labelledby="customer-heading"
@@ -1325,19 +1380,30 @@ function App() {
                 'Investigate revenue losses across sources',
                 'Did those accounts have support escalations or declining usage?',
                 'What evidence supports a pricing-related explanation?',
-              ].map((text) => (
+              ].map((text, index) => (
                 <button
                   key={text}
                   type="button"
                   disabled={busy}
                   onClick={() => void crossSource(text)}
+                  aria-label={text}
                 >
-                  {text}
+                  {
+                    [
+                      'Investigate possible reasons',
+                      'Support & usage',
+                      'Pricing evidence',
+                    ][index]
+                  }
                 </button>
               ))}
             </div>
             {crossMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={crossAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {crossMessage}
               </p>
             )}
@@ -1348,24 +1414,69 @@ function App() {
                   {crossAnswer.record.customerIds.join(', ') ||
                     'No retained losses'}
                 </p>
-                <p className="meta-line">
-                  Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
-                  Plan source: {crossAnswer.record.plan.planner} · Hypothesis
-                  review: {crossAnswer.record.modelStatus}
-                </p>
-                <p className="ai-explanation">
-                  {crossAnswer.record.plan.planner === 'model' ||
-                  crossAnswer.record.modelStatus !== 'disabled'
-                    ? 'AI may select among approved context sources and propose tentative explanations. The app checks each proposal against cited evidence; MRR values and customer scope come from validated data.'
-                    : 'No AI model was used for this context follow-up. The app queried the approved sources; MRR values and customer scope come from validated data.'}
-                </p>
+                <div className="cross-source">
+                  <h3>Tentative hypotheses</h3>
+                  {crossAnswer.record.hypotheses.length === 0 && (
+                    <p>
+                      No validated model explanation is available. Review the
+                      observed records and document excerpts.
+                    </p>
+                  )}
+                  {crossAnswer.record.hypotheses.map((hypothesis, index) => (
+                    <div key={index}>
+                      <p>
+                        {hypothesis.kind} may be relevant to the retained
+                        losses; causality is unconfirmed.
+                      </p>
+                      <p>Supporting references:</p>
+                      {hypothesis.supportingEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                      <p>Contradictory references:</p>
+                      {hypothesis.contradictoryEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <details className="supporting-details">
+                  <summary>How context was investigated</summary>
+                  <p className="meta-line">
+                    Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
+                    Plan source: {crossAnswer.record.plan.planner} · Hypothesis
+                    review: {crossAnswer.record.modelStatus}
+                  </p>
+                  <p className="ai-explanation">
+                    {crossAnswer.record.plan.planner === 'model' ||
+                    crossAnswer.record.modelStatus !== 'disabled'
+                      ? 'AI may select among approved context sources and propose tentative explanations. The app checks each proposal against cited evidence; MRR values and customer scope come from validated data.'
+                      : 'No AI model was used for this context follow-up. The app queried the approved sources; MRR values and customer scope come from validated data.'}
+                  </p>
+                </details>
                 {crossAnswer.evidence
                   .filter(
                     (item) => item.source === 'synthetic_operational_records',
                   )
                   .map((item) => (
-                    <div className="cross-source" key={item.evidenceId}>
-                      <h3>{String(item.scope.source)} evidence</h3>
+                    <details
+                      className="supporting-details cross-source"
+                      key={item.evidenceId}
+                    >
+                      <summary>
+                        {String(item.scope.source).toUpperCase()} records
+                      </summary>
                       <p className="meta-line">
                         Source status: {String(item.scope.sourceStatus)} ·
                         Freshness: {item.freshness} · Missing coverage:{' '}
@@ -1436,7 +1547,7 @@ function App() {
                       >
                         Inspect {String(item.scope.source)} query evidence
                       </button>
-                    </div>
+                    </details>
                   ))}
                 {crossAnswer.evidence
                   .filter((item) => item.type === 'document_chunk')
@@ -1462,43 +1573,6 @@ function App() {
                     </div>
                   ))}
                 <div className="cross-source">
-                  <h3>Tentative hypotheses</h3>
-                  {crossAnswer.record.hypotheses.length === 0 && (
-                    <p>
-                      No validated model explanation is available. Review the
-                      observed records and document excerpts.
-                    </p>
-                  )}
-                  {crossAnswer.record.hypotheses.map((hypothesis, index) => (
-                    <div key={index}>
-                      <p>
-                        {hypothesis.kind} may be relevant to the retained
-                        losses; causality is unconfirmed.
-                      </p>
-                      <p>Supporting references:</p>
-                      {hypothesis.supportingEvidenceIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => void inspect(id, crossSession.current)}
-                        >
-                          {id}
-                        </button>
-                      ))}
-                      <p>Contradictory references:</p>
-                      {hypothesis.contradictoryEvidenceIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => void inspect(id, crossSession.current)}
-                        >
-                          {id}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-                <div className="cross-source">
                   <h3>Coverage and limitations</h3>
                   <ul>
                     {crossAnswer.record.warnings.map((text, index) => (
@@ -1517,6 +1591,43 @@ function App() {
               </div>
             )}
           </section>
+          <details className="supporting-details">
+            <summary>
+              Sources & limitations{' '}
+              <span>{answer.evidence.length} sources</span>
+            </summary>
+            <section className="supporting-section">
+              <h2>Limitations</h2>
+              <ul>
+                {answer.limitations.map((text, index) => (
+                  <li key={index}>{text}</li>
+                ))}
+              </ul>
+            </section>
+            <section className="supporting-section">
+              <h2>Evidence</h2>
+              <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
+                {answer.evidence.map((item) => (
+                  <li key={item.evidenceId}>
+                    <button
+                      type="button"
+                      onClick={() => void inspect(item.evidenceId)}
+                      aria-controls="evidence-detail"
+                    >
+                      {citationLabel(item.evidenceId)}
+                    </button>
+                    <span>
+                      {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
+                      {item.sourceStatus
+                        ? ` Source: ${item.sourceStatus} ·`
+                        : ''}{' '}
+                      Freshness: {item.freshness}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </details>
           {record && (
             <details className="supporting-details trail-details">
               <summary className="cursor-pointer font-semibold">

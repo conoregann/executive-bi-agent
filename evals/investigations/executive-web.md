@@ -33,3 +33,18 @@ values; incoherent reconciliation suppresses the chart. Reads are repeatable,
 and the chart and provenance survive PostgreSQL persistence across API instances.
 Executable coverage: schema contract, investigations package, API answer and live
 PostgreSQL tests, plus browser tests.
+
+WEB-12: The structured form has no optional question helper or redundant country
+phrase input. Month and customer filters remain editable, and country actions
+use retained parent scope.
+
+WEB-13: Complete synthetic August for all customers, calculate churn, then run
+a second investigation for cust_riviera. Search session history and reopen the
+all-customer result: scope, 25% churn, and authenticated child evidence are restored
+without rerunning calculations. No tokens enter URLs or browser storage. Reload
+and sign-out clear history; a search with no matches has an explicit empty state.
+
+WEB-14: Copy a multiline Markdown excerpt. Clipboard text is verbatim; the copy
+button is below and left aligned with the excerpt. “Copied” and its checkmark
+reset after two seconds. Sources disclosures support keyboard use; mobile
+content remains within the viewport.

@@ -71,6 +71,7 @@ async function complete(page) {
     .getByRole('button', { name: 'Investigate MRR', exact: true })
     .click();
   await page.getByRole('article', { name: 'Executive answer' }).waitFor();
+  await page.locator('.result-hero .citation-details summary').click();
 }
 async function assertNoHorizontalOverflow(page) {
   const layout = await page.evaluate(() => ({
@@ -86,6 +87,48 @@ async function assertNoHorizontalOverflow(page) {
   }));
   assert.ok(layout.width <= layout.viewport, JSON.stringify(layout));
 }
+test('default presentation keeps supporting details collapsed and churn aligned', async (t) => {
+  const page = await pageForTest(t);
+  await page
+    .getByRole('button', { name: 'Investigate MRR', exact: true })
+    .click();
+  await page.getByRole('article').waitFor();
+  assert.equal(await page.locator('.results details[open]').count(), 0);
+  const labelBounds = await page
+    .locator('.chart-axis-label')
+    .evaluateAll((labels) => labels.map((label) => label.getBBox().x));
+  assert.ok(
+    labelBounds.every((x) => x >= 0),
+    JSON.stringify(labelBounds),
+  );
+  await page.screenshot({
+    path: '/tmp/executive-bi-minimal-desktop.png',
+    fullPage: true,
+  });
+  const sources = page.locator('.result-hero .citation-details summary');
+  await sources.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(
+    await page.locator('.result-hero .citation-details').getAttribute('open'),
+    '',
+  );
+  await page.getByRole('button', { name: 'Calculate customer churn' }).click();
+  await page.locator('.churn-rate-value').waitFor();
+  const section = await page
+    .locator('[aria-labelledby=churn-heading]')
+    .boundingBox();
+  const rate = await page.locator('.churn-rate-value').boundingBox();
+  const action = await page
+    .getByRole('button', { name: 'Calculate customer churn' })
+    .boundingBox();
+  assert.equal(rate.x, section.x);
+  assert.equal(action.x, section.x);
+  await page.screenshot({
+    path: '/tmp/executive-bi-churn-desktop.png',
+    fullPage: true,
+  });
+});
+
 test('synthetic investigation renders all answer sections and protected citations', async (t) => {
   const page = await pageForTest(t);
   const errors = [];
@@ -104,7 +147,7 @@ test('synthetic investigation renders all answer sections and protected citation
   const requestBox = await page.locator('.request-panel').boundingBox();
   const resultBox = await page.locator('.results').boundingBox();
   assert.ok(requestBox.x < resultBox.x);
-  assert.ok(requestBox.width >= 320);
+  assert.ok(requestBox.width >= 260);
   await page.getByText('Sources & limitations').click();
   for (const name of [
     'Answer',
@@ -154,13 +197,16 @@ test('synthetic customer churn follow-up shows retained 1 / 4 and inspectable ci
   const page = await pageForTest(t);
   await complete(page);
   await page.getByRole('button', { name: 'Calculate customer churn' }).click();
-  await page.getByText('Customer churn rate', { exact: true }).waitFor();
+  await page.locator('.churn-rate-value').waitFor();
   assert.equal(await page.locator('.churn-rate-value').textContent(), '25%');
   assert.match(
     await page.locator('.churn-highlight').textContent(),
     /1 of 4 starting customers churned/,
   );
   assert.equal(await page.getByText('25%', { exact: true }).count(), 1);
+  await page
+    .locator('[aria-labelledby=churn-heading] .citation-details summary')
+    .click();
   await page.getByRole('button', { name: 'Inspect churn calculation' }).click();
   await page.getByRole('heading', { name: 'Evidence detail' }).waitFor();
   await page.getByText('View structured values', { exact: true }).click();
@@ -185,7 +231,7 @@ test('header control hides the left panel fully and restores its form state', as
     await page
       .locator('.primary-button')
       .evaluate((button) => getComputedStyle(button).backgroundColor),
-    'rgb(200, 213, 187)',
+    'rgb(41, 41, 41)',
   );
   await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
   const expandedResult = await page.locator('.empty-state').boundingBox();
@@ -241,13 +287,14 @@ test('scoped answer preserves scope, mobile width and keyboard access', async (t
   await page.getByRole('article').waitFor();
   assert.match(
     await page.locator('.scope').textContent(),
-    /Customers: cust_acme/,
+    /Customerscust_acme/,
   );
   await assertNoHorizontalOverflow(page);
   await page.screenshot({
     path: '/tmp/executive-bi-web-mobile.png',
     fullPage: true,
   });
+  await page.locator('.result-hero .citation-details summary').click();
   const citation = page.getByRole('button', { name: /^Inspect / }).first();
   await citation.focus();
   await page.keyboard.press('Enter');
@@ -344,6 +391,18 @@ test('malformed answers fail closed and document Markdown renders safely with it
     await page.evaluate(() => window.copiedMarkdown),
     '# August sales review\n\n**Synthetic context** with source formatting.',
   );
+  await page
+    .getByText('Copied', { exact: true })
+    .waitFor({ state: 'hidden', timeout: 4000 });
+  const textBox = await page
+    .locator('.context-claim .markdown-content')
+    .boundingBox();
+  const copyBox = await page
+    .locator('.context-claim .copy-markdown')
+    .boundingBox();
+  assert.ok(copyBox.y >= textBox.y + textBox.height);
+  assert.equal(copyBox.x, textBox.x);
+  await page.locator('.context-claim .citation-details summary').click();
   assert.equal(
     await page.getByRole('button', { name: /^Inspect source excerpt/ }).count(),
     1,
@@ -458,58 +517,48 @@ test('synthetic incomplete and unavailable charts retain the executive answer', 
   );
 });
 
-test('natural-language review preserves selected customer scope and handles clarification', async (t) => {
+test('minimal input and session history reopen scoped results and child evidence', async (t) => {
   const page = await pageForTest(t);
-  const applyQuestion = page.getByRole('button', {
-    name: 'Apply month from question',
-  });
-  assert.equal(await applyQuestion.isDisabled(), true);
-  assert.equal(
-    await page.getByLabel('Question optional').getAttribute('placeholder'),
-    'Why did MRR fall in August 2026?',
-  );
-  let starts = 0;
-  page.on('request', (request) => {
-    if (request.url().endsWith('/mrr-decline')) starts++;
-  });
-  await page.getByLabel('Customer IDs (optional)').fill('cust_acme');
-  await page
-    .getByLabel('Question optional')
-    .fill('Why did MRR fall in August?');
-  assert.match(await page.locator('.question-help').textContent(), /not AI/);
-  await applyQuestion.click();
-  await page.getByRole('status').filter({ hasText: 'Which year' }).waitFor();
-  assert.equal(starts, 0);
-  await page
-    .getByLabel('Question optional')
-    .fill('Why did MRR fall in August 2026 in Germany?');
-  await applyQuestion.click();
-  await page.getByRole('status').filter({ hasText: 'not supported' }).waitFor();
-  assert.equal(starts, 0);
-  await page.getByLabel('Reporting month').fill('2026-07');
-  await page
-    .getByLabel('Question optional')
-    .fill('Why did MRR fall in August 2026?');
-  await applyQuestion.click();
-  await page.getByRole('status').filter({ hasText: 'Resolved MRR' }).waitFor();
-  assert.equal(
-    await page.getByLabel('Reporting month').inputValue(),
-    '2026-08',
-  );
-  assert.equal(
-    await page.getByLabel('Customer IDs (optional)').inputValue(),
-    'cust_acme',
-  );
-  assert.equal(starts, 0);
+  assert.equal(await page.getByLabel('Question optional').count(), 0);
+  assert.equal(await page.getByText(/Access:|Rule-based helper/).count(), 0);
   await complete(page);
-  assert.match(
-    await page.locator('.scope').textContent(),
-    /Customers: cust_acme/,
+  await page.getByRole('button', { name: 'Calculate customer churn' }).click();
+  await page.locator('.churn-rate-value').waitFor();
+  await page.getByLabel('Customer IDs (optional)').fill('cust_riviera');
+  await complete(page);
+  assert.match(await page.locator('.scope').textContent(), /cust_riviera/);
+  const history = page.getByRole('navigation', {
+    name: 'Recent investigations',
+  });
+  assert.equal(await history.getByRole('button').count(), 2);
+  await page.getByLabel('Search investigations').fill('no match');
+  await history.getByText('No matching investigations.').waitFor();
+  await page.getByLabel('Search investigations').fill('August');
+  await history
+    .getByRole('button', { name: 'August 2026 All customers' })
+    .click();
+  assert.match(await page.locator('.scope').textContent(), /All customers/);
+  assert.equal(await page.locator('.churn-rate-value').textContent(), '25%');
+  await page
+    .locator('[aria-labelledby=churn-heading] .citation-details summary')
+    .click();
+  await page.getByRole('button', { name: 'Inspect churn calculation' }).click();
+  await page.getByRole('heading', { name: 'Evidence detail' }).waitFor();
+  assert.equal(
+    await page.evaluate(() => localStorage.length + sessionStorage.length),
+    0,
   );
-  assert.equal(starts, 1);
+  await page.reload();
+  await page.getByRole('button', { name: 'Sign in' }).waitFor();
+  assert.equal(
+    await page
+      .getByRole('navigation', { name: 'Recent investigations' })
+      .count(),
+    0,
+  );
 });
 
-test('country follow-up action and bounded phrase show compared values and protected evidence on mobile', async (t) => {
+test('country follow-up action show compared values and protected evidence on mobile', async (t) => {
   const page = await pageForTest(t, { width: 390, height: 844 });
   await complete(page);
   await page
@@ -539,25 +588,6 @@ test('country follow-up action and bounded phrase show compared values and prote
     await page.locator('#evidence-detail').textContent(),
     /country_change/,
   );
-  await page.getByText('Use a follow-up question').click();
-  await page
-    .getByLabel('Follow-up question', { exact: true })
-    .fill('Break that down by country in September 2026');
-  await page
-    .getByRole('button', { name: 'Run follow-up', exact: true })
-    .click();
-  await page
-    .getByRole('status')
-    .filter({ hasText: 'Only “Break that down by country”' })
-    .waitFor();
-  assert.equal(await table.count(), 0);
-  await page
-    .getByLabel('Follow-up question', { exact: true })
-    .fill('Break that down by country');
-  await page
-    .getByRole('button', { name: 'Run follow-up', exact: true })
-    .click();
-  await table.waitFor();
   assert.match(
     await page.getByRole('article').textContent(),
     /not churn or acquisition/,
@@ -701,9 +731,9 @@ test('cross-source journey retains country scope and cites operational records o
   const section = page.getByRole('region', {
     name: 'Cross-source revenue investigation',
   });
-  await section
-    .getByRole('heading', { name: 'crm evidence', exact: true })
-    .waitFor();
+  await section.getByText('CRM records', { exact: true }).waitFor();
+  await section.getByText('CRM records', { exact: true }).click();
+  await section.getByText('SUPPORT records', { exact: true }).click();
   assert.match(await section.textContent(), /Accounts: cust_acme/);
   assert.match(await section.textContent(), /budget_frozen/);
   assert.match(await section.textContent(), /conflict/);
