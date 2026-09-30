@@ -30,6 +30,49 @@ type Claim =
   | InvestigationAnswer['answer']
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
+
+function CopyMarkdownButton({ text }: { text: string }) {
+  const [status, setStatus] = useState<'copied' | 'failed' | ''>('');
+  async function copyMarkdown() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus('copied');
+    } catch {
+      setStatus('failed');
+    }
+  }
+
+  return (
+    <span className="copy-markdown-wrap">
+      <button
+        className="copy-markdown"
+        type="button"
+        aria-label="Copy source as Markdown"
+        title={status === 'copied' ? 'Copied Markdown' : 'Copy Markdown'}
+        onClick={() => void copyMarkdown()}
+      >
+        {status === 'copied' ? (
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m4 10 4 4 8-8" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="7" y="6" width="9" height="11" rx="1.5" />
+            <path d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-6A1.5 1.5 0 0 0 3 4.5v8A1.5 1.5 0 0 0 4.5 14H7" />
+          </svg>
+        )}
+      </button>
+      <span className="copy-feedback" role="status" aria-live="polite">
+        {status === 'copied'
+          ? 'Copied'
+          : status === 'failed'
+            ? 'Copy failed'
+            : ''}
+      </span>
+    </span>
+  );
+}
+
 function App() {
   const [signedIn, setSignedIn] = useState(false);
   const [username, setUsername] = useState('');
@@ -460,17 +503,22 @@ function App() {
             value={question}
             maxLength={1000}
             disabled={busy || resolving}
-            placeholder="Why did MRR fall?"
+            placeholder="Why did MRR fall in August 2026?"
             onChange={(event) => {
               setQuestion(event.target.value);
               setResolution('');
             }}
           />
         </label>
+        <p className="field-help question-help">
+          Rule-based helper, not AI. It recognizes supported MRR decline
+          questions and applies the month below for review; it does not run the
+          investigation.
+        </p>
         <button
           className="text-button resolve-button"
           type="button"
-          disabled={busy || resolving}
+          disabled={busy || resolving || !question.trim()}
           onClick={async () => {
             setResolving(true);
             setResolution('Resolving question…');
@@ -493,7 +541,7 @@ function App() {
             }
           }}
         >
-          Resolve question
+          Apply month from question
         </button>
         {resolution && (
           <p className="inline-status" role="status" aria-live="polite">
@@ -822,12 +870,11 @@ function App() {
             {answer.context.length ? (
               answer.context.map((item, index) => (
                 <div className="claim context-claim" key={index}>
-                  <small>Source context · causality unconfirmed</small>
+                  <div className="context-claim-heading">
+                    <small>Source context · causality unconfirmed</small>
+                    <CopyMarkdownButton text={item.text} />
+                  </div>
                   <MarkdownContent text={item.text} />
-                  <details className="original-excerpt">
-                    <summary>View original excerpt</summary>
-                    <pre>{item.text}</pre>
-                  </details>
                   <div className="flex flex-wrap gap-2">
                     {item.evidenceIds.map((id) => (
                       <button
@@ -926,30 +973,50 @@ function App() {
                     )
                     .join(' · ')}
                 </p>
-                <p>
-                  {churnAnswer.value.churnedCustomers}{' '}
-                  {churnAnswer.value.churnedCustomers === 1
-                    ? 'customer'
-                    : 'customers'}{' '}
-                  churned / {churnAnswer.value.startingCustomers} starting
-                  customers
-                </p>
-                <p>
-                  {churnAnswer.value.rate === null
-                    ? 'Rate unavailable: no starting customers.'
-                    : `${(churnAnswer.value.rate * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}
-                </p>
+                <div
+                  className="churn-highlight"
+                  aria-label="Customer churn result"
+                >
+                  <p className="churn-rate-value">
+                    {churnAnswer.value.rate === null
+                      ? '—'
+                      : `${(churnAnswer.value.rate * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}
+                  </p>
+                  <div className="churn-rate-copy">
+                    <p className="churn-rate-label">Customer churn rate</p>
+                    <p className="churn-count">
+                      <strong>{churnAnswer.value.churnedCustomers}</strong> of{' '}
+                      <strong>{churnAnswer.value.startingCustomers}</strong>{' '}
+                      starting customers churned
+                    </p>
+                    {churnAnswer.value.rate === null && (
+                      <p className="meta-line">
+                        Rate unavailable because there were no starting
+                        customers.
+                      </p>
+                    )}
+                  </div>
+                </div>
                 <div className="source-actions">
-                  {churnAnswer.sourceEvidenceIds.map((id) => (
-                    <button
-                      type="button"
-                      key={id}
-                      aria-controls="evidence-detail"
-                      onClick={() => void inspect(id, churnSession.current)}
-                    >
-                      Inspect churn evidence {id}
-                    </button>
-                  ))}
+                  {churnAnswer.sourceEvidenceIds.map((id) => {
+                    const item = churnAnswer.evidence.find(
+                      (candidate) => candidate.evidenceId === id,
+                    );
+                    const label =
+                      item?.type === 'metric_query'
+                        ? `Inspect churn query · ${String(item.scope.month).slice(0, 7)}`
+                        : 'Inspect churn calculation';
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        aria-controls="evidence-detail"
+                        onClick={() => void inspect(id, churnSession.current)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
                 {churnAnswer.warnings.map((warning) => (
                   <p className="data-note" key={warning}>
@@ -1376,13 +1443,14 @@ function App() {
                   .map((item) => (
                     <div className="cross-source" key={item.evidenceId}>
                       <h3>Document context</h3>
-                      <MarkdownContent
-                        text={String(item.content.excerpt ?? '')}
-                      />
-                      <details className="original-excerpt">
-                        <summary>View original excerpt</summary>
-                        <pre>{String(item.content.excerpt ?? '')}</pre>
-                      </details>
+                      <div className="cross-document-excerpt">
+                        <MarkdownContent
+                          text={String(item.content.excerpt ?? '')}
+                        />
+                        <CopyMarkdownButton
+                          text={String(item.content.excerpt ?? '')}
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
@@ -1454,11 +1522,19 @@ function App() {
               <summary className="cursor-pointer font-semibold">
                 How this answer was generated
               </summary>
-              <p>
-                Stored investigation: {record.investigationId} · Outcome:{' '}
-                {record.status}
-              </p>
-              <p>Recorded plan in tool order.</p>
+              <dl className="trail-meta">
+                <div>
+                  <dt>Investigation</dt>
+                  <dd>{record.investigationId}</dd>
+                </div>
+                <div>
+                  <dt>Outcome</dt>
+                  <dd>
+                    <span className="outcome-pill">{record.status}</span>
+                  </dd>
+                </div>
+              </dl>
+              <p className="trail-intro">Steps ran in this order:</p>
               <ol className="list-decimal pl-5">
                 {record.plan.steps.map((step) => (
                   <li key={step}>{step.replaceAll('_', ' ')}</li>
@@ -1526,11 +1602,10 @@ function App() {
               typeof evidence.content.excerpt === 'string' ? (
                 <>
                   <h3>Supporting values or document excerpt</h3>
-                  <MarkdownContent text={evidence.content.excerpt} />
-                  <details className="original-excerpt">
-                    <summary>View original excerpt</summary>
-                    <pre>{evidence.content.excerpt}</pre>
-                  </details>
+                  <div className="evidence-document-excerpt">
+                    <MarkdownContent text={evidence.content.excerpt} />
+                    <CopyMarkdownButton text={evidence.content.excerpt} />
+                  </div>
                 </>
               ) : (
                 <>

@@ -25,7 +25,9 @@ Each document has a stable `documentId`, title, source, observed timestamp,
 freshness timestamp, content, and optional canonical customer IDs. The adapter
 rejects duplicate IDs, invalid timestamps, empty identity fields, malformed
 customer IDs, and content longer than 10,000 characters. Documents are split
-deterministically into excerpts no longer than 1,200 characters.
+deterministically into excerpts no longer than 1,200 characters. Markdown
+headings and blank-line paragraph boundaries are preserved so the UI can render
+and copy source excerpts without flattening their structure.
 
 Customer IDs are a permission boundary. When a search supplies `customerIds`,
 only documents explicitly tagged with at least one requested ID are eligible.

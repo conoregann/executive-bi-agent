@@ -154,12 +154,14 @@ test('synthetic customer churn follow-up shows retained 1 / 4 and inspectable ci
   const page = await pageForTest(t);
   await complete(page);
   await page.getByRole('button', { name: 'Calculate customer churn' }).click();
-  await page.getByText('1 customer churned / 4 starting customers').waitFor();
+  await page.getByText('Customer churn rate', { exact: true }).waitFor();
+  assert.equal(await page.locator('.churn-rate-value').textContent(), '25%');
+  assert.match(
+    await page.locator('.churn-highlight').textContent(),
+    /1 of 4 starting customers churned/,
+  );
   assert.equal(await page.getByText('25%', { exact: true }).count(), 1);
-  await page
-    .getByRole('button', { name: /^Inspect churn evidence/ })
-    .last()
-    .click();
+  await page.getByRole('button', { name: 'Inspect churn calculation' }).click();
   await page.getByRole('heading', { name: 'Evidence detail' }).waitFor();
   await page.getByText('View structured values', { exact: true }).click();
   await page.getByText(/customer_churn_rate = churned_customers/).waitFor();
@@ -326,6 +328,22 @@ test('malformed answers fail closed and document Markdown renders safely with it
     await page.locator('.context-claim strong').textContent(),
     'Synthetic context',
   );
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (value) => {
+          window.copiedMarkdown = value;
+        },
+      },
+    });
+  });
+  await page.getByRole('button', { name: 'Copy source as Markdown' }).click();
+  await page.getByText('Copied', { exact: true }).waitFor();
+  assert.equal(
+    await page.evaluate(() => window.copiedMarkdown),
+    '# August sales review\n\n**Synthetic context** with source formatting.',
+  );
   assert.equal(
     await page.getByRole('button', { name: /^Inspect source excerpt/ }).count(),
     1,
@@ -352,11 +370,11 @@ test('malformed answers fail closed and document Markdown renders safely with it
   assert.equal(await page.evaluate(() => window.injected), undefined);
   await page
     .locator('#evidence-detail')
-    .getByText('View original excerpt', { exact: true })
+    .getByRole('button', { name: 'Copy source as Markdown' })
     .click();
-  assert.match(
-    await page.locator('#evidence-detail').textContent(),
-    /<img src=x/,
+  assert.equal(
+    await page.evaluate(() => window.copiedMarkdown),
+    '<img src=x onerror="window.injected=true">',
   );
 });
 
@@ -442,6 +460,14 @@ test('synthetic incomplete and unavailable charts retain the executive answer', 
 
 test('natural-language review preserves selected customer scope and handles clarification', async (t) => {
   const page = await pageForTest(t);
+  const applyQuestion = page.getByRole('button', {
+    name: 'Apply month from question',
+  });
+  assert.equal(await applyQuestion.isDisabled(), true);
+  assert.equal(
+    await page.getByLabel('Question optional').getAttribute('placeholder'),
+    'Why did MRR fall in August 2026?',
+  );
   let starts = 0;
   page.on('request', (request) => {
     if (request.url().endsWith('/mrr-decline')) starts++;
@@ -450,20 +476,21 @@ test('natural-language review preserves selected customer scope and handles clar
   await page
     .getByLabel('Question optional')
     .fill('Why did MRR fall in August?');
-  await page.getByRole('button', { name: 'Resolve question' }).click();
+  assert.match(await page.locator('.question-help').textContent(), /not AI/);
+  await applyQuestion.click();
   await page.getByRole('status').filter({ hasText: 'Which year' }).waitFor();
   assert.equal(starts, 0);
   await page
     .getByLabel('Question optional')
     .fill('Why did MRR fall in August 2026 in Germany?');
-  await page.getByRole('button', { name: 'Resolve question' }).click();
+  await applyQuestion.click();
   await page.getByRole('status').filter({ hasText: 'not supported' }).waitFor();
   assert.equal(starts, 0);
   await page.getByLabel('Reporting month').fill('2026-07');
   await page
     .getByLabel('Question optional')
     .fill('Why did MRR fall in August 2026?');
-  await page.getByRole('button', { name: 'Resolve question' }).click();
+  await applyQuestion.click();
   await page.getByRole('status').filter({ hasText: 'Resolved MRR' }).waitFor();
   assert.equal(
     await page.getByLabel('Reporting month').inputValue(),

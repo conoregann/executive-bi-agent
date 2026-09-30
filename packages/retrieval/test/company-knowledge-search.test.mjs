@@ -123,6 +123,18 @@ test('indexes the complete approved document without exposing an unbounded excer
   assert.ok((result.hits[0]?.excerpt.length ?? 0) <= 1_200);
 });
 
+test('preserves Markdown headings and paragraph breaks in excerpts', async () => {
+  const excerpt =
+    '# August sales review\n\n**Synthetic internal sales review**\n\nAcme cancelled its subscription.';
+  const result = await search([document('sales-review', excerpt)]).search({
+    query: 'August sales review',
+  });
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.hits[0]?.excerpt, excerpt);
+  assert.equal(result.hits[0]?.evidence.content.excerpt, excerpt);
+});
+
 test('rejects ambiguous documents before they become evidence sources', () => {
   assert.throws(
     () =>

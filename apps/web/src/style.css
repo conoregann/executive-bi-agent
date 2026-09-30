@@ -173,6 +173,10 @@ input:focus {
   padding-top: 16px;
   border-top: 1px solid #cecec8;
 }
+.question-help {
+  margin-top: -10px;
+  margin-bottom: 13px;
+}
 .primary-button {
   display: block;
   width: 100%;
@@ -484,17 +488,14 @@ td button,
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-.original-excerpt,
 .evidence-technical {
   margin: 12px 0;
   color: #66665f;
   font-size: 13px;
 }
-.original-excerpt summary,
 .evidence-technical summary {
   cursor: pointer;
 }
-.original-excerpt pre,
 .evidence-technical pre,
 .evidence-panel pre {
   max-height: 320px;
@@ -507,6 +508,92 @@ td button,
   padding: 12px;
   font-size: 12px;
   line-height: 1.55;
+}
+.context-claim-heading,
+.cross-document-excerpt,
+.evidence-document-excerpt {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.copy-markdown-wrap {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+}
+.copy-markdown {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #c8c9c1;
+  border-radius: 9px;
+  background: transparent;
+  color: #526845;
+}
+.copy-markdown:hover {
+  background: #edf2e8;
+}
+.copy-markdown svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+.copy-feedback {
+  color: #526845;
+  font-size: 12px;
+}
+.cross-document-excerpt .markdown-content,
+.evidence-document-excerpt .markdown-content {
+  flex: 1;
+  min-width: 0;
+}
+.churn-highlight {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 4vw, 48px);
+  margin: 20px 0 14px;
+  border-left: 4px solid #526845;
+  border-radius: 0 12px 12px 0;
+  background: #edf2e8;
+  padding: 20px 24px;
+}
+.churn-rate-value {
+  flex: none;
+  margin: 0;
+  color: #34482b;
+  font-size: clamp(42px, 5vw, 58px) !important;
+  font-weight: 620;
+  line-height: 1;
+  letter-spacing: -0.055em;
+  font-variant-numeric: tabular-nums;
+}
+.churn-rate-copy {
+  min-width: 0;
+}
+.churn-rate-label {
+  margin: 0 0 5px;
+  color: #4c6042;
+  font-size: 13px !important;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.churn-count {
+  margin: 0;
+  color: #252920;
+  font-size: 17px !important;
+}
+.churn-count strong {
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
 }
 .ai-explanation {
   margin: 8px 0 18px;
@@ -714,6 +801,45 @@ td button {
 .trail-details {
   grid-column: 1 / -1;
 }
+.trail-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin: 18px 0 22px;
+}
+.trail-meta > div {
+  min-width: 0;
+  border-radius: 9px;
+  background: #f1f1ed;
+  padding: 12px 14px;
+}
+.trail-meta dt {
+  margin-bottom: 6px;
+  color: #6d6d67;
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.trail-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.outcome-pill {
+  display: inline-block;
+  border-radius: 999px;
+  background: #dbe7d2;
+  padding: 3px 9px;
+  color: #34482b;
+  text-transform: capitalize;
+}
+.trail-intro {
+  margin-top: 0;
+  color: #62625c;
+}
 .trail-details > p,
 .trail-details > ol,
 .trail-details > h3,
@@ -816,6 +942,20 @@ pre {
   .panel-footnote {
     margin: 18px 0 0;
     padding-top: 13px;
+  }
+  .churn-highlight {
+    align-items: flex-start;
+    gap: 18px;
+    padding: 17px 16px;
+  }
+  .churn-rate-value {
+    font-size: 42px !important;
+  }
+  .churn-count {
+    font-size: 15px !important;
+  }
+  .trail-meta {
+    grid-template-columns: minmax(0, 1fr);
   }
   .empty-state {
     min-height: 300px;

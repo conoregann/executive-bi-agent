@@ -30,7 +30,9 @@ metrics, dimensions, country/plan/customer filters in prose, custom comparisons,
 quarters, and general conversational follow-ups remain unsupported. Customer scope stays
 in the separate explicit form field. The UI shows the resolution for review;
 the user submits the existing structured MRR request to run the investigation.
-Question text is not persisted as investigation evidence or used as authorization.
+The UI labels this action “Apply month from question” and explains that the
+resolver is rule-based, not AI. Question text is not persisted as investigation
+evidence or used as authorization.
 
 ### Authenticated conversational follow-up
 

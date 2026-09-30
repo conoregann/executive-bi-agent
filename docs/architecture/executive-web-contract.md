@@ -12,12 +12,12 @@ most 50 unique customer IDs. Empty scope means all customers granted to the sign
 dataset; May lacks source coverage and produces a blocked outcome. Each
 submission uses a new investigation identifier.
 
-An optional question field and “Resolve question” action populate the reporting
-month and display the previous-period interpretation. Resolution runs no
-investigation tools and preserves the explicit customer scope. Clarification,
-unsupported wording, and service failures are visible and allow editing/retry.
-The user reviews the structured fields and selects “Investigate MRR” to execute.
-The structured form remains available independently.
+An optional question field uses a bounded rule-based resolver, not an AI model.
+“Apply month from question” checks supported MRR-decline wording and updates the
+reporting month for review; it does not run tools or start an investigation.
+Clarification, unsupported wording, and service failures are visible and allow
+editing/retry. The user reviews the structured fields and selects “Investigate
+MRR” to execute. The structured form remains available independently.
 
 ## Answers and evidence
 
@@ -35,8 +35,8 @@ It shows the resolved month, previous-month comparison, and customer scope.
 Claim citations use human-readable evidence descriptions and open the
 authenticated evidence route. Evidence shows source references, scope,
 freshness, integrity, and supporting content. Retrieved document excerpts use a
-safe Markdown subset; raw HTML is never interpreted, and the verbatim excerpt
-remains available for inspection.
+safe Markdown subset; raw HTML is never interpreted, and a copy control places
+the verbatim Markdown excerpt on the clipboard.
 
 A username and password sign-in obtains an eight-hour server session. The page displays the active access scope and supports sign-out. Session and investigation bearer tokens live only in page memory. They never enter URLs or browser
 storage. Reloading clears access; a new submission clears the previous result.
@@ -65,6 +65,9 @@ inherited month and customer scope, “customers churned / starting customers”
 the formatted rate, warnings, and authenticated query/calculation citations.
 The browser formats the trusted rate; it does not derive cohort counts. A
 blocked child shows its retained identifier and warnings without a rate.
+Completed results emphasize the trusted churn percentage, with the churned and
+starting customer counts directly beside it for context. Evidence citations
+name the period or calculation they open.
 
 ## Country comparison follow-up
 
