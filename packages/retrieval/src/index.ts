@@ -332,7 +332,7 @@ function freezeDocument(document: KnowledgeDocument): KnowledgeDocument {
 function chunkContent(content: string): readonly string[] {
   const paragraphs = content
     .split(/\n\s*\n/u)
-    .map((paragraph) => paragraph.replace(/\s+/gu, ' ').trim())
+    .map((paragraph) => paragraph.replace(/[ \t]+/gu, ' ').trim())
     .filter((paragraph) => paragraph !== '');
   const chunks: string[] = [];
   let current = '';
@@ -345,12 +345,12 @@ function chunkContent(content: string): readonly string[] {
       current = '';
     } else if (
       current &&
-      current.length + paragraph.length + 1 > MAX_CHUNK_LENGTH
+      current.length + paragraph.length + 2 > MAX_CHUNK_LENGTH
     ) {
       chunks.push(current);
       current = paragraph;
     } else {
-      current = current ? `${current}\n${paragraph}` : paragraph;
+      current = current ? `${current}\n\n${paragraph}` : paragraph;
     }
   }
   if (current) chunks.push(current);

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   CrossSourceAnswer,
@@ -19,22 +25,104 @@ import {
   readCountryFollowUpAnswer,
   readEvidence,
   startInvestigation,
-  resolveQuestion,
   login,
   signOut,
 } from './client.ts';
 import './style.css';
+import { MarkdownContent } from './markdown.tsx';
 
 type Claim =
   | InvestigationAnswer['answer']
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
+
+function CopyMarkdownButton({ text }: { text: string }) {
+  const [status, setStatus] = useState<'copied' | 'failed' | ''>('');
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  async function copyMarkdown() {
+    clearTimeout(timer.current);
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus('copied');
+    } catch {
+      setStatus('failed');
+    }
+    timer.current = setTimeout(() => setStatus(''), 2000);
+  }
+
+  return (
+    <span className="copy-markdown-wrap">
+      <button
+        className="copy-markdown"
+        type="button"
+        aria-label="Copy source as Markdown"
+        title={status === 'copied' ? 'Copied Markdown' : 'Copy Markdown'}
+        onClick={() => void copyMarkdown()}
+      >
+        {status === 'copied' ? (
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="m4 10 4 4 8-8" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="7" y="6" width="9" height="11" rx="1.5" />
+            <path d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-6A1.5 1.5 0 0 0 3 4.5v8A1.5 1.5 0 0 0 4.5 14H7" />
+          </svg>
+        )}
+      </button>
+      <span className="copy-feedback" role="status" aria-live="polite">
+        {status === 'copied'
+          ? 'Copied'
+          : status === 'failed'
+            ? 'Copy failed'
+            : ''}
+      </span>
+    </span>
+  );
+}
+
+function EvidenceLinks({ children }: { children: ReactNode }) {
+  return (
+    <details className="citation-details">
+      <summary>Sources</summary>
+      <div className="citation-links">{children}</div>
+    </details>
+  );
+}
+
+type Session = { id: string; token: string };
+type HistoryEntry = {
+  record: Extract<MrrDeclineApiResponse, { record: unknown }>['record'];
+  answer: InvestigationAnswer;
+  session: Session;
+  customers: string;
+  churnAnswer?: ChurnFollowUpAnswer;
+  churnSession?: Session;
+  followAnswer?: CountryFollowUpAnswer;
+  followSession?: Session;
+  customerAnswer?: CustomerFollowUpAnswer;
+  customerSession?: Session;
+  crossAnswer?: CrossSourceAnswer;
+  crossSession?: Session;
+};
+
+function monthLabel(value: string) {
+  return new Date(value.slice(0, 7) + '-01T12:00:00Z').toLocaleDateString(
+    'en',
+    {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    },
+  );
+}
+
 function App() {
   const [signedIn, setSignedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [accessLabel, setAccessLabel] = useState('');
   const [requestOpen, setRequestOpen] = useState(true);
   const [churnAnswer, setChurnAnswer] = useState<ChurnFollowUpAnswer>();
   const [churnMessage, setChurnMessage] = useState('');
@@ -78,15 +166,11 @@ function App() {
   const customerSession = useRef<{ id: string; token: string } | undefined>(
     undefined,
   );
-  const [followQuestion, setFollowQuestion] = useState('');
   const [followAnswer, setFollowAnswer] = useState<CountryFollowUpAnswer>();
   const [followMessage, setFollowMessage] = useState('');
   const followSession = useRef<{ id: string; token: string } | undefined>(
     undefined,
   );
-  const [question, setQuestion] = useState('');
-  const [resolution, setResolution] = useState('');
-  const [resolving, setResolving] = useState(false);
   const [month, setMonth] = useState('2026-08');
   const [customers, setCustomers] = useState('');
   const [busy, setBusy] = useState(false);
@@ -104,6 +188,65 @@ function App() {
   useEffect(() => {
     if (evidence || evidenceError) evidenceHeading.current?.focus();
   }, [evidence, evidenceError]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historySearch, setHistorySearch] = useState('');
+  useEffect(() => {
+    if (busy || !record || !answer || !session.current) return;
+    const entry: HistoryEntry = {
+      record,
+      answer,
+      session: session.current,
+      customers: answer.scope.permittedCustomerIds.join(', '),
+      churnAnswer,
+      churnSession: churnSession.current,
+      followAnswer,
+      followSession: followSession.current,
+      customerAnswer,
+      customerSession: customerSession.current,
+      crossAnswer,
+      crossSession: crossSession.current,
+    };
+    setHistory((previous) =>
+      [
+        entry,
+        ...previous.filter((item) => item.session.id !== entry.session.id),
+      ].slice(0, 20),
+    );
+  }, [
+    busy,
+    record,
+    answer,
+    churnAnswer,
+    followAnswer,
+    customerAnswer,
+    crossAnswer,
+  ]);
+
+  function reopen(entry: HistoryEntry) {
+    evidenceRequest.current++;
+    setEvidence(undefined);
+    setEvidenceError('');
+    setEvidenceBusy(false);
+    setRecord(entry.record);
+    setAnswer(entry.answer);
+    session.current = entry.session;
+    setMonth(entry.answer.scope.month.slice(0, 7));
+    setCustomers(entry.customers);
+    setChurnAnswer(entry.churnAnswer);
+    churnSession.current = entry.churnSession;
+    setFollowAnswer(entry.followAnswer);
+    followSession.current = entry.followSession;
+    setCustomerAnswer(entry.customerAnswer);
+    customerSession.current = entry.customerSession;
+    setCrossAnswer(entry.crossAnswer);
+    crossSession.current = entry.crossSession;
+    setMessage('');
+    setChurnMessage('');
+    setFollowMessage('');
+    setCustomerMessage('');
+    setCrossMessage('');
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     evidenceRequest.current++;
@@ -299,7 +442,7 @@ function App() {
       <div className="claim" key={index}>
         <small>{item.classification.replaceAll('_', ' ')}</small>
         <p>{item.text}</p>
-        <div className="flex flex-wrap gap-2">
+        <EvidenceLinks>
           {item.evidenceIds.map((id) => (
             <button
               type="button"
@@ -307,12 +450,38 @@ function App() {
               onClick={() => void inspect(id)}
               aria-controls="evidence-detail"
             >
-              Inspect {id}
+              {citationLabel(id)}
             </button>
           ))}
-        </div>
+        </EvidenceLinks>
       </div>
     );
+  }
+  function citationLabel(id: string) {
+    const item = answer?.evidence.find(
+      (evidenceItem) => evidenceItem.evidenceId === id,
+    );
+    if (!item) return 'Inspect evidence';
+    if (item.type === 'metric_query') {
+      const ref = item.sourceRef;
+      if (ref.startsWith('mrr_movement:')) {
+        return `Inspect customer MRR movements · ${ref.split(':')[1] ?? ''}`;
+      }
+      const period = /mrr:(\d{4}-\d{2})/.exec(ref)?.[1];
+      if (ref.includes(':by:plan'))
+        return `Inspect MRR by plan${period ? ` · ${period}` : ''}`;
+      if (ref.startsWith('mrr:'))
+        return `Inspect total MRR${period ? ` · ${period}` : ''}`;
+      return 'Inspect metric query';
+    }
+    if (item.type === 'document_chunk')
+      return `Inspect source excerpt · ${item.sourceRef}`;
+    if (item.type === 'calculation') {
+      return item.sourceRef === 'mrr_calculation'
+        ? 'Inspect month comparison calculation'
+        : 'Inspect revenue movement reconciliation';
+    }
+    return 'Inspect evidence';
   }
   if (!signedIn)
     return (
@@ -323,12 +492,7 @@ function App() {
             event.preventDefault();
             setLoginError('');
             try {
-              const access = await login(username, password);
-              setAccessLabel(
-                access.role === 'admin'
-                  ? 'All customers'
-                  : access.customerIds.join(', '),
-              );
+              await login(username, password);
               setPassword('');
               setSignedIn(true);
             } catch (error) {
@@ -386,13 +550,14 @@ function App() {
         </button>
         <div className="topbar-title">
           <h1>MRR analysis</h1>
-          <span className="access-label">Access: {accessLabel}</span>
         </div>
         <button
           type="button"
           className="signout-button"
           onClick={() => {
             signOut();
+            setHistory([]);
+            setHistorySearch('');
             setSignedIn(false);
             setAnswer(undefined);
             setRecord(undefined);
@@ -427,52 +592,6 @@ function App() {
         <div className="panel-heading">
           <h2 id="request-heading">New investigation</h2>
         </div>
-        <label className="field-label">
-          Question <span className="optional">optional</span>
-          <input
-            value={question}
-            maxLength={1000}
-            disabled={busy || resolving}
-            placeholder="Why did MRR fall?"
-            onChange={(event) => {
-              setQuestion(event.target.value);
-              setResolution('');
-            }}
-          />
-        </label>
-        <button
-          className="text-button resolve-button"
-          type="button"
-          disabled={busy || resolving}
-          onClick={async () => {
-            setResolving(true);
-            setResolution('Resolving question…');
-            try {
-              const result = await resolveQuestion(question);
-              if (result.status === 'resolved') {
-                setMonth(result.month.slice(0, 7));
-                setResolution(
-                  `Resolved MRR investigation for ${result.month.slice(0, 7)}, compared with the previous month. Review the month and customer scope below, then select Investigate MRR.`,
-                );
-              } else setResolution(result.message);
-            } catch (error) {
-              setResolution(
-                error instanceof Error
-                  ? error.message
-                  : 'Question resolution unavailable.',
-              );
-            } finally {
-              setResolving(false);
-            }
-          }}
-        >
-          Resolve question
-        </button>
-        {resolution && (
-          <p className="inline-status" role="status" aria-live="polite">
-            {resolution}
-          </p>
-        )}
         <form className="request-form" onSubmit={(event) => void submit(event)}>
           <label className="field-label">
             Reporting month
@@ -481,7 +600,7 @@ function App() {
               type="month"
               value={month}
               onChange={(event) => setMonth(event.target.value)}
-              disabled={busy || resolving}
+              disabled={busy}
             />
           </label>
           <label className="field-label">
@@ -491,14 +610,14 @@ function App() {
               onChange={(event) => setCustomers(event.target.value)}
               placeholder="cust_acme, cust_beta"
               aria-describedby="scope-help"
-              disabled={busy || resolving}
+              disabled={busy}
             />
           </label>
           <p id="scope-help" className="field-help">
             Comma-separated IDs. Leave blank for all customers in your access
             scope.
           </p>
-          <button className="primary-button" disabled={busy || resolving}>
+          <button className="primary-button" disabled={busy}>
             {busy ? 'Investigating…' : 'Investigate MRR'}
           </button>
         </form>
@@ -507,9 +626,61 @@ function App() {
             {message}
           </p>
         )}
-        <p className="panel-footnote">
-          Available: July–August 2026. Access clears on reload.
-        </p>
+        <p className="panel-footnote">Available: July–August 2026.</p>
+        <nav className="history-panel" aria-label="Recent investigations">
+          <h2>Recent investigations</h2>
+          <p className="field-help">
+            This session · clears on reload or sign-out
+          </p>
+          {history.length > 0 && (
+            <input
+              type="search"
+              aria-label="Search investigations"
+              placeholder="Search history"
+              value={historySearch}
+              onChange={(event) => setHistorySearch(event.target.value)}
+            />
+          )}
+          {history.length === 0 && (
+            <p className="field-help">Your investigations will appear here.</p>
+          )}
+          {history
+            .filter((entry) =>
+              (
+                monthLabel(entry.answer.scope.month) +
+                ' ' +
+                (entry.customers || 'All customers')
+              )
+                .toLowerCase()
+                .includes(historySearch.toLowerCase()),
+            )
+            .map((entry) => (
+              <button
+                type="button"
+                key={entry.session.id}
+                disabled={busy}
+                aria-current={
+                  record?.investigationId === entry.session.id
+                    ? 'page'
+                    : undefined
+                }
+                onClick={() => reopen(entry)}
+              >
+                <span>{monthLabel(entry.answer.scope.month)}</span>
+                <small>{entry.customers || 'All customers'}</small>
+              </button>
+            ))}
+          {history.length > 0 &&
+            !history.some((entry) =>
+              (
+                monthLabel(entry.answer.scope.month) +
+                ' ' +
+                (entry.customers || 'All customers')
+              )
+                .toLowerCase()
+                .includes(historySearch.toLowerCase()),
+            ) && <p className="field-help">No matching investigations.</p>}
+        </nav>
       </section>
       {!answer && !busy && !message && (
         <section className="empty-state" aria-label="Getting started">
@@ -518,24 +689,30 @@ function App() {
         </section>
       )}
       {answer && (
-        <article className="results" aria-label="Executive answer">
+        <article
+          key={record?.investigationId}
+          className="results"
+          aria-label="Executive answer"
+        >
           <section className="result-hero">
             <h2>Answer</h2>
-            <p className="scope">
-              Reporting month: {answer.scope.month.slice(0, 7)} · Comparison:
-              previous month · Customers:{' '}
-              {answer.scope.permittedCustomerIds.join(', ') || 'All customers'}
-            </p>
-            <p className="meta-line">
-              Source status:{' '}
-              {answer.evidence.some(
-                (item) =>
-                  item.type === 'metric_query' &&
-                  item.sourceStatus === 'complete',
-              )
-                ? 'Complete for cited metric periods'
-                : 'Unknown'}
-            </p>
+            <dl className="scope">
+              <div>
+                <dt>Reporting month</dt>
+                <dd>{monthLabel(answer.scope.month)}</dd>
+              </div>
+              <div>
+                <dt>Comparison</dt>
+                <dd>Previous month</dd>
+              </div>
+              <div>
+                <dt>Customers</dt>
+                <dd>
+                  {answer.scope.permittedCustomerIds.join(', ') ||
+                    'All customers'}
+                </dd>
+              </div>
+            </dl>
             {claim(answer.answer)}
           </section>
           {answer.waterfall && (
@@ -544,77 +721,171 @@ function App() {
               aria-labelledby="waterfall-heading"
             >
               <h2 id="waterfall-heading">Revenue movement waterfall</h2>
-              <svg
-                viewBox="0 0 720 300"
-                role="img"
-                aria-label="Reconciled MRR movement from previous to current month"
-              >
-                {answer.waterfall.data.map((row, index) => {
-                  const max = Math.max(
-                    1,
-                    ...answer.waterfall!.data.flatMap((item) => [
-                      item.startEurCents,
-                      item.endEurCents,
-                    ]),
-                  );
-                  const scale = 220 / max;
-                  return (
-                    <g key={row.label}>
-                      <rect
-                        x={index * 120 + 20}
-                        y={
-                          250 -
-                          Math.max(row.startEurCents, row.endEurCents) * scale
-                        }
-                        width="70"
-                        height={Math.max(
-                          1,
-                          Math.abs(row.endEurCents - row.startEurCents) * scale,
-                        )}
-                        fill={row.valueEurCents < 0 ? '#607751' : '#8a9e7c'}
-                      />
-                      <text
-                        x={index * 120 + 55}
-                        y="280"
-                        textAnchor="middle"
-                        fontSize="13"
-                      >
-                        {row.label}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+              <p className="chart-caption">
+                Monthly MRR bridge · values in EUR · bars show the change from
+                each step’s starting balance.
+              </p>
               <div
-                className="table-scroll"
-                tabIndex={0}
+                className="waterfall-chart-scroll"
                 role="region"
-                aria-label="Revenue movement values"
+                aria-label="Revenue movement chart"
+                tabIndex={0}
               >
-                <table>
-                  <caption>Deterministic revenue movement in EUR</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Movement</th>
-                      <th scope="col">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {answer.waterfall.data.map((row) => (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td>{eur(row.valueEurCents)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <svg
+                  viewBox="0 0 900 390"
+                  role="img"
+                  aria-label={`MRR movement from ${eur(answer.waterfall.data[0]?.startEurCents ?? 0)} to ${eur(answer.waterfall.data.at(-1)?.endEurCents ?? 0)}`}
+                >
+                  {(() => {
+                    const rows = answer.waterfall!.data;
+                    const maxValue = Math.max(
+                      1,
+                      ...rows.flatMap((row) => [
+                        row.startEurCents,
+                        row.endEurCents,
+                      ]),
+                    );
+                    const axisMax =
+                      Math.ceil(maxValue / 4 / 10000) * 10000 * 4 || 10000;
+                    const left = Math.max(104, eur(axisMax).length * 7 + 20);
+                    const right = 880;
+                    const top = 28;
+                    const bottom = 310;
+                    const scale = (bottom - top) / axisMax;
+                    const step = (right - left) / rows.length;
+                    const y = (value: number) => bottom - value * scale;
+                    return (
+                      <>
+                        {[0, 1, 2, 3, 4].map((tick) => {
+                          const value = (axisMax * tick) / 4;
+                          const tickY = y(value);
+                          return (
+                            <g key={tick}>
+                              <line
+                                x1={left}
+                                x2={right}
+                                y1={tickY}
+                                y2={tickY}
+                                className="chart-gridline"
+                              />
+                              <text
+                                x={left - 12}
+                                y={tickY + 4}
+                                textAnchor="end"
+                                className="chart-axis-label"
+                              >
+                                {eur(value)}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        <line
+                          x1={left}
+                          x2={left}
+                          y1={top}
+                          y2={bottom}
+                          className="chart-axis"
+                        />
+                        {rows.map((row, index) => {
+                          const x = left + step * index + (step - 78) / 2;
+                          const startY = y(row.startEurCents);
+                          const endY = y(row.endEurCents);
+                          const barY = Math.min(startY, endY);
+                          const barHeight = Math.max(
+                            2,
+                            Math.abs(endY - startY),
+                          );
+                          const nextX =
+                            left + step * (index + 1) + (step - 78) / 2;
+                          const isTotal =
+                            index === 0 || index === rows.length - 1;
+                          const labelY =
+                            row.valueEurCents < 0
+                              ? barY + barHeight + 17
+                              : barY - 8;
+                          return (
+                            <g key={row.label}>
+                              <rect
+                                x={x}
+                                y={barY}
+                                width="78"
+                                height={barHeight}
+                                className={
+                                  isTotal
+                                    ? 'chart-total'
+                                    : row.valueEurCents < 0
+                                      ? 'chart-negative'
+                                      : 'chart-positive'
+                                }
+                              />
+                              <text
+                                x={x + 39}
+                                y={labelY}
+                                textAnchor="middle"
+                                className="chart-value-label"
+                              >
+                                {eur(row.valueEurCents)}
+                              </text>
+                              <text
+                                x={x + 39}
+                                y="339"
+                                textAnchor="middle"
+                                className="chart-category-label"
+                              >
+                                {row.label}
+                              </text>
+                              {index < rows.length - 1 && (
+                                <line
+                                  x1={x + 78}
+                                  x2={nextX}
+                                  y1={endY}
+                                  y2={endY}
+                                  className="chart-connector"
+                                />
+                              )}
+                            </g>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </svg>
               </div>
-              <button
-                type="button"
-                onClick={() => void inspect(answer.waterfall!.sourceEvidenceId)}
-              >
-                Inspect waterfall evidence
-              </button>
+              <details className="supporting-details chart-details">
+                <summary>Values & sources</summary>
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Revenue movement values"
+                >
+                  <table>
+                    <caption>Deterministic revenue movement in EUR</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Movement</th>
+                        <th scope="col">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {answer.waterfall.data.map((row) => (
+                        <tr key={row.label}>
+                          <th scope="row">{row.label}</th>
+                          <td>{eur(row.valueEurCents)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void inspect(answer.waterfall!.sourceEvidenceId)
+                  }
+                >
+                  Inspect waterfall evidence
+                </button>
+              </details>
             </section>
           )}
           <div className="analysis-grid">
@@ -704,7 +975,24 @@ function App() {
           <section className="result-section context-section">
             <h2>Context</h2>
             {answer.context.length ? (
-              answer.context.map(claim)
+              answer.context.map((item, index) => (
+                <div className="claim context-claim" key={index}>
+                  <MarkdownContent text={item.text} />
+                  <CopyMarkdownButton text={item.text} />
+                  <EvidenceLinks>
+                    {item.evidenceIds.map((id) => (
+                      <button
+                        type="button"
+                        key={id}
+                        onClick={() => void inspect(id)}
+                        aria-controls="evidence-detail"
+                      >
+                        {citationLabel(id)}
+                      </button>
+                    ))}
+                  </EvidenceLinks>
+                </div>
+              ))
             ) : (
               <p>No scoped company context was retrieved.</p>
             )}
@@ -716,43 +1004,6 @@ function App() {
               Owner: {answer.recommendedNextStep.owner}
             </p>
           </section>
-          <details className="supporting-details">
-            <summary>
-              Sources & limitations{' '}
-              <span>{answer.evidence.length} sources</span>
-            </summary>
-            <section className="supporting-section">
-              <h2>Limitations</h2>
-              <ul>
-                {answer.limitations.map((text, index) => (
-                  <li key={index}>{text}</li>
-                ))}
-              </ul>
-            </section>
-            <section className="supporting-section">
-              <h2>Evidence</h2>
-              <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
-                {answer.evidence.map((item) => (
-                  <li key={item.evidenceId}>
-                    <button
-                      type="button"
-                      onClick={() => void inspect(item.evidenceId)}
-                      aria-controls="evidence-detail"
-                    >
-                      Inspect {item.evidenceId}
-                    </button>
-                    <span>
-                      {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
-                      {item.sourceStatus
-                        ? ` Source: ${item.sourceStatus} ·`
-                        : ''}{' '}
-                      Freshness: {item.freshness}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </details>
           <section
             className="result-section follow-section"
             aria-labelledby="churn-heading"
@@ -761,13 +1012,17 @@ function App() {
             <h2 id="churn-heading">Customer churn rate</h2>
             <button
               type="button"
-              disabled={busy || resolving}
+              disabled={busy}
               onClick={() => void churnFollowUp()}
             >
               Calculate customer churn
             </button>
             {churnMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={churnAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {churnMessage}
               </p>
             )}
@@ -779,41 +1034,62 @@ function App() {
                   {churnAnswer.permittedCustomerIds.join(', ') ||
                     'All customers'}
                 </p>
-                <p className="meta-line">
-                  Source status:{' '}
-                  {churnAnswer.evidence
-                    .filter((item) => item.type === 'metric_query')
-                    .map(
-                      (item) =>
-                        `${String(item.scope.month).slice(0, 7)} ${String(item.scope.sourceStatus ?? 'unknown')}`,
-                    )
-                    .join(' · ')}
-                </p>
-                <p>
-                  {churnAnswer.value.churnedCustomers}{' '}
-                  {churnAnswer.value.churnedCustomers === 1
-                    ? 'customer'
-                    : 'customers'}{' '}
-                  churned / {churnAnswer.value.startingCustomers} starting
-                  customers
-                </p>
-                <p>
-                  {churnAnswer.value.rate === null
-                    ? 'Rate unavailable: no starting customers.'
-                    : `${(churnAnswer.value.rate * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}
-                </p>
-                <div className="source-actions">
-                  {churnAnswer.sourceEvidenceIds.map((id) => (
-                    <button
-                      type="button"
-                      key={id}
-                      aria-controls="evidence-detail"
-                      onClick={() => void inspect(id, churnSession.current)}
-                    >
-                      Inspect churn evidence {id}
-                    </button>
-                  ))}
+                <div
+                  className="churn-highlight"
+                  aria-label="Customer churn result"
+                >
+                  <p className="churn-rate-value">
+                    {churnAnswer.value.rate === null
+                      ? '—'
+                      : `${(churnAnswer.value.rate * 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`}
+                  </p>
+                  <div className="churn-rate-copy">
+                    <p className="churn-rate-label">Customer churn rate</p>
+                    <p className="churn-count">
+                      <strong>{churnAnswer.value.churnedCustomers}</strong> of{' '}
+                      <strong>{churnAnswer.value.startingCustomers}</strong>{' '}
+                      starting customers churned
+                    </p>
+                    {churnAnswer.value.rate === null && (
+                      <p className="meta-line">
+                        Rate unavailable because there were no starting
+                        customers.
+                      </p>
+                    )}
+                  </div>
                 </div>
+                <EvidenceLinks>
+                  <p className="meta-line">
+                    Source status:{' '}
+                    {churnAnswer.evidence
+                      .filter((item) => item.type === 'metric_query')
+                      .map(
+                        (item) =>
+                          `${String(item.scope.month).slice(0, 7)} ${String(item.scope.sourceStatus ?? 'unknown')}`,
+                      )
+                      .join(' · ')}
+                  </p>
+
+                  {churnAnswer.sourceEvidenceIds.map((id) => {
+                    const item = churnAnswer.evidence.find(
+                      (candidate) => candidate.evidenceId === id,
+                    );
+                    const label =
+                      item?.type === 'metric_query'
+                        ? `Inspect churn query · ${String(item.scope.month).slice(0, 7)}`
+                        : 'Inspect churn calculation';
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        aria-controls="evidence-detail"
+                        onClick={() => void inspect(id, churnSession.current)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </EvidenceLinks>
                 {churnAnswer.warnings.map((warning) => (
                   <p className="data-note" key={warning}>
                     {warning}
@@ -829,34 +1105,17 @@ function App() {
             <h2 id="country-heading">Country comparison</h2>
             <button
               type="button"
-              disabled={busy || resolving}
+              disabled={busy}
               onClick={() => void followUp()}
             >
               Break down by country
             </button>
-            <details className="phrase-details">
-              <summary>Use a follow-up question</summary>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void followUp(followQuestion);
-                }}
-              >
-                <label className="flex flex-col gap-2 font-semibold">
-                  Follow-up question
-                  <input
-                    value={followQuestion}
-                    maxLength={1000}
-                    disabled={busy || resolving}
-                    placeholder="Break that down by country"
-                    onChange={(event) => setFollowQuestion(event.target.value)}
-                  />
-                </label>
-                <button disabled={busy || resolving}>Run follow-up</button>
-              </form>
-            </details>
             {followMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={followAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {followMessage}
               </p>
             )}
@@ -979,7 +1238,7 @@ function App() {
               </>
             )}
           </section>
-          {(followAnswer || customerMessage || customerAnswer) && (
+          {(customerMessage || customerAnswer) && (
             <section
               id="customer-drilldown"
               aria-labelledby="customer-heading"
@@ -1121,19 +1380,30 @@ function App() {
                 'Investigate revenue losses across sources',
                 'Did those accounts have support escalations or declining usage?',
                 'What evidence supports a pricing-related explanation?',
-              ].map((text) => (
+              ].map((text, index) => (
                 <button
                   key={text}
                   type="button"
                   disabled={busy}
                   onClick={() => void crossSource(text)}
+                  aria-label={text}
                 >
-                  {text}
+                  {
+                    [
+                      'Investigate possible reasons',
+                      'Support & usage',
+                      'Pricing evidence',
+                    ][index]
+                  }
                 </button>
               ))}
             </div>
             {crossMessage && (
-              <p className="inline-status" role="status" aria-live="polite">
+              <p
+                className={crossAnswer ? 'sr-only' : 'inline-status'}
+                role="status"
+                aria-live="polite"
+              >
                 {crossMessage}
               </p>
             )}
@@ -1144,18 +1414,69 @@ function App() {
                   {crossAnswer.record.customerIds.join(', ') ||
                     'No retained losses'}
                 </p>
-                <p className="meta-line">
-                  Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
-                  Planner: {crossAnswer.record.plan.planner} · Model synthesis:{' '}
-                  {crossAnswer.record.modelStatus}
-                </p>
+                <div className="cross-source">
+                  <h3>Tentative hypotheses</h3>
+                  {crossAnswer.record.hypotheses.length === 0 && (
+                    <p>
+                      No validated model explanation is available. Review the
+                      observed records and document excerpts.
+                    </p>
+                  )}
+                  {crossAnswer.record.hypotheses.map((hypothesis, index) => (
+                    <div key={index}>
+                      <p>
+                        {hypothesis.kind} may be relevant to the retained
+                        losses; causality is unconfirmed.
+                      </p>
+                      <p>Supporting references:</p>
+                      {hypothesis.supportingEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                      <p>Contradictory references:</p>
+                      {hypothesis.contradictoryEvidenceIds.map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => void inspect(id, crossSession.current)}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <details className="supporting-details">
+                  <summary>How context was investigated</summary>
+                  <p className="meta-line">
+                    Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
+                    Plan source: {crossAnswer.record.plan.planner} · Hypothesis
+                    review: {crossAnswer.record.modelStatus}
+                  </p>
+                  <p className="ai-explanation">
+                    {crossAnswer.record.plan.planner === 'model' ||
+                    crossAnswer.record.modelStatus !== 'disabled'
+                      ? 'AI may select among approved context sources and propose tentative explanations. The app checks each proposal against cited evidence; MRR values and customer scope come from validated data.'
+                      : 'No AI model was used for this context follow-up. The app queried the approved sources; MRR values and customer scope come from validated data.'}
+                  </p>
+                </details>
                 {crossAnswer.evidence
                   .filter(
                     (item) => item.source === 'synthetic_operational_records',
                   )
                   .map((item) => (
-                    <div className="cross-source" key={item.evidenceId}>
-                      <h3>{String(item.scope.source)} evidence</h3>
+                    <details
+                      className="supporting-details cross-source"
+                      key={item.evidenceId}
+                    >
+                      <summary>
+                        {String(item.scope.source).toUpperCase()} records
+                      </summary>
                       <p className="meta-line">
                         Source status: {String(item.scope.sourceStatus)} ·
                         Freshness: {item.freshness} · Missing coverage:{' '}
@@ -1226,16 +1547,21 @@ function App() {
                       >
                         Inspect {String(item.scope.source)} query evidence
                       </button>
-                    </div>
+                    </details>
                   ))}
                 {crossAnswer.evidence
                   .filter((item) => item.type === 'document_chunk')
                   .map((item) => (
                     <div className="cross-source" key={item.evidenceId}>
                       <h3>Document context</h3>
-                      <blockquote>
-                        {String(item.content.excerpt ?? '')}
-                      </blockquote>
+                      <div className="cross-document-excerpt">
+                        <MarkdownContent
+                          text={String(item.content.excerpt ?? '')}
+                        />
+                        <CopyMarkdownButton
+                          text={String(item.content.excerpt ?? '')}
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
@@ -1246,43 +1572,6 @@ function App() {
                       </button>
                     </div>
                   ))}
-                <div className="cross-source">
-                  <h3>Tentative hypotheses</h3>
-                  {crossAnswer.record.hypotheses.length === 0 && (
-                    <p>
-                      No validated model explanation is available. Review the
-                      observed records and document excerpts.
-                    </p>
-                  )}
-                  {crossAnswer.record.hypotheses.map((hypothesis, index) => (
-                    <div key={index}>
-                      <p>
-                        {hypothesis.kind} may be relevant to the retained
-                        losses; causality is unconfirmed.
-                      </p>
-                      <p>Supporting references:</p>
-                      {hypothesis.supportingEvidenceIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => void inspect(id, crossSession.current)}
-                        >
-                          {id}
-                        </button>
-                      ))}
-                      <p>Contradictory references:</p>
-                      {hypothesis.contradictoryEvidenceIds.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => void inspect(id, crossSession.current)}
-                        >
-                          {id}
-                        </button>
-                      ))}
-                    </div>
-                  ))}
-                </div>
                 <div className="cross-source">
                   <h3>Coverage and limitations</h3>
                   <ul>
@@ -1302,16 +1591,61 @@ function App() {
               </div>
             )}
           </section>
+          <details className="supporting-details">
+            <summary>
+              Sources & limitations{' '}
+              <span>{answer.evidence.length} sources</span>
+            </summary>
+            <section className="supporting-section">
+              <h2>Limitations</h2>
+              <ul>
+                {answer.limitations.map((text, index) => (
+                  <li key={index}>{text}</li>
+                ))}
+              </ul>
+            </section>
+            <section className="supporting-section">
+              <h2>Evidence</h2>
+              <ul className="list-disc pl-5 [&>li]:mb-3.5 [&_span]:block [&_span]:text-[0.85rem] [&_span]:[overflow-wrap:anywhere]">
+                {answer.evidence.map((item) => (
+                  <li key={item.evidenceId}>
+                    <button
+                      type="button"
+                      onClick={() => void inspect(item.evidenceId)}
+                      aria-controls="evidence-detail"
+                    >
+                      {citationLabel(item.evidenceId)}
+                    </button>
+                    <span>
+                      {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
+                      {item.sourceStatus
+                        ? ` Source: ${item.sourceStatus} ·`
+                        : ''}{' '}
+                      Freshness: {item.freshness}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </details>
           {record && (
             <details className="supporting-details trail-details">
               <summary className="cursor-pointer font-semibold">
                 How this answer was generated
               </summary>
-              <p>
-                Stored investigation: {record.investigationId} · Outcome:{' '}
-                {record.status}
-              </p>
-              <p>Recorded plan in tool order.</p>
+              <dl className="trail-meta">
+                <div>
+                  <dt>Investigation</dt>
+                  <dd>{record.investigationId}</dd>
+                </div>
+                <div>
+                  <dt>Outcome</dt>
+                  <dd>
+                    <span className="outcome-pill">{record.status}</span>
+                  </dd>
+                </div>
+              </dl>
+              <p className="trail-intro">Steps ran in this order:</p>
               <ol className="list-decimal pl-5">
                 {record.plan.steps.map((step) => (
                   <li key={step}>{step.replaceAll('_', ' ')}</li>
@@ -1329,7 +1663,8 @@ function App() {
                       aria-controls="evidence-detail"
                       onClick={() => void inspect(item.evidenceId)}
                     >
-                      Inspect trail {item.evidenceId}
+                      Inspect trail ·{' '}
+                      {citationLabel(item.evidenceId).replace(/^Inspect /, '')}
                     </button>
                   </li>
                 ))}
@@ -1370,10 +1705,28 @@ function App() {
                 <dt>Integrity</dt>
                 <dd>{evidence.integrity}</dd>
               </dl>
-              <h3>Scope</h3>
-              <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
-              <h3>Supporting values or document excerpt</h3>
-              <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
+              <details className="evidence-technical">
+                <summary>Technical scope</summary>
+                <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
+              </details>
+              {evidence.type === 'document_chunk' &&
+              typeof evidence.content.excerpt === 'string' ? (
+                <>
+                  <h3>Supporting values or document excerpt</h3>
+                  <div className="evidence-document-excerpt">
+                    <MarkdownContent text={evidence.content.excerpt} />
+                    <CopyMarkdownButton text={evidence.content.excerpt} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3>Supporting values or document excerpt</h3>
+                  <details className="evidence-technical">
+                    <summary>View structured values</summary>
+                    <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
+                  </details>
+                </>
+              )}
             </>
           ) : (
             !evidenceBusy &&

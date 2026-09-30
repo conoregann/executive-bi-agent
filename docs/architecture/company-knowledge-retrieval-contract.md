@@ -26,7 +26,9 @@ freshness timestamp, content, optional canonical customer tags, and a required
 access policy. The adapter
 rejects duplicate IDs, invalid timestamps, empty identity fields, malformed
 customer IDs, and content longer than 10,000 characters. Documents are split
-deterministically into excerpts no longer than 1,200 characters.
+deterministically into excerpts no longer than 1,200 characters. Markdown
+headings and blank-line paragraph boundaries are preserved so the UI can render
+and copy source excerpts without flattening their structure.
 
 The access policy is `company`, `admin`, or `customers` with a non-empty list of
 canonical customer IDs. `company` permits any authenticated company user;

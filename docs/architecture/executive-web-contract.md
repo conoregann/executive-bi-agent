@@ -3,21 +3,18 @@
 ## Scope
 
 `apps/web` is a React/Vite interface for the existing structured synthetic
-MRR-decline API. It resolves bounded natural-language MRR-decline questions
-through the [question resolver](../discovery/question-contract.md); it calculates no
-metrics. Routes are explicit API paths; there is no filesystem URL routing.
+MRR-decline API. It accepts structured month and customer inputs and calculates no
+metrics. The bounded question resolver remains an API capability; it is not part
+of the web form. Routes are explicit API paths; there is no filesystem URL routing.
 
 The form accepts a reporting month and an optional comma-separated list of at
 most 50 unique customer IDs. Empty scope means all customers granted to the signed-in user. June–August 2026 are available in the synthetic
 dataset; May lacks source coverage and produces a blocked outcome. Each
 submission uses a new investigation identifier.
 
-An optional question field and “Resolve question” action populate the reporting
-month and display the previous-period interpretation. Resolution runs no
-investigation tools and preserves the explicit customer scope. Clarification,
-unsupported wording, and service failures are visible and allow editing/retry.
-The user reviews the structured fields and selects “Investigate MRR” to execute.
-The structured form remains available independently.
+The form has one investigation action. The redundant optional question helper
+and country phrase input are not exposed. Follow-ups use named actions against
+the retained parent scope.
 
 ## Answers and evidence
 
@@ -32,12 +29,19 @@ state; collapsed inputs are not focusable. On narrow screens the request comes
 first. Thin rules separate result sections.
 Fixture and source provenance remain in their records.
 It shows the resolved month, previous-month comparison, and customer scope.
-Every supplied claim citation opens the authenticated evidence route. Evidence
-shows source references, scope, freshness, integrity, and supporting content.
-Document excerpts are rendered as text and cannot execute markup.
+Claim citations use human-readable evidence descriptions and open the
+authenticated evidence route. Evidence shows source references, scope,
+freshness, integrity, and supporting content. Retrieved document excerpts use a
+safe Markdown subset; raw HTML is never interpreted, and a copy control places
+the verbatim Markdown excerpt on the clipboard.
 
-A username and password sign-in obtains an eight-hour server session. The page displays the active access scope and supports sign-out. Session and investigation bearer tokens live only in page memory. They never enter URLs or browser
-storage. Reloading clears access; a new submission clears the previous result.
+A username and password sign-in obtains an eight-hour server session. The page supports sign-out; resolved customer scope is shown with each answer. Session and investigation bearer tokens live only in page memory. They never enter URLs or browser
+storage. Reloading and sign-out clear access and recent history. The sidebar provides
+searchable history for the latest 20 completed investigations in the current
+page session. Reopening restores the retained answer, completed follow-up results,
+and their separate evidence credentials without rerunning tools. A new submission
+replaces the active result and leaves completed investigations in that session
+history. History is not persisted to browser storage or available after reload.
 Only the latest evidence request may update the evidence panel. Reads use
 `no-store`; the API also marks responses `no-store`.
 
@@ -54,7 +58,7 @@ A keyboard-operable “How this answer was generated” disclosure shows the
 recorded five-step plan, terminal outcome, and supporting cited evidence. It is
 a retained plan, not execution timing or live progress. It uses the creation
 response's validated record and the answer's cited evidence; opening it runs no
-tools. New submissions and reloads clear the prior trail with the answer.
+tools. The trail follows the active answer, including when reopened from session history.
 
 ## Customer churn follow-up
 
@@ -63,13 +67,15 @@ inherited month and customer scope, “customers churned / starting customers”
 the formatted rate, warnings, and authenticated query/calculation citations.
 The browser formats the trusted rate; it does not derive cohort counts. A
 blocked child shows its retained identifier and warnings without a rate.
+Completed results emphasize the trusted churn percentage, with the churned and
+starting customer counts directly beside it for context. Evidence citations
+name the period or calculation they open.
 
 ## Country comparison follow-up
 
-Completed parent answers offer “Break down by country” and a dedicated
-“Follow-up question” field accepting the bounded country phrase. Both execute
+Completed parent answers offer “Break down by country”. This executes
 against the stored parent scope, independently of edits to the new-investigation
-form. Loading, unsupported wording, blocked results and service failures are
+form. Loading, blocked results and service failures are
 announced and permit retry. A blocked child shows its retained identifier and
 warnings; it does not display invented values.
 
@@ -79,8 +85,8 @@ MRR, and current MRR. Missing dimensions show an explicit
 unassigned-country row and limitation. Row and total citations open the child's
 retained calculation; its input queries and parent total snapshots are also
 inspectable. Separate page-memory tokens protect parent and child citations.
-The parent answer and trail remain visible and unchanged. Reload/new parent
-submission clears child access with parent access; server records remain retained.
+The parent answer and trail remain visible and unchanged. Reload clears child access with parent access; a new submission retains completed
+children only inside their parent session-history entry; server records remain retained.
 Country migration is explicitly distinguished from churn and acquisition.
 
 ## Deployment boundary and failures
@@ -110,14 +116,15 @@ and the absence of business-cause evidence. Empty losses have an explicit state.
 
 Loading, blocked records and service failures are announced and permit retry.
 Blocked children expose their retained identifier without numerical claims.
-Tokens stay in separate page-memory references. A new investigation, country
-comparison or page reload clears prior customer access/results; stored server
+Tokens stay in separate page-memory references. A new country comparison clears the active customer result. A new investigation
+keeps completed customer results with its history entry; reload clears all access; stored server
 results remain available through their token-protected routes after restart.
 
 ## Cross-source workspace
 
-Completed MRR answers show a reconciled revenue-movement waterfall with a value
-table and evidence inspection. Cross-source actions use the selected customer
+Completed MRR answers show a reconciled revenue-movement waterfall with a
+labeled EUR value axis, movement values, connecting balances, a value table, and
+evidence inspection. Cross-source actions use the selected customer
 drill-down when present, otherwise the initial MRR investigation. Busy status
 and the retained approved plan identify the contextual investigation; execution
 remains synchronous without streaming. CRM, support and usage sections show source
@@ -125,3 +132,18 @@ records, deterministic active-user deltas, coverage and freshness, document
 excerpts, tentative model hypotheses and explicit limitations. Each contextual
 child has a separate evidence token. Parent answers remain visible. See the
 [cross-source contract](cross-source-investigation-contract.md).
+The cross-source result explains the model's limited role: it may propose
+approved context sources and tentative evidence-linked hypotheses, while the
+application validates proposals and presents deterministic MRR values and the
+retained customer scope.
+
+## Presentation and disclosure
+
+Neutral greys, consistent controls, and thin dividers organize the interface.
+The reporting month, comparison, and customer scope are separate labeled fields.
+Claims keep nearby “Sources” disclosures; chart values, operational records,
+model execution details, source inventory, and the retained plan are expandable.
+Hypotheses and their uncertainty remain visible with coverage warnings.
+Copy controls sit on their own line below full-width document excerpts, copy
+verbatim Markdown, and reset success or failure feedback after two seconds.
+The trusted churn percentage is emphasized beside its cohort counts.

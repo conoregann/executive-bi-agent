@@ -128,7 +128,7 @@ export function synthesizeMrrDeclineAnswer(
   );
   const context = documents.map((item) => ({
     classification: 'context' as const,
-    text: `${item.content.title}: ${item.content.excerpt}`,
+    text: item.content.excerpt,
     evidenceIds: [item.evidenceId],
   }));
   const claims = [

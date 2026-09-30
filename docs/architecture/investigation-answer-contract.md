@@ -25,8 +25,9 @@ contains the six ordered answer fields below, plus an optional `chart`:
 2. `drivers`: negative customer movements sorted by signed EUR-cent change,
    then customer ID. Values cite the customer movement query. These are at most
    five ranked movements, not a complete decomposition or contribution share.
-3. `context`: retrieved titles and verbatim excerpts, labeled contextual
-   evidence and citing document chunks. Excerpts are source data, not generated
+3. `context`: verbatim retrieved excerpts, labeled contextual evidence and
+   citing document chunks. The interface renders Markdown formatting while
+   keeping the copied excerpt verbatim. Excerpts are source data, not generated
    interpretations or instructions.
 4. `limitations`: retained warnings, bounded-driver coverage, missing knowledge,
    and an explicit caveat that contextual documents do not establish causality.

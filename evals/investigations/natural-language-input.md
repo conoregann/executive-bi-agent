@@ -1,7 +1,7 @@
 # Bounded natural-language MRR input
 
 Contract: [question resolution](../../docs/discovery/question-contract.md).
-Executable coverage: API resolver/HTTP tests and web browser tests.
+Executable coverage: API resolver/HTTP tests. The web uses structured inputs directly.
 
 - **NL-01:** “Why did MRR fall in August 2026?” resolves to `2026-08-01`,
   MRR investigation, previous-period comparison. Resolution creates no record,
@@ -15,5 +15,5 @@ Executable coverage: API resolver/HTTP tests and web browser tests.
   custom comparisons, follow-ups, and appended SQL/instructions return unsupported.
   Never silently discard a filter, broaden customer scope, or execute SQL.
 - **NL-05:** Blank, oversized, and unknown-field request bodies return `400`.
-  The UI allows question edits after clarification and requires explicit
-  investigation submission after resolution.
+  API clients can revise a question after clarification. Resolution never starts
+  an investigation; execution requires a separate structured submission.

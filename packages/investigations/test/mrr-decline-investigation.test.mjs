@@ -405,6 +405,10 @@ test('composes trusted metric and knowledge capabilities without generated claim
     /EUR 3400.00.*EUR 1000.00.*EUR -2400.00/,
   );
   assert.equal(answer.answer.context.length, 1);
+  const contextEvidence = found.evidence.find(
+    (item) => item.type === 'document_chunk',
+  );
+  assert.equal(answer.answer.context[0].text, contextEvidence.content.excerpt);
   const breakdown = found.evidence.find(
     (item) => item.scope.groupBy === 'plan',
   );
