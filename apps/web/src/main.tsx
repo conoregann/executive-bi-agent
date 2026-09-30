@@ -20,6 +20,8 @@ import {
   readEvidence,
   startInvestigation,
   resolveQuestion,
+  login,
+  signOut,
 } from './client.ts';
 import './style.css';
 
@@ -28,6 +30,11 @@ type Claim =
   | InvestigationAnswer['drivers'][number]
   | InvestigationAnswer['context'][number];
 function App() {
+  const [signedIn, setSignedIn] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [accessLabel, setAccessLabel] = useState('');
   const [requestOpen, setRequestOpen] = useState(true);
   const [churnAnswer, setChurnAnswer] = useState<ChurnFollowUpAnswer>();
   const [churnMessage, setChurnMessage] = useState('');
@@ -307,6 +314,56 @@ function App() {
       </div>
     );
   }
+  if (!signedIn)
+    return (
+      <main className="signin-page">
+        <form
+          className="signin-form"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setLoginError('');
+            try {
+              const access = await login(username, password);
+              setAccessLabel(
+                access.role === 'admin'
+                  ? 'All customers'
+                  : access.customerIds.join(', '),
+              );
+              setPassword('');
+              setSignedIn(true);
+            } catch (error) {
+              setLoginError(
+                error instanceof Error ? error.message : 'Sign in failed.',
+              );
+            }
+          }}
+        >
+          <h1>MRR analysis</h1>
+          <p>Sign in to investigate your customer scope.</p>
+          <label className="field-label">
+            Username
+            <input
+              autoComplete="username"
+              required
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </label>
+          <label className="field-label">
+            Password
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <button className="primary-button">Sign in</button>
+          {loginError && <p role="alert">{loginError}</p>}
+        </form>
+      </main>
+    );
   return (
     <main className="workspace" data-panel-open={requestOpen}>
       <header className="topbar">
@@ -329,7 +386,36 @@ function App() {
         </button>
         <div className="topbar-title">
           <h1>MRR analysis</h1>
+          <span className="access-label">Access: {accessLabel}</span>
         </div>
+        <button
+          type="button"
+          className="signout-button"
+          onClick={() => {
+            signOut();
+            setSignedIn(false);
+            setAnswer(undefined);
+            setRecord(undefined);
+            setEvidence(undefined);
+            setChurnAnswer(undefined);
+            setFollowAnswer(undefined);
+            setCustomerAnswer(undefined);
+            setCrossAnswer(undefined);
+            setMessage('');
+            setFollowMessage('');
+            setCustomerMessage('');
+            setCrossMessage('');
+            setChurnMessage('');
+            session.current = undefined;
+            followSession.current = undefined;
+            customerSession.current = undefined;
+            crossSession.current = undefined;
+            churnSession.current = undefined;
+            evidenceRequest.current += 1;
+          }}
+        >
+          Sign out
+        </button>
       </header>
       <section
         className="request-panel"
@@ -409,7 +495,8 @@ function App() {
             />
           </label>
           <p id="scope-help" className="field-help">
-            Comma-separated IDs. Leave blank for all customers.
+            Comma-separated IDs. Leave blank for all customers in your access
+            scope.
           </p>
           <button className="primary-button" disabled={busy || resolving}>
             {busy ? 'Investigating…' : 'Investigate MRR'}

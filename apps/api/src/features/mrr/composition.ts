@@ -23,6 +23,7 @@ import {
 import { TrustedMrrService } from '@executive-bi/metrics';
 import { createCompanyKnowledgeSearch } from '@executive-bi/retrieval';
 import { MrrDeclineApi } from './routes.js';
+import type { AccessStore } from '../../access.js';
 import {
   loadSyntheticMrrDeclineDependencies,
   type SyntheticMrrDeclineDependencies,
@@ -34,6 +35,7 @@ export function createMrrDeclineApi(
   store?: InvestigationStore,
   operations?: OperationalRepository,
   model?: InvestigationModel,
+  access?: AccessStore,
 ): MrrDeclineApi {
   return composeMrrDeclineApi(
     createSubscriptionMonthRepository(dependencies.snapshot),
@@ -41,6 +43,7 @@ export function createMrrDeclineApi(
     store,
     operations,
     model,
+    access,
   );
 }
 
@@ -50,6 +53,7 @@ function composeMrrDeclineApi(
   store?: InvestigationStore,
   operations?: OperationalRepository,
   model?: InvestigationModel,
+  access?: AccessStore,
 ): MrrDeclineApi {
   const metrics = new TrustedMrrService(repository);
   const knowledge = createCompanyKnowledgeSearch(documents);
@@ -74,7 +78,7 @@ function composeMrrDeclineApi(
         }
       : undefined,
   );
-  return new MrrDeclineApi(investigation);
+  return new MrrDeclineApi(investigation, access);
 }
 
 export async function createSyntheticMrrDeclineApi(
@@ -101,6 +105,7 @@ export async function createSyntheticMrrDeclineApi(
 export async function createPostgresMrrDeclineApi(
   client: PostgresQueryClient,
   store: InvestigationStore,
+  access?: AccessStore,
 ): Promise<MrrDeclineApi> {
   return composeMrrDeclineApi(
     createPostgresSubscriptionMonthRepository(client),
@@ -108,6 +113,7 @@ export async function createPostgresMrrDeclineApi(
     store,
     createPostgresOperationalRepository(client),
     configuredModel(),
+    access,
   );
 }
 

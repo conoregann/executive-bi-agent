@@ -20,6 +20,8 @@ The initial architecture deliberately excludes exploratory SQL and external inte
 - [MRR-decline API contract](api-mrr-decline-contract.md) — the narrow
   synthetic-data integration boundary.
 
+- [User access contract](user-access-contract.md) — identity-backed sessions, server-resolved customer scope, and revocation.
+
 - [Evidence-backed answer contract](investigation-answer-contract.md) — deterministic
   executive presentation of persisted investigations and inspectable citations.
 

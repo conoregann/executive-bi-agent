@@ -129,5 +129,6 @@ WHERE source = 'analytics.subscription_month';
 \ir init/03-analytics-role.sql
 
 \ir init/04-operations.sql
+\ir init/05-access.sql
 
 COMMIT;

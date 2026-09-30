@@ -23,13 +23,29 @@ import {
 import { resolveQuestion } from './resolve-question.js';
 import { resolveQuestionRequestSchema } from '@executive-bi/schemas';
 import { parseJson } from '../../http/json.js';
+import {
+  newToken,
+  tokenHash,
+  verifyPassword,
+  resolveScope,
+  permitsRecord,
+  type AccessStore,
+  type UserAccess,
+} from '../../access.js';
 const MRR_DECLINE_PATH = '/v1/investigations/mrr-decline';
 
 export class MrrDeclineApi {
-  constructor(private readonly investigation: MrrDeclineInvestigationService) {}
+  constructor(
+    private readonly investigation: MrrDeclineInvestigationService,
+    private readonly access?: AccessStore,
+  ) {}
 
   async fetch(request: Request): Promise<Response> {
     const pathname = new URL(request.url).pathname;
+    if (pathname === '/v1/sessions' && request.method === 'POST')
+      return this.login(request);
+    const user = this.access ? await this.authenticate(request) : undefined;
+    if (this.access && !user) return unauthorized();
     if (
       pathname === '/v1/investigations/resolve-question' &&
       request.method === 'POST'
@@ -47,7 +63,7 @@ export class MrrDeclineApi {
         pathname,
       );
     if (detail && pathname !== MRR_DECLINE_PATH)
-      return this.fetchStored(request, detail[1]!, detail[2]);
+      return this.fetchStored(request, detail[1]!, detail[2], user);
     if (request.method !== 'POST' || pathname !== MRR_DECLINE_PATH) {
       return Response.json(
         { status: 'not_found', error: 'Route not found.' },
@@ -63,7 +79,16 @@ export class MrrDeclineApi {
     const parsed = mrrDeclineRequestSchema.safeParse(body.value);
     if (!parsed.success) return invalidResponse(parsed.error.message);
 
-    const result = await this.investigation.start(parsed.data);
+    const scope = user
+      ? resolveScope(user, parsed.data.permittedCustomerIds)
+      : (parsed.data.permittedCustomerIds ?? []);
+    if (!scope) return forbidden();
+    const result = await this.investigation.start({
+      ...parsed.data,
+      ...(scope.length ? { permittedCustomerIds: scope } : {}),
+    });
+    if (user && result.record)
+      await this.access!.bind(result.record.investigationId, user.userId);
     if (result.status === 'invalid_request') {
       return validatedResponse(
         {
@@ -87,12 +112,88 @@ export class MrrDeclineApi {
     );
   }
 
+  private async login(request: Request): Promise<Response> {
+    if (!this.access) return notFound();
+    if (!request.headers.get('content-type')?.includes('application/json'))
+      return invalidResponse('Content-Type must be application/json.');
+    const body = await parseJson(request);
+    if (!body.ok || !body.value || typeof body.value !== 'object')
+      return unauthorized();
+    const { username, password } = body.value as Record<string, unknown>;
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' ||
+      username.length > 100 ||
+      password.length > 1024
+    )
+      return unauthorized();
+    const credentials = await this.access.credentials(username);
+    if (
+      !credentials ||
+      !(await verifyPassword(password, credentials.passwordHash))
+    )
+      return unauthorized();
+    const user = await this.access.user(credentials.userId);
+    if (!user?.active) return unauthorized();
+    const token = newToken();
+    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    await this.access.saveSession(tokenHash(token), user.userId, expiresAt);
+    return Response.json({
+      status: 'ok',
+      sessionToken: token,
+      expiresAt: expiresAt.toISOString(),
+      role: user.role,
+      customerIds: user.customerIds,
+    });
+  }
+
+  private async authenticate(
+    request: Request,
+  ): Promise<UserAccess | undefined> {
+    const token = request.headers.get('x-session-token');
+    if (!token || !/^[A-Za-z0-9_-]{43}$/u.test(token)) return undefined;
+    const userId = await this.access!.sessionUser(tokenHash(token));
+    if (!userId) return undefined;
+    const user = await this.access!.user(userId);
+    return user?.active ? user : undefined;
+  }
+
+  private async authorizedRecord(
+    id: string,
+    user: UserAccess,
+  ): Promise<boolean> {
+    return (await this.access!.owner(id)) === user.userId;
+  }
+
   private async fetchStored(
     request: Request,
     investigationId: string,
     evidenceId?: string,
+    user?: UserAccess,
   ): Promise<Response> {
     const pathname = new URL(request.url).pathname;
+    if (user) {
+      const bearer = request.headers.get('authorization');
+      if (
+        !bearer?.startsWith('Bearer ') ||
+        !/^[A-Za-z0-9_-]{43}$/u.test(bearer.slice(7))
+      )
+        return Response.json(
+          { status: 'unauthorized', error: 'Bearer access token required.' },
+          { status: 401 },
+        );
+      if (!(await this.authorizedRecord(investigationId, user)))
+        return notFound();
+      const parent = await this.investigation.getInvestigation(
+        investigationId,
+        bearer.slice(7),
+      );
+      if (
+        parent.status !== 'ok' ||
+        !permitsRecord(user, parent.record.permittedCustomerIds)
+      )
+        return notFound();
+    }
     const crossSource = pathname.endsWith('/cross-source-follow-ups');
     const churnFollowUp = pathname.endsWith('/customer-churn-follow-ups');
     const customerFollowUp = pathname.endsWith('/customer-follow-ups');
@@ -149,6 +250,11 @@ export class MrrDeclineApi {
                 body.value,
               );
       if (result.status === 'not_found') return notFound();
+      if (
+        user &&
+        (result.status === 'completed' || result.status === 'blocked')
+      )
+        await this.access!.bind(result.record.investigationId, user.userId);
       if (result.status === 'completed' || result.status === 'blocked')
         return Response.json(
           (churnFollowUp
@@ -204,6 +310,8 @@ export class MrrDeclineApi {
       token,
     );
     if (found.status !== 'ok') return notFound();
+    if (user && !permitsRecord(user, found.record.permittedCustomerIds))
+      return notFound();
     if (pathname === `/v1/investigations/${investigationId}/answer`) {
       const result =
         found.record.kind === 'mrr_cross_source'
@@ -237,6 +345,20 @@ export class MrrDeclineApi {
       record: storedInvestigationRecordSchema.parse(found.record),
     });
   }
+}
+
+function unauthorized(): Response {
+  return Response.json(
+    { status: 'unauthorized', error: 'Valid user session required.' },
+    { status: 401 },
+  );
+}
+
+function forbidden(): Response {
+  return Response.json(
+    { status: 'forbidden', error: 'Requested customer scope is unavailable.' },
+    { status: 403 },
+  );
 }
 
 function notFound(): Response {

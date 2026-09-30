@@ -8,8 +8,7 @@ through the [question resolver](../discovery/question-contract.md); it calculate
 metrics. Routes are explicit API paths; there is no filesystem URL routing.
 
 The form accepts a reporting month and an optional comma-separated list of at
-most 50 unique customer IDs. Empty scope means the full synthetic dataset, not
-production permission discovery. June–August 2026 are available in the synthetic
+most 50 unique customer IDs. Empty scope means all customers granted to the signed-in user. June–August 2026 are available in the synthetic
 dataset; May lacks source coverage and produces a blocked outcome. Each
 submission uses a new investigation identifier.
 
@@ -37,7 +36,7 @@ Every supplied claim citation opens the authenticated evidence route. Evidence
 shows source references, scope, freshness, integrity, and supporting content.
 Document excerpts are rendered as text and cannot execute markup.
 
-Bearer tokens live only in page memory. They never enter URLs or browser
+A username and password sign-in obtains an eight-hour server session. The page displays the active access scope and supports sign-out. Session and investigation bearer tokens live only in page memory. They never enter URLs or browser
 storage. Reloading clears access; a new submission clears the previous result.
 Only the latest evidence request may update the evidence panel. Reads use
 `no-store`; the API also marks responses `no-store`.
@@ -97,8 +96,7 @@ outcomes that allow retry. Inputs and citations support keyboard use and narrow
 screens. The interface does not expose a synthetic-data badge; the data and
 evidence records retain their synthetic provenance.
 
-General natural-language resolution, new metrics, additional chart types, SSE streaming, production
-identity/tenant authorization, and NestJS migration remain planned scope.
+General natural-language resolution, new metrics, additional chart types, SSE streaming, external identity providers and multi-tenant authorization, and NestJS migration remain planned scope.
 
 ## Customer drill-down
 
