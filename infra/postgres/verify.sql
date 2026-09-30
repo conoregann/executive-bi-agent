@@ -179,3 +179,17 @@ BEGIN
  OR has_table_privilege('executive_bi_analytics','raw.operational_coverage','SELECT') THEN
  RAISE EXCEPTION 'Operational reader permission boundary failed'; END IF;
 END $$;
+
+DO $$
+BEGIN
+ IF to_regclass('app.users') IS NULL
+ OR to_regclass('app.user_customer_scopes') IS NULL
+ OR to_regclass('app.sessions') IS NULL
+ OR to_regclass('app.investigation_owners') IS NULL THEN
+  RAISE EXCEPTION 'User access tables are missing';
+ END IF;
+ IF has_table_privilege('executive_bi_analytics', 'app.users', 'SELECT')
+ OR has_table_privilege('executive_bi_analytics', 'app.sessions', 'SELECT') THEN
+  RAISE EXCEPTION 'User access tables are exposed to PUBLIC';
+ END IF;
+END $$;

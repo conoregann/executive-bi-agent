@@ -161,6 +161,31 @@ test('identity scope survives omitted filters, changed IDs, token replay, follow
     404,
   );
   assert.equal(access.owners.has('stolen-child'), false);
+  const child = await api.fetch(
+    new Request(base + path + '/country-follow-ups', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-session-token': alice,
+        authorization: `Bearer ${body.accessToken}`,
+      },
+      body: JSON.stringify({
+        investigationId: 'alice-child',
+        action: 'breakdown_mrr_by_country',
+      }),
+    }),
+  );
+  assert.equal(child.status, 201);
+  const childBody = await child.json();
+  assert.equal(access.owners.get('alice-child'), 'alice');
+  assert.equal(
+    (
+      await api.fetch(
+        get('/investigations/alice-child/answer', alice, childBody.accessToken),
+      )
+    ).status,
+    200,
+  );
   access.users.get('alice').customerIds = [];
   assert.equal(
     (await api.fetch(get(path + '/answer', alice, body.accessToken))).status,

@@ -666,3 +666,17 @@ test('cross-source journey retains country scope and cites operational records o
     true,
   );
 });
+test('sign-out clears retained answers and requires another sign-in', async (t) => {
+  const page = await pageForTest(t);
+  await complete(page);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await page.getByRole('button', { name: 'Sign in' }).waitFor();
+  await page.getByLabel('Username').fill('synthetic_admin');
+  await page.getByLabel('Password').fill('synthetic_password');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Hide request panel' }).waitFor();
+  assert.equal(
+    await page.getByRole('article', { name: 'Executive answer' }).count(),
+    0,
+  );
+});
