@@ -24,6 +24,7 @@ import {
   signOut,
 } from './client.ts';
 import './style.css';
+import { MarkdownContent } from './markdown.tsx';
 
 type Claim =
   | InvestigationAnswer['answer']
@@ -307,12 +308,38 @@ function App() {
               onClick={() => void inspect(id)}
               aria-controls="evidence-detail"
             >
-              Inspect {id}
+              {citationLabel(id)}
             </button>
           ))}
         </div>
       </div>
     );
+  }
+  function citationLabel(id: string) {
+    const item = answer?.evidence.find(
+      (evidenceItem) => evidenceItem.evidenceId === id,
+    );
+    if (!item) return 'Inspect evidence';
+    if (item.type === 'metric_query') {
+      const ref = item.sourceRef;
+      if (ref.startsWith('mrr_movement:')) {
+        return `Inspect customer MRR movements · ${ref.split(':')[1] ?? ''}`;
+      }
+      const period = /mrr:(\d{4}-\d{2})/.exec(ref)?.[1];
+      if (ref.includes(':by:plan'))
+        return `Inspect MRR by plan${period ? ` · ${period}` : ''}`;
+      if (ref.startsWith('mrr:'))
+        return `Inspect total MRR${period ? ` · ${period}` : ''}`;
+      return 'Inspect metric query';
+    }
+    if (item.type === 'document_chunk')
+      return `Inspect source excerpt · ${item.sourceRef}`;
+    if (item.type === 'calculation') {
+      return item.sourceRef === 'mrr_calculation'
+        ? 'Inspect month comparison calculation'
+        : 'Inspect revenue movement reconciliation';
+    }
+    return 'Inspect evidence';
   }
   if (!signedIn)
     return (
@@ -544,47 +571,136 @@ function App() {
               aria-labelledby="waterfall-heading"
             >
               <h2 id="waterfall-heading">Revenue movement waterfall</h2>
-              <svg
-                viewBox="0 0 720 300"
-                role="img"
-                aria-label="Reconciled MRR movement from previous to current month"
+              <p className="chart-caption">
+                Monthly MRR bridge · values in EUR · bars show the change from
+                each step’s starting balance.
+              </p>
+              <div
+                className="waterfall-chart-scroll"
+                role="region"
+                aria-label="Revenue movement chart"
+                tabIndex={0}
               >
-                {answer.waterfall.data.map((row, index) => {
-                  const max = Math.max(
-                    1,
-                    ...answer.waterfall!.data.flatMap((item) => [
-                      item.startEurCents,
-                      item.endEurCents,
-                    ]),
-                  );
-                  const scale = 220 / max;
-                  return (
-                    <g key={row.label}>
-                      <rect
-                        x={index * 120 + 20}
-                        y={
-                          250 -
-                          Math.max(row.startEurCents, row.endEurCents) * scale
-                        }
-                        width="70"
-                        height={Math.max(
-                          1,
-                          Math.abs(row.endEurCents - row.startEurCents) * scale,
-                        )}
-                        fill={row.valueEurCents < 0 ? '#607751' : '#8a9e7c'}
-                      />
-                      <text
-                        x={index * 120 + 55}
-                        y="280"
-                        textAnchor="middle"
-                        fontSize="13"
-                      >
-                        {row.label}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+                <svg
+                  viewBox="0 0 900 390"
+                  role="img"
+                  aria-label={`MRR movement from ${eur(answer.waterfall.data[0]?.startEurCents ?? 0)} to ${eur(answer.waterfall.data.at(-1)?.endEurCents ?? 0)}`}
+                >
+                  {(() => {
+                    const rows = answer.waterfall!.data;
+                    const maxValue = Math.max(
+                      1,
+                      ...rows.flatMap((row) => [
+                        row.startEurCents,
+                        row.endEurCents,
+                      ]),
+                    );
+                    const axisMax =
+                      Math.ceil(maxValue / 4 / 10000) * 10000 * 4 || 10000;
+                    const left = 84;
+                    const right = 880;
+                    const top = 28;
+                    const bottom = 310;
+                    const scale = (bottom - top) / axisMax;
+                    const step = (right - left) / rows.length;
+                    const y = (value: number) => bottom - value * scale;
+                    return (
+                      <>
+                        {[0, 1, 2, 3, 4].map((tick) => {
+                          const value = (axisMax * tick) / 4;
+                          const tickY = y(value);
+                          return (
+                            <g key={tick}>
+                              <line
+                                x1={left}
+                                x2={right}
+                                y1={tickY}
+                                y2={tickY}
+                                className="chart-gridline"
+                              />
+                              <text
+                                x={left - 12}
+                                y={tickY + 4}
+                                textAnchor="end"
+                                className="chart-axis-label"
+                              >
+                                {eur(value)}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        <line
+                          x1={left}
+                          x2={left}
+                          y1={top}
+                          y2={bottom}
+                          className="chart-axis"
+                        />
+                        {rows.map((row, index) => {
+                          const x = left + step * index + (step - 78) / 2;
+                          const startY = y(row.startEurCents);
+                          const endY = y(row.endEurCents);
+                          const barY = Math.min(startY, endY);
+                          const barHeight = Math.max(
+                            2,
+                            Math.abs(endY - startY),
+                          );
+                          const nextX =
+                            left + step * (index + 1) + (step - 78) / 2;
+                          const isTotal =
+                            index === 0 || index === rows.length - 1;
+                          const labelY =
+                            row.valueEurCents < 0
+                              ? barY + barHeight + 17
+                              : barY - 8;
+                          return (
+                            <g key={row.label}>
+                              <rect
+                                x={x}
+                                y={barY}
+                                width="78"
+                                height={barHeight}
+                                className={
+                                  isTotal
+                                    ? 'chart-total'
+                                    : row.valueEurCents < 0
+                                      ? 'chart-negative'
+                                      : 'chart-positive'
+                                }
+                              />
+                              <text
+                                x={x + 39}
+                                y={labelY}
+                                textAnchor="middle"
+                                className="chart-value-label"
+                              >
+                                {eur(row.valueEurCents)}
+                              </text>
+                              <text
+                                x={x + 39}
+                                y="339"
+                                textAnchor="middle"
+                                className="chart-category-label"
+                              >
+                                {row.label}
+                              </text>
+                              {index < rows.length - 1 && (
+                                <line
+                                  x1={x + 78}
+                                  x2={nextX}
+                                  y1={endY}
+                                  y2={endY}
+                                  className="chart-connector"
+                                />
+                              )}
+                            </g>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
               <div
                 className="table-scroll"
                 tabIndex={0}
@@ -704,7 +820,28 @@ function App() {
           <section className="result-section context-section">
             <h2>Context</h2>
             {answer.context.length ? (
-              answer.context.map(claim)
+              answer.context.map((item, index) => (
+                <div className="claim context-claim" key={index}>
+                  <small>Source context · causality unconfirmed</small>
+                  <MarkdownContent text={item.text} />
+                  <details className="original-excerpt">
+                    <summary>View original excerpt</summary>
+                    <pre>{item.text}</pre>
+                  </details>
+                  <div className="flex flex-wrap gap-2">
+                    {item.evidenceIds.map((id) => (
+                      <button
+                        type="button"
+                        key={id}
+                        onClick={() => void inspect(id)}
+                        aria-controls="evidence-detail"
+                      >
+                        {citationLabel(id)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))
             ) : (
               <p>No scoped company context was retrieved.</p>
             )}
@@ -739,7 +876,7 @@ function App() {
                       onClick={() => void inspect(item.evidenceId)}
                       aria-controls="evidence-detail"
                     >
-                      Inspect {item.evidenceId}
+                      {citationLabel(item.evidenceId)}
                     </button>
                     <span>
                       {item.type.replaceAll('_', ' ')} · {item.sourceRef} ·
@@ -1146,8 +1283,14 @@ function App() {
                 </p>
                 <p className="meta-line">
                   Approved plan: {crossAnswer.record.plan.steps.join(' → ')} ·
-                  Planner: {crossAnswer.record.plan.planner} · Model synthesis:{' '}
-                  {crossAnswer.record.modelStatus}
+                  Plan source: {crossAnswer.record.plan.planner} · Hypothesis
+                  review: {crossAnswer.record.modelStatus}
+                </p>
+                <p className="ai-explanation">
+                  {crossAnswer.record.plan.planner === 'model' ||
+                  crossAnswer.record.modelStatus !== 'disabled'
+                    ? 'AI may select among approved context sources and propose tentative explanations. The app checks each proposal against cited evidence; MRR values and customer scope come from validated data.'
+                    : 'No AI model was used for this context follow-up. The app queried the approved sources; MRR values and customer scope come from validated data.'}
                 </p>
                 {crossAnswer.evidence
                   .filter(
@@ -1233,9 +1376,13 @@ function App() {
                   .map((item) => (
                     <div className="cross-source" key={item.evidenceId}>
                       <h3>Document context</h3>
-                      <blockquote>
-                        {String(item.content.excerpt ?? '')}
-                      </blockquote>
+                      <MarkdownContent
+                        text={String(item.content.excerpt ?? '')}
+                      />
+                      <details className="original-excerpt">
+                        <summary>View original excerpt</summary>
+                        <pre>{String(item.content.excerpt ?? '')}</pre>
+                      </details>
                       <button
                         type="button"
                         onClick={() =>
@@ -1329,7 +1476,8 @@ function App() {
                       aria-controls="evidence-detail"
                       onClick={() => void inspect(item.evidenceId)}
                     >
-                      Inspect trail {item.evidenceId}
+                      Inspect trail ·{' '}
+                      {citationLabel(item.evidenceId).replace(/^Inspect /, '')}
                     </button>
                   </li>
                 ))}
@@ -1370,10 +1518,29 @@ function App() {
                 <dt>Integrity</dt>
                 <dd>{evidence.integrity}</dd>
               </dl>
-              <h3>Scope</h3>
-              <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
-              <h3>Supporting values or document excerpt</h3>
-              <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
+              <details className="evidence-technical">
+                <summary>Technical scope</summary>
+                <pre>{JSON.stringify(evidence.scope, null, 2)}</pre>
+              </details>
+              {evidence.type === 'document_chunk' &&
+              typeof evidence.content.excerpt === 'string' ? (
+                <>
+                  <h3>Supporting values or document excerpt</h3>
+                  <MarkdownContent text={evidence.content.excerpt} />
+                  <details className="original-excerpt">
+                    <summary>View original excerpt</summary>
+                    <pre>{evidence.content.excerpt}</pre>
+                  </details>
+                </>
+              ) : (
+                <>
+                  <h3>Supporting values or document excerpt</h3>
+                  <details className="evidence-technical">
+                    <summary>View structured values</summary>
+                    <pre>{JSON.stringify(evidence.content, null, 2)}</pre>
+                  </details>
+                </>
+              )}
             </>
           ) : (
             !evidenceBusy &&

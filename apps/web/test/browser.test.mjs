@@ -161,6 +161,7 @@ test('synthetic customer churn follow-up shows retained 1 / 4 and inspectable ci
     .last()
     .click();
   await page.getByRole('heading', { name: 'Evidence detail' }).waitFor();
+  await page.getByText('View structured values', { exact: true }).click();
   await page.getByText(/customer_churn_rate = churned_customers/).waitFor();
   assert.match(
     await page.locator('#evidence-detail').textContent(),
@@ -291,7 +292,7 @@ test('service and evidence failures are recoverable without stale evidence', asy
   );
 });
 
-test('malformed answers fail closed and document markup renders as text', async (t) => {
+test('malformed answers fail closed and document Markdown renders safely with its source available', async (t) => {
   const page = await pageForTest(t);
   await page.route('**/answer', (route) =>
     route.fulfill({
@@ -309,7 +310,26 @@ test('malformed answers fail closed and document markup renders as text', async 
     .waitFor();
   assert.equal(await page.getByRole('article').count(), 0);
   await page.unroute('**/answer');
+  await page.route('**/answer', async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.answer.context[0].text =
+      '# August sales review\n\n**Synthetic context** with source formatting.';
+    await route.fulfill({ response, json: body });
+  });
   await complete(page);
+  assert.equal(
+    await page.getByRole('heading', { name: 'August sales review' }).count(),
+    1,
+  );
+  assert.equal(
+    await page.locator('.context-claim strong').textContent(),
+    'Synthetic context',
+  );
+  assert.equal(
+    await page.getByRole('button', { name: /^Inspect source excerpt/ }).count(),
+    1,
+  );
   await page.route('**/evidence/**', async (route) => {
     const response = await route.fetch();
     const body = await response.json();
@@ -318,12 +338,11 @@ test('malformed answers fail closed and document markup renders as text', async 
     };
     await route.fulfill({ response, json: body });
   });
+  await page.getByRole('button', { name: /^Inspect source excerpt/ }).click();
   await page
-    .getByRole('button', { name: /^Inspect / })
-    .first()
-    .click();
-  await page
-    .getByRole('heading', { name: 'Supporting values or document excerpt' })
+    .getByRole('heading', {
+      name: 'Supporting values or document excerpt',
+    })
     .waitFor();
   assert.match(
     await page.locator('#evidence-detail').textContent(),
@@ -331,12 +350,28 @@ test('malformed answers fail closed and document markup renders as text', async 
   );
   assert.equal(await page.locator('#evidence-detail img').count(), 0);
   assert.equal(await page.evaluate(() => window.injected), undefined);
+  await page
+    .locator('#evidence-detail')
+    .getByText('View original excerpt', { exact: true })
+    .click();
+  assert.match(
+    await page.locator('#evidence-detail').textContent(),
+    /<img src=x/,
+  );
 });
 
 test('synthetic chart and retained trail support scoped values and keyboard inspection', async (t) => {
   const page = await pageForTest(t, { width: 390, height: 844 });
   await page.getByLabel('Customer IDs (optional)').fill('cust_riviera');
   await complete(page);
+  assert.equal(
+    await page.locator('.waterfall-section svg .chart-gridline').count(),
+    5,
+  );
+  assert.equal(
+    await page.locator('.waterfall-section svg .chart-connector').count(),
+    5,
+  );
   const table = page.getByRole('table', { name: 'Plan MRR values (EUR)' });
   assert.match(await table.textContent(), /EUR 300.00/);
   assert.doesNotMatch(await table.textContent(), /2500.00/);

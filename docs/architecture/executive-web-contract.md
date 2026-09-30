@@ -32,9 +32,11 @@ state; collapsed inputs are not focusable. On narrow screens the request comes
 first. Thin rules separate result sections.
 Fixture and source provenance remain in their records.
 It shows the resolved month, previous-month comparison, and customer scope.
-Every supplied claim citation opens the authenticated evidence route. Evidence
-shows source references, scope, freshness, integrity, and supporting content.
-Document excerpts are rendered as text and cannot execute markup.
+Claim citations use human-readable evidence descriptions and open the
+authenticated evidence route. Evidence shows source references, scope,
+freshness, integrity, and supporting content. Retrieved document excerpts use a
+safe Markdown subset; raw HTML is never interpreted, and the verbatim excerpt
+remains available for inspection.
 
 A username and password sign-in obtains an eight-hour server session. The page displays the active access scope and supports sign-out. Session and investigation bearer tokens live only in page memory. They never enter URLs or browser
 storage. Reloading clears access; a new submission clears the previous result.
@@ -116,8 +118,9 @@ results remain available through their token-protected routes after restart.
 
 ## Cross-source workspace
 
-Completed MRR answers show a reconciled revenue-movement waterfall with a value
-table and evidence inspection. Cross-source actions use the selected customer
+Completed MRR answers show a reconciled revenue-movement waterfall with a
+labeled EUR value axis, movement values, connecting balances, a value table, and
+evidence inspection. Cross-source actions use the selected customer
 drill-down when present, otherwise the initial MRR investigation. Busy status
 and the retained approved plan identify the contextual investigation; execution
 remains synchronous without streaming. CRM, support and usage sections show source
@@ -125,3 +128,7 @@ records, deterministic active-user deltas, coverage and freshness, document
 excerpts, tentative model hypotheses and explicit limitations. Each contextual
 child has a separate evidence token. Parent answers remain visible. See the
 [cross-source contract](cross-source-investigation-contract.md).
+The cross-source result explains the model's limited role: it may propose
+approved context sources and tentative evidence-linked hypotheses, while the
+application validates proposals and presents deterministic MRR values and the
+retained customer scope.
